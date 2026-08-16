@@ -1,4 +1,4 @@
-package com.example.avatar_app
+package com.avatar.avatarapp
 
 import io.flutter.embedding.android.FlutterActivity
 
