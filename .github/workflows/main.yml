@@ -1,3 +1,4 @@
+
 name: Android Build Test
 
 on:
@@ -24,8 +25,11 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Create test Flutter app
-        run: flutter create .
+      - name: Create Flutter project
+        run: flutter create --project-name avatar_app .
+
+      - name: Get dependencies
+        run: flutter pub get
 
       - name: Build APK
         run: flutter build apk --release
