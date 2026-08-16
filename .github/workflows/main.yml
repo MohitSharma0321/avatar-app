@@ -1,5 +1,4 @@
-
-name: Android Build Test
+name: Build Avatar App
 
 on:
   workflow_dispatch:
@@ -13,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -26,25 +25,32 @@ jobs:
           cache: true
 
       - name: Create Flutter project
-        run: flutter create --project-name avatar_app .
+        run: flutter create --project-name avatar_app build_app
+
+      - name: Copy app code
+        run: |
+          cp -r app/lib/* build_app/lib/
 
       - name: Get dependencies
+        working-directory: build_app
         run: flutter pub get
 
       - name: Build APK
+        working-directory: build_app
         run: flutter build apk --release
 
       - name: Build AAB
+        working-directory: build_app
         run: flutter build appbundle --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: avatar-app-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build_app/build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: avatar-app-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+          path: build_app/build/app/outputs/bundle/release/app-release.aab
