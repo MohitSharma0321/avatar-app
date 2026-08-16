@@ -29,13 +29,7 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
-        
-      - name: Get Android SHA fingerprints
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew signingReport
-          
+   
       - name: Build APK
         run: flutter build apk --release
 
