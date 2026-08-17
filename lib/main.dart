@@ -27,9 +27,9 @@ class AvatarApp extends StatelessWidget {
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // AUTH GATE
-// --------------------------------------------------
+// ==================================================
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -57,9 +57,9 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-// --------------------------------------------------
-// WELCOME
-// --------------------------------------------------
+// ==================================================
+// WELCOME SCREEN
+// ==================================================
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -96,6 +96,7 @@ class WelcomeScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 40),
+
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -111,7 +112,9 @@ class WelcomeScreen extends StatelessWidget {
                     child: const Text('Create Account'),
                   ),
                 ),
+
                 const SizedBox(height: 12),
+
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
@@ -135,9 +138,9 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // CREATE ACCOUNT
-// --------------------------------------------------
+// ==================================================
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -157,11 +160,17 @@ class _CreateAccountScreenState
   bool hidePassword = true;
 
   Future<void> createAccount() async {
+    final name = nameController.text.trim();
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      showMessage('Email और password भरें');
+    if (name.isEmpty) {
+      showMessage('Name भरें');
+      return;
+    }
+
+    if (email.isEmpty) {
+      showMessage('Email भरें');
       return;
     }
 
@@ -172,7 +181,9 @@ class _CreateAccountScreenState
       return;
     }
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+    });
 
     try {
       final credential = await FirebaseAuth.instance
@@ -181,11 +192,7 @@ class _CreateAccountScreenState
         password: password,
       );
 
-      if (nameController.text.trim().isNotEmpty) {
-        await credential.user?.updateDisplayName(
-          nameController.text.trim(),
-        );
-      }
+      await credential.user?.updateDisplayName(name);
 
       if (!mounted) return;
 
@@ -207,13 +214,17 @@ class _CreateAccountScreenState
     }
 
     if (mounted) {
-      setState(() => loading = false);
+      setState(() {
+        loading = false;
+      });
     }
   }
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+      ),
     );
   }
 
@@ -244,7 +255,9 @@ class _CreateAccountScreenState
                   fontWeight: FontWeight.bold,
                 ),
               ),
+
               const SizedBox(height: 24),
+
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(
@@ -253,28 +266,35 @@ class _CreateAccountScreenState
                   prefixIcon: Icon(Icons.person),
                 ),
               ),
+
               const SizedBox(height: 16),
+
               TextField(
                 controller: emailController,
-                keyboardType: TextInputType.emailAddress,
+                keyboardType:
+                    TextInputType.emailAddress,
                 decoration: const InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.email),
                 ),
               ),
+
               const SizedBox(height: 16),
+
               TextField(
                 controller: passwordController,
                 obscureText: hidePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.lock),
+                  prefixIcon:
+                      const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     onPressed: () {
                       setState(() {
-                        hidePassword = !hidePassword;
+                        hidePassword =
+                            !hidePassword;
                       });
                     },
                     icon: Icon(
@@ -285,32 +305,45 @@ class _CreateAccountScreenState
                   ),
                 ),
               ),
+
               const SizedBox(height: 24),
+
               SizedBox(
                 height: 50,
                 child: FilledButton(
-                  onPressed: loading ? null : createAccount,
+                  onPressed:
+                      loading ? null : createAccount,
                   child: loading
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(),
+                          child:
+                              CircularProgressIndicator(),
                         )
-                      : const Text('Create Account'),
+                      : const Text(
+                          'Create Account',
+                        ),
                 ),
               ),
+
               const SizedBox(height: 14),
+
               OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const PhoneAuthScreen(),
+                      builder: (_) =>
+                          const PhoneAuthScreen(),
                     ),
                   );
                 },
-                icon: const Icon(Icons.phone_android),
-                label: const Text('Create Account with Phone OTP'),
+                icon: const Icon(
+                  Icons.phone_android,
+                ),
+                label: const Text(
+                  'Create Account with Phone OTP',
+                ),
               ),
             ],
           ),
@@ -320,18 +353,20 @@ class _CreateAccountScreenState
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // LOGIN
-// --------------------------------------------------
+// ==================================================
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<LoginScreen> createState() =>
+      _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState
+    extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
@@ -347,10 +382,13 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+    });
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -358,7 +396,8 @@ class _LoginScreenState extends State<LoginScreen> {
       String message = 'Login failed';
 
       if (e.code == 'user-not-found' ||
-          e.code == 'invalid-credential') {
+          e.code == 'invalid-credential' ||
+          e.code == 'wrong-password') {
         message = 'Email या password गलत है';
       } else if (e.code == 'invalid-email') {
         message = 'Email सही नहीं है';
@@ -370,13 +409,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (mounted) {
-      setState(() => loading = false);
+      setState(() {
+        loading = false;
+      });
     }
   }
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+      ),
     );
   }
 
@@ -397,14 +440,18 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 30),
+
               const Icon(
                 Icons.account_circle,
                 size: 100,
               ),
+
               const SizedBox(height: 20),
+
               const Text(
                 'Welcome Back',
                 textAlign: TextAlign.center,
@@ -413,28 +460,35 @@ class _LoginScreenState extends State<LoginScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+
               const SizedBox(height: 30),
+
               TextField(
                 controller: emailController,
-                keyboardType: TextInputType.emailAddress,
+                keyboardType:
+                    TextInputType.emailAddress,
                 decoration: const InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.email),
                 ),
               ),
+
               const SizedBox(height: 16),
+
               TextField(
                 controller: passwordController,
                 obscureText: hidePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.lock),
+                  prefixIcon:
+                      const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     onPressed: () {
                       setState(() {
-                        hidePassword = !hidePassword;
+                        hidePassword =
+                            !hidePassword;
                       });
                     },
                     icon: Icon(
@@ -445,28 +499,42 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 24),
+
               SizedBox(
                 height: 50,
                 child: FilledButton(
                   onPressed: loading ? null : login,
                   child: loading
-                      ? const CircularProgressIndicator()
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child:
+                              CircularProgressIndicator(),
+                        )
                       : const Text('Login'),
                 ),
               ),
+
               const SizedBox(height: 14),
+
               OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const PhoneAuthScreen(),
+                      builder: (_) =>
+                          const PhoneAuthScreen(),
                     ),
                   );
                 },
-                icon: const Icon(Icons.phone_android),
-                label: const Text('Login with Phone OTP'),
+                icon: const Icon(
+                  Icons.phone_android,
+                ),
+                label: const Text(
+                  'Login with Phone OTP',
+                ),
               ),
             ],
           ),
@@ -476,9 +544,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // PHONE OTP
-// --------------------------------------------------
+// ==================================================
 
 class PhoneAuthScreen extends StatefulWidget {
   const PhoneAuthScreen({super.key});
@@ -488,7 +556,8 @@ class PhoneAuthScreen extends StatefulWidget {
       _PhoneAuthScreenState();
 }
 
-class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
+class _PhoneAuthScreenState
+    extends State<PhoneAuthScreen> {
   final phoneController = TextEditingController();
   final otpController = TextEditingController();
 
@@ -512,7 +581,9 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       return;
     }
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+    });
 
     try {
       await FirebaseAuth.instance.verifyPhoneNumber(
@@ -521,41 +592,52 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
         verificationCompleted:
             (PhoneAuthCredential credential) async {
           try {
-            await FirebaseAuth.instance.signInWithCredential(
+            await FirebaseAuth.instance
+                .signInWithCredential(
               credential,
             );
           } catch (e) {
             if (mounted) {
-              showMessage('Automatic verification failed');
+              showMessage(
+                'Automatic verification failed',
+              );
             }
           }
         },
 
-        verificationFailed: (FirebaseAuthException e) {
-          if (mounted) {
-            setState(() => loading = false);
+        verificationFailed:
+            (FirebaseAuthException e) {
+          if (!mounted) return;
 
-            String message =
-                'OTP भेजने में समस्या हुई';
+          setState(() {
+            loading = false;
+          });
 
-            if (e.code == 'invalid-phone-number') {
-              message = 'Phone number सही नहीं है';
-            } else if (e.code == 'too-many-requests') {
-              message =
-                  'बहुत ज्यादा attempts हो गए। थोड़ी देर बाद try करें';
-            } else if (e.code == 'quota-exceeded') {
-              message =
-                  'Firebase SMS quota समाप्त हो गया है';
-            } else if (e.code == 'operation-not-allowed') {
-              message =
-                  'Firebase में Phone Authentication enable करें';
-            }
+          String message =
+              'OTP भेजने में समस्या हुई';
 
-            showMessage(message);
+          if (e.code ==
+              'invalid-phone-number') {
+            message = 'Phone number सही नहीं है';
+          } else if (e.code ==
+              'too-many-requests') {
+            message =
+                'बहुत ज्यादा attempts हो गए। थोड़ी देर बाद try करें';
+          } else if (e.code ==
+              'quota-exceeded') {
+            message =
+                'Firebase SMS quota समाप्त हो गया है';
+          } else if (e.code ==
+              'operation-not-allowed') {
+            message =
+                'Firebase में Phone Authentication enable करें';
           }
+
+          showMessage(message);
         },
 
-        codeSent: (String id, int? resendToken) {
+        codeSent:
+            (String id, int? resendToken) {
           if (!mounted) return;
 
           setState(() {
@@ -567,18 +649,26 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
           showMessage('OTP भेज दिया गया है');
         },
 
-        codeAutoRetrievalTimeout: (String id) {
+        codeAutoRetrievalTimeout:
+            (String id) {
           verificationId = id;
 
           if (mounted) {
-            setState(() => loading = false);
+            setState(() {
+              loading = false;
+            });
           }
         },
       );
     } catch (e) {
       if (mounted) {
-        setState(() => loading = false);
-        showMessage('OTP भेजने में समस्या हुई');
+        setState(() {
+          loading = false;
+        });
+
+        showMessage(
+          'OTP भेजने में समस्या हुई',
+        );
       }
     }
   }
@@ -596,39 +686,53 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       return;
     }
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+    });
 
     try {
-      final credential = PhoneAuthProvider.credential(
+      final credential =
+          PhoneAuthProvider.credential(
         verificationId: verificationId!,
         smsCode: otp,
       );
 
-      await FirebaseAuth.instance.signInWithCredential(
+      await FirebaseAuth.instance
+          .signInWithCredential(
         credential,
       );
     } on FirebaseAuthException catch (e) {
-      String message = 'OTP verify नहीं हुआ';
+      String message =
+          'OTP verify नहीं हुआ';
 
-      if (e.code == 'invalid-verification-code') {
+      if (e.code ==
+          'invalid-verification-code') {
         message = 'OTP गलत है';
-      } else if (e.code == 'session-expired') {
-        message = 'OTP expire हो गया। नया OTP भेजें';
+      } else if (e.code ==
+          'session-expired') {
+        message =
+            'OTP expire हो गया। नया OTP भेजें';
       }
 
       showMessage(message);
     } catch (e) {
-      showMessage('OTP verify करने में समस्या हुई');
+      showMessage(
+        'OTP verify करने में समस्या हुई',
+      );
     }
 
     if (mounted) {
-      setState(() => loading = false);
+      setState(() {
+        loading = false;
+      });
     }
   }
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+      ),
     );
   }
 
@@ -649,14 +753,18 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 25),
+
               const Icon(
                 Icons.phone_android,
                 size: 90,
               ),
+
               const SizedBox(height: 20),
+
               const Text(
                 'Phone Verification',
                 textAlign: TextAlign.center,
@@ -665,46 +773,15 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+
               const SizedBox(height: 10),
+
               const Text(
                 'अपने phone number पर OTP प्राप्त करें',
                 textAlign: TextAlign.center,
               ),
+
               const SizedBox(height: 30),
 
               TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  hintText: '+91XXXXXXXXXX',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              SizedBox(
-                height: 50,
-                child: FilledButton(
-                  onPressed: loading ? null : sendOTP,
-                  child: loading
-                      ? const CircularProgressIndicator()
-                      : const Text('Send OTP'),
-                ),
-              ),
-
-              if (codeSent) ...[
-                const SizedBox(height: 30),
-
-                TextField(
-                  controller: otpController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: const InputDecoration(
-                    labelText: 'Enter OTP',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock_outline),
-                  ),
-         
+                controller: phoneContr
