@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  generate:
+  sha:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,11 +20,16 @@ jobs:
           flutter-version: '3.44.7'
           channel: stable
 
-      - name: Generate Gradle wrapper
-        run: |
-          flutter create --project-name avatar_app .
+      - name: Generate Flutter project files
+        run: flutter create --project-name avatar_app .
 
-            - name: Generate debug keystore
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Generate debug keystore
         run: |
           mkdir -p ~/.config/.android
           keytool -genkeypair -v \
