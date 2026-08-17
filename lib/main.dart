@@ -174,7 +174,10 @@ Future<void> _signInWithGoogle(
   try {
     final GoogleSignInAccount googleUser =
     await GoogleSignIn.instance.authenticate(
-  scopeHint: const ['email', 'profile'],
+  scopeHint: const [
+    'email',
+    'profile',
+  ],
 );
     
     final GoogleSignInAuthentication googleAuth =
