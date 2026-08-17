@@ -27,9 +27,9 @@ class AvatarApp extends StatelessWidget {
   }
 }
 
-// ============================================================
+// ==================================================
 // AUTH GATE
-// ============================================================
+// ==================================================
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -57,9 +57,9 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-// ============================================================
+// ==================================================
 // WELCOME SCREEN
-// ============================================================
+// ==================================================
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -96,6 +96,7 @@ class WelcomeScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 40),
+
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -110,7 +111,9 @@ class WelcomeScreen extends StatelessWidget {
                     child: const Text('Create Account'),
                   ),
                 ),
+
                 const SizedBox(height: 12),
+
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
@@ -134,9 +137,9 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-// ============================================================
+// ==================================================
 // CREATE ACCOUNT
-// ============================================================
+// ==================================================
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -146,7 +149,8 @@ class CreateAccountScreen extends StatefulWidget {
       _CreateAccountScreenState();
 }
 
-class _CreateAccountScreenState extends State<CreateAccountScreen> {
+class _CreateAccountScreenState
+    extends State<CreateAccountScreen> {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -155,27 +159,18 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   bool hidePassword = true;
 
   Future<void> createAccount() async {
-    final name = nameController.text.trim();
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    if (name.isEmpty) {
-      showMessage('Name भरें');
-      return;
-    }
-
-    if (email.isEmpty) {
-      showMessage('Email भरें');
-      return;
-    }
-
-    if (password.isEmpty) {
-      showMessage('Password भरें');
+    if (email.isEmpty || password.isEmpty) {
+      showMessage('Email और password भरें');
       return;
     }
 
     if (password.length < 6) {
-      showMessage('Password कम से कम 6 characters का होना चाहिए');
+      showMessage(
+        'Password कम से कम 6 characters का होना चाहिए',
+      );
       return;
     }
 
@@ -184,13 +179,17 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     });
 
     try {
-      final credential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      await credential.user?.updateDisplayName(name);
+      final name = nameController.text.trim();
+
+      if (name.isNotEmpty) {
+        await credential.user?.updateDisplayName(name);
+      }
 
       if (!mounted) return;
 
@@ -207,7 +206,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       }
 
       showMessage(message);
-    } catch (e) {
+    } catch (_) {
       showMessage('कुछ गलत हो गया');
     }
 
@@ -251,7 +250,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+
               const SizedBox(height: 24),
+
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(
@@ -260,7 +261,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   prefixIcon: Icon(Icons.person),
                 ),
               ),
+
               const SizedBox(height: 16),
+
               TextField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -270,7 +273,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   prefixIcon: Icon(Icons.email),
                 ),
               ),
+
               const SizedBox(height: 16),
+
               TextField(
                 controller: passwordController,
                 obscureText: hidePassword,
@@ -292,7 +297,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 24),
+
               SizedBox(
                 height: 50,
                 child: FilledButton(
@@ -301,12 +308,16 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Text('Create Account'),
                 ),
               ),
+
               const SizedBox(height: 14),
+
               OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -317,7 +328,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   );
                 },
                 icon: const Icon(Icons.phone_android),
-                label: const Text('Create Account with Phone OTP'),
+                label: const Text(
+                  'Create Account with Phone OTP',
+                ),
               ),
             ],
           ),
@@ -327,9 +340,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   }
 }
 
-// ============================================================
+// ==================================================
 // LOGIN
-// ============================================================
+// ==================================================
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -371,10 +384,12 @@ class _LoginScreenState extends State<LoginScreen> {
         message = 'Email या password गलत है';
       } else if (e.code == 'invalid-email') {
         message = 'Email सही नहीं है';
+      } else if (e.code == 'wrong-password') {
+        message = 'Password गलत है';
       }
 
       showMessage(message);
-    } catch (e) {
+    } catch (_) {
       showMessage('कुछ गलत हो गया');
     }
 
@@ -411,11 +426,14 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 30),
+
               const Icon(
                 Icons.account_circle,
                 size: 100,
               ),
+
               const SizedBox(height: 20),
+
               const Text(
                 'Welcome Back',
                 textAlign: TextAlign.center,
@@ -424,7 +442,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+
               const SizedBox(height: 30),
+
               TextField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -434,7 +454,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   prefixIcon: Icon(Icons.email),
                 ),
               ),
+
               const SizedBox(height: 16),
+
               TextField(
                 controller: passwordController,
                 obscureText: hidePassword,
@@ -456,7 +478,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 24),
+
               SizedBox(
                 height: 50,
                 child: FilledButton(
@@ -465,12 +489,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Text('Login'),
                 ),
               ),
+
               const SizedBox(height: 14),
+
               OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -491,18 +519,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ============================================================
+// ==================================================
 // PHONE OTP
-// ============================================================
+// ==================================================
 
 class PhoneAuthScreen extends StatefulWidget {
   const PhoneAuthScreen({super.key});
 
   @override
-  State<PhoneAuthScreen> createState() => _PhoneAuthScreenState();
+  State<PhoneAuthScreen> createState() =>
+      _PhoneAuthScreenState();
 }
 
-class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
+class _PhoneAuthScreenState
+    extends State<PhoneAuthScreen> {
   final phoneController = TextEditingController();
   final otpController = TextEditingController();
 
@@ -519,9 +549,9 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       return;
     }
 
-    if (!RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(phone)) {
+    if (!phone.startsWith('+')) {
       showMessage(
-        'Country code के साथ number डालें, जैसे +919876543210',
+        'Country code के साथ number डालें, जैसे +91XXXXXXXXXX',
       );
       return;
     }
@@ -534,12 +564,13 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: phone,
 
-        verificationCompleted: (PhoneAuthCredential credential) async {
+        verificationCompleted:
+            (PhoneAuthCredential credential) async {
           try {
             await FirebaseAuth.instance.signInWithCredential(
               credential,
             );
-          } catch (e) {
+          } catch (_) {
             if (mounted) {
               showMessage('Automatic verification failed');
             }
@@ -561,13 +592,14 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
             message =
                 'बहुत ज्यादा attempts हो गए। थोड़ी देर बाद try करें';
           } else if (e.code == 'quota-exceeded') {
-            message = 'Firebase SMS quota समाप्त हो गया है';
+            message =
+                'Firebase SMS quota समाप्त हो गया है';
           } else if (e.code == 'operation-not-allowed') {
             message =
                 'Firebase में Phone Authentication enable करें';
-          } else if (e.code == 'app-not-authorized') {
-            message =
-                'यह app Firebase में authorized नहीं है। SHA-1 और SHA-256 check करें';
+          } else if (e.message != null &&
+              e.message!.isNotEmpty) {
+            message = e.message!;
           }
 
           showMessage(message);
@@ -595,13 +627,14 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
           }
         },
       );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          loading = false;
-        });
-        showMessage('OTP भेजने में समस्या हुई');
-      }
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+      });
+
+      showMessage('OTP भेजने में समस्या हुई');
     }
   }
 
@@ -613,7 +646,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       return;
     }
 
-    if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
+    if (otp.length != 6) {
       showMessage('6 digit OTP डालें');
       return;
     }
@@ -637,11 +670,12 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
       if (e.code == 'invalid-verification-code') {
         message = 'OTP गलत है';
       } else if (e.code == 'session-expired') {
-        message = 'OTP expire हो गया। नया OTP भेजें';
+        message =
+            'OTP expire हो गया। नया OTP भेजें';
       }
 
       showMessage(message);
-    } catch (e) {
+    } catch (_) {
       showMessage('OTP verify करने में समस्या हुई');
     }
 
@@ -678,11 +712,14 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 25),
+
               const Icon(
                 Icons.phone_android,
                 size: 90,
               ),
+
               const SizedBox(height: 20),
+
               const Text(
                 'Phone Verification',
                 textAlign: TextAlign.center,
@@ -691,11 +728,14 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+
               const SizedBox(height: 10),
+
               const Text(
                 'अपने phone number पर OTP प्राप्त करें',
                 textAlign: TextAlign.center,
               ),
+
               const SizedBox(height: 30),
 
               TextField(
@@ -703,7 +743,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
                   labelText: 'Phone Number',
-                  hintText: '+919876543210',
+                  hintText: '+91XXXXXXXXXX',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.phone),
                 ),
@@ -715,6 +755,51 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                 height: 50,
                 child: FilledButton(
                   onPressed: loading ? null : sendOTP,
-                  child: loading
+                         child: loading
                       ? const SizedBox(
-              
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(),
+                        )
+                      : const Text('Send OTP'),
+                ),
+              ),
+
+              if (codeSent) ...[
+                const SizedBox(height: 30),
+
+                TextField(
+                  controller: otpController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'Enter OTP',
+                    hintText: '6 digit OTP',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                SizedBox(
+                  height: 50,
+                  child: FilledButton(
+                    onPressed: loading ? null : verifyOTP,
+                    child: loading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(),
+                          )
+                        : const Text('Verify OTP'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
