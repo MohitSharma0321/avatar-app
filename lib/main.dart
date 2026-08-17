@@ -9,7 +9,10 @@ Future<void> main() async {
   await Firebase.initializeApp();
 
   // Initialize Google Sign-In.
-  await GoogleSignIn.instance.initialize();
+  await GoogleSignIn.instance.initialize(
+  serverClientId:
+      '1031057616319-1htoaers6se9epkfdg6t8d4k38i4aeic.apps.googleusercontent.com',
+);
 
   runApp(const AvatarApp());
 }
@@ -172,13 +175,10 @@ Future<void> _signInWithGoogle(
   BuildContext context,
 ) async {
   try {
-    final GoogleSignInAccount googleUser =
+   final GoogleSignInAccount googleUser =
     await GoogleSignIn.instance.authenticate(
-  scopeHint: const [
-    'email',
-    'profile',
-  ],
-);
+  scopeHint: const ['email', 'profile'],
+); 
     
     final GoogleSignInAuthentication googleAuth =
         googleUser.authentication;
