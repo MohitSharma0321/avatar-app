@@ -1,18 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp();
-
-  // Initialize Google Sign-In.
-  await GoogleSignIn.instance.initialize(
-  serverClientId:
-      '1031057616319-1htoaers6se9epkfdg6t8d4k38i4aeic.apps.googleusercontent.com',
-);
 
   runApp(const AvatarApp());
 }
@@ -145,85 +138,12 @@ class WelcomeScreen extends StatelessWidget {
                     child: const Text('Login'),
                   ),
                 ),
-
-                const SizedBox(height: 12),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      _signInWithGoogle(context);
-                    },
-                    icon: const Icon(Icons.login),
-                    label: const Text('Continue with Google'),
-                  ),
-                ),
               ],
             ),
           ),
         ),
       ),
     );
-  }
-}
-
-// --------------------------------------------------
-// GOOGLE SIGN IN
-// --------------------------------------------------
-
-Future<void> _signInWithGoogle(
-  BuildContext context,
-) async {
-  try {
-   final GoogleSignInAccount googleUser =
-    await GoogleSignIn.instance.authenticate(
-  scopeHint: const ['email', 'profile'],
-); 
-    
-    final GoogleSignInAuthentication googleAuth =
-        googleUser.authentication;
-
-    final idToken = googleAuth.idToken;
-
-    if (idToken == null) {
-      if (context.mounted) {
-        _showMessage(
-          context,
-          'Google sign-in failed: ID token not received.',
-        );
-      }
-      return;
-    }
-
-    final credential =
-        GoogleAuthProvider.credential(
-      idToken: idToken,
-    );
-
-    await FirebaseAuth.instance.signInWithCredential(
-      credential,
-    );
-  } on GoogleSignInException catch (e) {
-    if (context.mounted) {
-      _showMessage(
-        context,
-        'Google sign-in failed: ${e.code}\n${e.description ?? 'No details'}',
-      );
-    }
-  } on FirebaseAuthException catch (e) {
-    if (context.mounted) {
-      _showMessage(
-        context,
-        'Firebase error: ${e.message ?? e.code}',
-      );
-    }
-  } catch (e) {
-    if (context.mounted) {
-      _showMessage(
-        context,
-        'Google sign-in failed.',
-      );
-    }
   }
 }
 
@@ -427,18 +347,6 @@ class _CreateAccountScreenState
                         ),
                 ),
               ),
-
-              const SizedBox(height: 14),
-
-              OutlinedButton.icon(
-                onPressed: () {
-                  _signInWithGoogle(context);
-                },
-                icon: const Icon(Icons.login),
-                label: const Text(
-                  'Continue with Google',
-                ),
-              ),
             ],
           ),
         ),
@@ -625,18 +533,6 @@ class _LoginScreenState
                       : const Text('Login'),
                 ),
               ),
-
-              const SizedBox(height: 14),
-
-              OutlinedButton.icon(
-                onPressed: () {
-                  _signInWithGoogle(context);
-                },
-                icon: const Icon(Icons.login),
-                label: const Text(
-                  'Continue with Google',
-                ),
-              ),
             ],
           ),
         ),
@@ -663,12 +559,8 @@ class HomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             onPressed: () async {
-              await GoogleSignIn.instance
-                  .signOut();
-
-              await FirebaseAuth.instance
-                  .signOut();
-            },
+  await FirebaseAuth.instance.signOut();
+},
             icon: const Icon(Icons.logout),
           ),
         ],
