@@ -1,3 +1,4 @@
+import 'package:flutter_3d_controller/flutter_3d_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -553,489 +554,67 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int currentIndex = 0;
-
-  final List<Widget> pages = const [
-    HomeTab(),
-    AvatarScreen(),
-    ProfileScreen(),
-    SettingsScreen(),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: pages[currentIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Avatar',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_circle_outlined),
-            selectedIcon: Icon(Icons.account_circle),
-            label: 'Profile',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// --------------------------------------------------
-// HOME TAB
-// --------------------------------------------------
-
-class HomeTab extends StatelessWidget {
-  const HomeTab({super.key});
+  final Flutter3DController controller =
+      Flutter3DController();
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Avatar'),
+        actions: [
+          IconButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+
+              if (mounted) {
+                setState(() {});
+              }
+            },
+            icon: const Icon(Icons.logout),
+          ),
+        ],
+      ),
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 20),
+
             const Text(
-              'Welcome to Avatar',
+              'Your Avatar',
               style: TextStyle(
-                fontSize: 30,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
               ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
+
+            Expanded(
+              child: Flutter3DViewer(
+                controller: controller,
+                src: 'assets/models/New_Project_18082026.glb',
+              ),
+            ),
+
+            const SizedBox(height: 10),
 
             Text(
               user?.displayName?.isNotEmpty == true
                   ? user!.displayName!
-                  : user?.email ?? 'User',
+                  : user?.email ?? '',
+              textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 17,
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            Container(
-              width: double.infinity,
-              height: 300,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest,
-              ),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.view_in_ar,
-                      size: 90,
-                    ),
-                    SizedBox(height: 15),
-                    Text(
-                      'Your 3D Avatar',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      '3D model will appear here',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: FilledButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const CreateAvatarScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.add),
-                label: const Text(
-                  'Create Avatar',
-                  style: TextStyle(fontSize: 17),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const AvatarScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.edit),
-                label: const Text(
-                  'Customize Avatar',
-                  style: TextStyle(fontSize: 17),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// --------------------------------------------------
-// AVATAR SCREEN
-// --------------------------------------------------
-
-class AvatarScreen extends StatelessWidget {
-  const AvatarScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Avatar'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest,
-                ),
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment:
-                        MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.view_in_ar,
-                        size: 100,
-                      ),
-                      SizedBox(height: 15),
-                      Text(
-                        '3D Avatar Preview',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '3D model coming next',
-                      ),
-                    ],
-                  ),
-                ),
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
               ),
             ),
 
             const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: FilledButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          const CreateAvatarScreen(),
-                    ),
-                  );
-                },
-                child: const Text(
-                  'Create / Customize Avatar',
-                ),
-              ),
-            ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// --------------------------------------------------
-// CREATE AVATAR
-// --------------------------------------------------
-
-class CreateAvatarScreen extends StatelessWidget {
-  const CreateAvatarScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Avatar'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              height: 280,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest,
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.view_in_ar,
-                  size: 100,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            const Text(
-              'Customize your Avatar',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            _optionButton(
-              context,
-              'Appearance',
-              Icons.face,
-            ),
-
-            _optionButton(
-              context,
-              'Hair',
-              Icons.face_retouching_natural,
-            ),
-
-            _optionButton(
-              context,
-              'Clothes',
-              Icons.checkroom,
-            ),
-
-            _optionButton(
-              context,
-              'Shoes',
-              Icons.directions_walk,
-            ),
-
-            _optionButton(
-              context,
-              'Accessories',
-              Icons.watch,
-            ),
-
-            const SizedBox(height: 20),
-
-            SizedBox(
-              height: 55,
-              child: FilledButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Avatar saved successfully!',
-                      ),
-                    ),
-                  );
-                },
-                child: const Text(
-                  'Save Avatar',
-                  style: TextStyle(fontSize: 17),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Widget _optionButton(
-    BuildContext context,
-    String title,
-    IconData icon,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: OutlinedButton.icon(
-        onPressed: () {},
-        icon: Icon(icon),
-        label: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(title),
-        ),
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(
-            double.infinity,
-            55,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// --------------------------------------------------
-// PROFILE
-// --------------------------------------------------
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: 55,
-                backgroundImage:
-                    user?.photoURL != null
-                        ? NetworkImage(user!.photoURL!)
-                        : null,
-                child: user?.photoURL == null
-                    ? const Icon(
-                        Icons.person,
-                        size: 60,
-                      )
-                    : null,
-              ),
-
-              const SizedBox(height: 20),
-
-              Text(
-                user?.displayName ?? 'User',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              Text(
-                user?.email ?? '',
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// --------------------------------------------------
-// SETTINGS
-// --------------------------------------------------
-
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
-      body: ListView(
-        children: [
-          const ListTile(
-            leading: Icon(Icons.person),
-            title: Text('Account'),
-          ),
-
-          const ListTile(
-            leading: Icon(Icons.notifications),
-            title: Text('Notifications'),
-          ),
-
-          const ListTile(
-            leading: Icon(Icons.lock),
-            title: Text('Privacy'),
-          ),
-
-          const ListTile(
-            leading: Icon(Icons.info),
-            title: Text('About Avatar'),
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Logout'),
-            onTap: () async {
-              await FirebaseAuth.instance.signOut();
-            },
-          ),
-        ],
       ),
     );
   }
