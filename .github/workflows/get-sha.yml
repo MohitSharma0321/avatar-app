@@ -1,0 +1,31 @@
+name: Generate SHA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.7'
+          channel: stable
+
+      - name: Generate Gradle wrapper
+        run: |
+          flutter create --project-name avatar_app .
+
+      - name: Get SHA fingerprints
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew signingReport
