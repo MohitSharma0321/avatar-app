@@ -37,9 +37,7 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
@@ -54,7 +52,7 @@ class AuthGate extends StatelessWidget {
 }
 
 // --------------------------------------------------
-// WELCOME SCREEN
+// WELCOME
 // --------------------------------------------------
 
 class WelcomeScreen extends StatelessWidget {
@@ -72,10 +70,7 @@ class WelcomeScreen extends StatelessWidget {
               children: [
                 const CircleAvatar(
                   radius: 70,
-                  child: Icon(
-                    Icons.person,
-                    size: 80,
-                  ),
+                  child: Icon(Icons.person, size: 80),
                 ),
                 const SizedBox(height: 28),
                 const Text(
@@ -92,7 +87,6 @@ class WelcomeScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 40),
-
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -107,9 +101,7 @@ class WelcomeScreen extends StatelessWidget {
                     child: const Text('Create Account'),
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
@@ -151,13 +143,210 @@ class _CreateAccountScreenState
   final emailController = TextEditingController();
   final phoneController = TextEditingController();
   final passwordController = TextEditingController();
+  final otpController = TextEditingController();
 
   bool loading = false;
+  bool otpSent = false;
+  bool phoneVerified = false;
   bool hidePassword = true;
 
+  String? verificationId;
+
+  void showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  String getFormattedPhone() {
+    String phone = phoneController.text.trim();
+
+    if (phone.startsWith('+')) {
+      return phone;
+    }
+
+    if (phone.startsWith('0')) {
+      phone = phone.substring(1);
+    }
+
+    return '+91$phone';
+  }
+
+  Future<void> sendOTP() async {
+    final phone = phoneController.text.trim();
+
+    if (phone.isEmpty) {
+      showMessage('Phone Number भरें');
+      return;
+    }
+
+    if (phone.length != 10) {
+      showMessage('10 digit Indian mobile number डालें');
+      return;
+    }
+
+    setState(() {
+      loading = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: getFormattedPhone(),
+
+        verificationCompleted:
+            (PhoneAuthCredential credential) async {
+          try {
+            await FirebaseAuth.instance.signInWithCredential(
+              credential,
+            );
+
+            if (mounted) {
+              setState(() {
+                phoneVerified = true;
+                otpSent = false;
+              });
+            }
+
+            showMessage('Phone automatically verified!');
+          } catch (_) {
+            showMessage('Phone verification failed');
+          }
+        },
+
+        verificationFailed: (FirebaseAuthException e) {
+          String message = 'OTP भेजने में समस्या हुई';
+
+          if (e.code == 'invalid-phone-number') {
+            message = 'Phone number सही नहीं है';
+          } else if (e.code == 'too-many-requests') {
+            message = 'बहुत ज्यादा attempts हो गए। बाद में try करें';
+          }
+
+          showMessage(message);
+
+          if (mounted) {
+            setState(() {
+              loading = false;
+            });
+          }
+        },
+
+        codeSent: (String id, int? resendToken) {
+          verificationId = id;
+
+          if (mounted) {
+            setState(() {
+              otpSent = true;
+              loading = false;
+            });
+          }
+
+          showMessage('OTP भेज दिया गया');
+        },
+
+        codeAutoRetrievalTimeout: (String id) {
+          verificationId = id;
+
+          if (mounted) {
+            setState(() {
+              loading = false;
+            });
+          }
+        },
+      );
+    } catch (_) {
+      showMessage('OTP भेजने में समस्या हुई');
+
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> verifyOTP() async {
+    final otp = otpController.text.trim();
+
+    if (verificationId == null) {
+      showMessage('पहले OTP भेजें');
+      return;
+    }
+
+    if (otp.length != 6) {
+      showMessage('6 digit OTP डालें');
+      return;
+    }
+
+    setState(() {
+      loading = true;
+    });
+
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId!,
+        smsCode: otp,
+      );
+
+      final currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser != null) {
+        await currentUser.linkWithCredential(credential);
+      } else {
+        await FirebaseAuth.instance.signInWithCredential(
+          credential,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          phoneVerified = true;
+          otpSent = false;
+          loading = false;
+        });
+      }
+
+      showMessage('Phone number verified successfully!');
+    } on FirebaseAuthException catch (e) {
+      String message = 'OTP verification failed';
+
+      if (e.code == 'invalid-verification-code') {
+        message = 'OTP गलत है';
+      } else if (e.code == 'session-expired') {
+        message = 'OTP expire हो गया। नया OTP भेजें';
+      } else if (e.code == 'credential-already-in-use') {
+        message = 'यह phone number किसी दूसरे account से जुड़ा है';
+      }
+
+      showMessage(message);
+
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
+    } catch (_) {
+      showMessage('OTP verification failed');
+
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
+    }
+  }
+
   Future<void> createAccount() async {
+    final name = nameController.text.trim();
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
+
+    if (name.isEmpty) {
+      showMessage('Name भरें');
+      return;
+    }
 
     if (email.isEmpty || password.isEmpty) {
       showMessage('Email और password भरें');
@@ -169,20 +358,42 @@ class _CreateAccountScreenState
       return;
     }
 
+    if (!phoneVerified) {
+      showMessage('पहले Phone Number verify करें');
+      return;
+    }
+
     setState(() {
       loading = true;
     });
 
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      User? user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        showMessage('Phone verification के बाद फिर से try करें');
+        return;
+      }
+
+      final credential =
+          EmailAuthProvider.credential(
         email: email,
         password: password,
       );
 
+      try {
+        await user.linkWithCredential(credential);
+      } on FirebaseAuthException catch (e) {
+        if (e.code != 'provider-already-linked') {
+          rethrow;
+        }
+      }
+
+      await user.updateDisplayName(name);
+
       if (!mounted) return;
 
       showMessage('Account successfully created!');
-      Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       String message = 'Account नहीं बन पाया';
 
@@ -192,6 +403,8 @@ class _CreateAccountScreenState
         message = 'Email सही नहीं है';
       } else if (e.code == 'weak-password') {
         message = 'Password बहुत weak है';
+      } else if (e.code == 'provider-already-linked') {
+        message = 'यह email पहले से linked है';
       }
 
       showMessage(message);
@@ -206,18 +419,13 @@ class _CreateAccountScreenState
     }
   }
 
-  void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
   @override
   void dispose() {
     nameController.dispose();
     emailController.dispose();
     phoneController.dispose();
     passwordController.dispose();
+    otpController.dispose();
     super.dispose();
   }
 
@@ -269,12 +477,71 @@ class _CreateAccountScreenState
               TextField(
                 controller: phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
+                enabled: !phoneVerified,
+                decoration: InputDecoration(
                   labelText: 'Phone Number',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
+                  hintText: '10 digit mobile number',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.phone),
+                  suffixIcon: phoneVerified
+                      ? const Icon(
+                          Icons.verified,
+                          color: Colors.green,
+                        )
+                      : null,
                 ),
               ),
+
+              const SizedBox(height: 12),
+
+              if (!phoneVerified)
+                SizedBox(
+                  height: 50,
+                  child: OutlinedButton.icon(
+                    onPressed: loading ? null : sendOTP,
+                    icon: const Icon(Icons.sms),
+                    label: Text(
+                      otpSent ? 'Resend OTP' : 'Send OTP',
+                    ),
+                  ),
+                ),
+
+              if (otpSent && !phoneVerified) ...[
+                const SizedBox(height: 16),
+
+                TextField(
+                  controller: otpController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'Enter OTP',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                ),
+
+                SizedBox(
+                  height: 50,
+                  child: FilledButton(
+                    onPressed: loading ? null : verifyOTP,
+                    child: loading
+                        ? const CircularProgressIndicator()
+                        : const Text('Verify OTP'),
+                  ),
+                ),
+              ],
+
+              if (phoneVerified) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Phone number verified ✓',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
 
               const SizedBox(height: 16),
 
@@ -309,21 +576,6 @@ class _CreateAccountScreenState
                   child: loading
                       ? const CircularProgressIndicator()
                       : const Text('Create Account'),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              SizedBox(
-                height: 50,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    showMessage(
-                      'Phone OTP functionality next step में connect होगी',
-                    );
-                  },
-                  icon: const Icon(Icons.sms),
-                  label: const Text('Verify with OTP'),
                 ),
               ),
             ],
@@ -500,62 +752,4 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Avatar'),
-        actions: [
-          IconButton(
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-            },
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircleAvatar(
-                radius: 60,
-                child: Icon(
-                  Icons.person,
-                  size: 70,
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              const Text(
-                'Welcome to Avatar!',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              Text(
-                user?.email ?? '',
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 30),
-
-              const Text(
-                'Your avatar journey starts here.',
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+  Widget bui
