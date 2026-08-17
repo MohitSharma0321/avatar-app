@@ -578,33 +578,16 @@ class _PhoneAuthScreenState
         },
 
         verificationFailed: (FirebaseAuthException e) {
-          if (!mounted) return;
+  if (!mounted) return;
 
-          setState(() {
-            loading = false;
-          });
+  setState(() {
+    loading = false;
+  });
 
-          String message = 'OTP भेजने में समस्या हुई';
-
-          if (e.code == 'invalid-phone-number') {
-            message = 'Phone number सही नहीं है';
-          } else if (e.code == 'too-many-requests') {
-            message =
-                'बहुत ज्यादा attempts हो गए। थोड़ी देर बाद try करें';
-          } else if (e.code == 'quota-exceeded') {
-            message =
-                'Firebase SMS quota समाप्त हो गया है';
-          } else if (e.code == 'operation-not-allowed') {
-            message =
-                'Firebase में Phone Authentication enable करें';
-          } else if (e.message != null &&
-              e.message!.isNotEmpty) {
-            message = e.message!;
-          }
-
-          showMessage(message);
-        },
-
+  showMessage(
+    'Firebase Error: ${e.code}\n${e.message ?? 'No details'}',
+  );
+},
         codeSent: (String id, int? resendToken) {
           if (!mounted) return;
 
