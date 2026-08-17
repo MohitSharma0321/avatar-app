@@ -27,9 +27,9 @@ class AvatarApp extends StatelessWidget {
   }
 }
 
-// ==================================================
+// ============================================================
 // AUTH GATE
-// ==================================================
+// ============================================================
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -57,9 +57,9 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-// ==================================================
+// ============================================================
 // WELCOME SCREEN
-// ==================================================
+// ============================================================
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -96,7 +96,6 @@ class WelcomeScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 40),
-
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -104,17 +103,14 @@ class WelcomeScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              const CreateAccountScreen(),
+                          builder: (_) => const CreateAccountScreen(),
                         ),
                       );
                     },
                     child: const Text('Create Account'),
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
@@ -138,9 +134,9 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-// ==================================================
+// ============================================================
 // CREATE ACCOUNT
-// ==================================================
+// ============================================================
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -150,8 +146,7 @@ class CreateAccountScreen extends StatefulWidget {
       _CreateAccountScreenState();
 }
 
-class _CreateAccountScreenState
-    extends State<CreateAccountScreen> {
+class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -174,10 +169,13 @@ class _CreateAccountScreenState
       return;
     }
 
+    if (password.isEmpty) {
+      showMessage('Password भरें');
+      return;
+    }
+
     if (password.length < 6) {
-      showMessage(
-        'Password कम से कम 6 characters का होना चाहिए',
-      );
+      showMessage('Password कम से कम 6 characters का होना चाहिए');
       return;
     }
 
@@ -186,8 +184,8 @@ class _CreateAccountScreenState
     });
 
     try {
-      final credential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
+      final credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -222,9 +220,7 @@ class _CreateAccountScreenState
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -255,9 +251,7 @@ class _CreateAccountScreenState
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 24),
-
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(
@@ -266,35 +260,28 @@ class _CreateAccountScreenState
                   prefixIcon: Icon(Icons.person),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               TextField(
                 controller: emailController,
-                keyboardType:
-                    TextInputType.emailAddress,
+                keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.email),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               TextField(
                 controller: passwordController,
                 obscureText: hidePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   border: const OutlineInputBorder(),
-                  prefixIcon:
-                      const Icon(Icons.lock),
+                  prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     onPressed: () {
                       setState(() {
-                        hidePassword =
-                            !hidePassword;
+                        hidePassword = !hidePassword;
                       });
                     },
                     icon: Icon(
@@ -305,45 +292,32 @@ class _CreateAccountScreenState
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
-
               SizedBox(
                 height: 50,
                 child: FilledButton(
-                  onPressed:
-                      loading ? null : createAccount,
+                  onPressed: loading ? null : createAccount,
                   child: loading
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child:
-                              CircularProgressIndicator(),
+                          child: CircularProgressIndicator(),
                         )
-                      : const Text(
-                          'Create Account',
-                        ),
+                      : const Text('Create Account'),
                 ),
               ),
-
               const SizedBox(height: 14),
-
               OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          const PhoneAuthScreen(),
+                      builder: (_) => const PhoneAuthScreen(),
                     ),
                   );
                 },
-                icon: const Icon(
-                  Icons.phone_android,
-                ),
-                label: const Text(
-                  'Create Account with Phone OTP',
-                ),
+                icon: const Icon(Icons.phone_android),
+                label: const Text('Create Account with Phone OTP'),
               ),
             ],
           ),
@@ -353,20 +327,18 @@ class _CreateAccountScreenState
   }
 }
 
-// ==================================================
+// ============================================================
 // LOGIN
-// ==================================================
+// ============================================================
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() =>
-      _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState
-    extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
@@ -387,8 +359,7 @@ class _LoginScreenState
     });
 
     try {
-      await FirebaseAuth.instance
-          .signInWithEmailAndPassword(
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -396,8 +367,7 @@ class _LoginScreenState
       String message = 'Login failed';
 
       if (e.code == 'user-not-found' ||
-          e.code == 'invalid-credential' ||
-          e.code == 'wrong-password') {
+          e.code == 'invalid-credential') {
         message = 'Email या password गलत है';
       } else if (e.code == 'invalid-email') {
         message = 'Email सही नहीं है';
@@ -417,9 +387,7 @@ class _LoginScreenState
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -440,18 +408,14 @@ class _LoginScreenState
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 30),
-
               const Icon(
                 Icons.account_circle,
                 size: 100,
               ),
-
               const SizedBox(height: 20),
-
               const Text(
                 'Welcome Back',
                 textAlign: TextAlign.center,
@@ -460,35 +424,28 @@ class _LoginScreenState
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 30),
-
               TextField(
                 controller: emailController,
-                keyboardType:
-                    TextInputType.emailAddress,
+                keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.email),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               TextField(
                 controller: passwordController,
                 obscureText: hidePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   border: const OutlineInputBorder(),
-                  prefixIcon:
-                      const Icon(Icons.lock),
+                  prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     onPressed: () {
                       setState(() {
-                        hidePassword =
-                            !hidePassword;
+                        hidePassword = !hidePassword;
                       });
                     },
                     icon: Icon(
@@ -499,9 +456,7 @@ class _LoginScreenState
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
-
               SizedBox(
                 height: 50,
                 child: FilledButton(
@@ -510,31 +465,23 @@ class _LoginScreenState
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child:
-                              CircularProgressIndicator(),
+                          child: CircularProgressIndicator(),
                         )
                       : const Text('Login'),
                 ),
               ),
-
               const SizedBox(height: 14),
-
               OutlinedButton.icon(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          const PhoneAuthScreen(),
+                      builder: (_) => const PhoneAuthScreen(),
                     ),
                   );
                 },
-                icon: const Icon(
-                  Icons.phone_android,
-                ),
-                label: const Text(
-                  'Login with Phone OTP',
-                ),
+                icon: const Icon(Icons.phone_android),
+                label: const Text('Login with Phone OTP'),
               ),
             ],
           ),
@@ -544,20 +491,18 @@ class _LoginScreenState
   }
 }
 
-// ==================================================
+// ============================================================
 // PHONE OTP
-// ==================================================
+// ============================================================
 
 class PhoneAuthScreen extends StatefulWidget {
   const PhoneAuthScreen({super.key});
 
   @override
-  State<PhoneAuthScreen> createState() =>
-      _PhoneAuthScreenState();
+  State<PhoneAuthScreen> createState() => _PhoneAuthScreenState();
 }
 
-class _PhoneAuthScreenState
-    extends State<PhoneAuthScreen> {
+class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   final phoneController = TextEditingController();
   final otpController = TextEditingController();
 
@@ -574,9 +519,9 @@ class _PhoneAuthScreenState
       return;
     }
 
-    if (!phone.startsWith('+')) {
+    if (!RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(phone)) {
       showMessage(
-        'Country code के साथ number डालें, जैसे +91XXXXXXXXXX',
+        'Country code के साथ number डालें, जैसे +919876543210',
       );
       return;
     }
@@ -589,55 +534,46 @@ class _PhoneAuthScreenState
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: phone,
 
-        verificationCompleted:
-            (PhoneAuthCredential credential) async {
+        verificationCompleted: (PhoneAuthCredential credential) async {
           try {
-            await FirebaseAuth.instance
-                .signInWithCredential(
+            await FirebaseAuth.instance.signInWithCredential(
               credential,
             );
           } catch (e) {
             if (mounted) {
-              showMessage(
-                'Automatic verification failed',
-              );
+              showMessage('Automatic verification failed');
             }
           }
         },
 
-        verificationFailed:
-            (FirebaseAuthException e) {
+        verificationFailed: (FirebaseAuthException e) {
           if (!mounted) return;
 
           setState(() {
             loading = false;
           });
 
-          String message =
-              'OTP भेजने में समस्या हुई';
+          String message = 'OTP भेजने में समस्या हुई';
 
-          if (e.code ==
-              'invalid-phone-number') {
+          if (e.code == 'invalid-phone-number') {
             message = 'Phone number सही नहीं है';
-          } else if (e.code ==
-              'too-many-requests') {
+          } else if (e.code == 'too-many-requests') {
             message =
                 'बहुत ज्यादा attempts हो गए। थोड़ी देर बाद try करें';
-          } else if (e.code ==
-              'quota-exceeded') {
-            message =
-                'Firebase SMS quota समाप्त हो गया है';
-          } else if (e.code ==
-              'operation-not-allowed') {
+          } else if (e.code == 'quota-exceeded') {
+            message = 'Firebase SMS quota समाप्त हो गया है';
+          } else if (e.code == 'operation-not-allowed') {
             message =
                 'Firebase में Phone Authentication enable करें';
+          } else if (e.code == 'app-not-authorized') {
+            message =
+                'यह app Firebase में authorized नहीं है। SHA-1 और SHA-256 check करें';
           }
 
           showMessage(message);
         },
 
-        codeSent:
-            (String id, int? resendToken) {
+        codeSent: (String id, int? resendToken) {
           if (!mounted) return;
 
           setState(() {
@@ -649,8 +585,7 @@ class _PhoneAuthScreenState
           showMessage('OTP भेज दिया गया है');
         },
 
-        codeAutoRetrievalTimeout:
-            (String id) {
+        codeAutoRetrievalTimeout: (String id) {
           verificationId = id;
 
           if (mounted) {
@@ -665,10 +600,7 @@ class _PhoneAuthScreenState
         setState(() {
           loading = false;
         });
-
-        showMessage(
-          'OTP भेजने में समस्या हुई',
-        );
+        showMessage('OTP भेजने में समस्या हुई');
       }
     }
   }
@@ -681,7 +613,7 @@ class _PhoneAuthScreenState
       return;
     }
 
-    if (otp.length != 6) {
+    if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
       showMessage('6 digit OTP डालें');
       return;
     }
@@ -691,34 +623,26 @@ class _PhoneAuthScreenState
     });
 
     try {
-      final credential =
-          PhoneAuthProvider.credential(
+      final credential = PhoneAuthProvider.credential(
         verificationId: verificationId!,
         smsCode: otp,
       );
 
-      await FirebaseAuth.instance
-          .signInWithCredential(
+      await FirebaseAuth.instance.signInWithCredential(
         credential,
       );
     } on FirebaseAuthException catch (e) {
-      String message =
-          'OTP verify नहीं हुआ';
+      String message = 'OTP verify नहीं हुआ';
 
-      if (e.code ==
-          'invalid-verification-code') {
+      if (e.code == 'invalid-verification-code') {
         message = 'OTP गलत है';
-      } else if (e.code ==
-          'session-expired') {
-        message =
-            'OTP expire हो गया। नया OTP भेजें';
+      } else if (e.code == 'session-expired') {
+        message = 'OTP expire हो गया। नया OTP भेजें';
       }
 
       showMessage(message);
     } catch (e) {
-      showMessage(
-        'OTP verify करने में समस्या हुई',
-      );
+      showMessage('OTP verify करने में समस्या हुई');
     }
 
     if (mounted) {
@@ -730,9 +654,7 @@ class _PhoneAuthScreenState
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -753,18 +675,14 @@ class _PhoneAuthScreenState
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 25),
-
               const Icon(
                 Icons.phone_android,
                 size: 90,
               ),
-
               const SizedBox(height: 20),
-
               const Text(
                 'Phone Verification',
                 textAlign: TextAlign.center,
@@ -773,15 +691,30 @@ class _PhoneAuthScreenState
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 10),
-
               const Text(
                 'अपने phone number पर OTP प्राप्त करें',
                 textAlign: TextAlign.center,
               ),
-
               const SizedBox(height: 30),
 
               TextField(
-                controller: phoneContr
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Phone Number',
+                  hintText: '+919876543210',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              SizedBox(
+                height: 50,
+                child: FilledButton(
+                  onPressed: loading ? null : sendOTP,
+                  child: loading
+                      ? const SizedBox(
+              
