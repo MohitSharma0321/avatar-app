@@ -207,7 +207,7 @@ Future<void> _signInWithGoogle(
     if (context.mounted) {
       _showMessage(
         context,
-        'Google sign-in failed: ${e.code}',
+        'Google sign-in failed: ${e.code}\n${e.description ?? 'No details'}',
       );
     }
   } on FirebaseAuthException catch (e) {
