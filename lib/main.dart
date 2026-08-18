@@ -839,11 +839,11 @@ class CreateAvatarScreen extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: OutlinedButton.icon(
         onPressed: () {
-          _showMessage(
-            context,
-            '$title customization coming next.',
-          );
-        },
+  _showMessage(
+    context,
+    'Hair customization selected.',
+  );
+},
         icon: Icon(icon),
         label: Align(
           alignment: Alignment.centerLeft,
