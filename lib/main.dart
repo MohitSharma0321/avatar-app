@@ -777,6 +777,52 @@ class CreateAvatarScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
+// ==================================================
+// CREATE AVATAR
+// ==================================================
+
+class CreateAvatarScreen extends StatelessWidget {
+  const CreateAvatarScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Create Avatar'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 3D MODEL
+            SizedBox(
+              height: 350,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: ModelViewer(
+                  src:
+                      'assets/models/New_Project_18082026.glb',
+                  alt: 'My 3D Avatar',
+                  autoRotate: true,
+                  cameraControls: true,
+                  backgroundColor: Colors.transparent,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'Customize your Avatar',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             _optionButton(
               context,
               'Appearance',
@@ -839,11 +885,33 @@ class CreateAvatarScreen extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: OutlinedButton.icon(
         onPressed: () {
-  _showMessage(
-    context,
-    'Hair customization selected.',
-  );
-},
+          if (title == 'Appearance') {
+            _showMessage(
+              context,
+              'Appearance customization selected.',
+            );
+          } else if (title == 'Hair') {
+            _showMessage(
+              context,
+              'Hair customization selected.',
+            );
+          } else if (title == 'Clothes') {
+            _showMessage(
+              context,
+              'Clothes customization selected.',
+            );
+          } else if (title == 'Shoes') {
+            _showMessage(
+              context,
+              'Shoes customization selected.',
+            );
+          } else if (title == 'Accessories') {
+            _showMessage(
+              context,
+              'Accessories customization selected.',
+            );
+          }
+        },
         icon: Icon(icon),
         label: Align(
           alignment: Alignment.centerLeft,
