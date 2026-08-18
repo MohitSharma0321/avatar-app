@@ -1013,6 +1013,144 @@ class AppearanceScreen extends StatelessWidget {
     );
   }
 }
+// ==================================================
+// HAIR CUSTOMIZATION
+// ==================================================
+
+class HairScreen extends StatelessWidget {
+  const HairScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Hair'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Customize Hair',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'Hair Style',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Hair Style 1 selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Hair Style 1'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Hair Style 2 selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Hair Style 2'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Hair Style 3 selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Hair Style 3'),
+              ),
+            ),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'Hair Color',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Black hair selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Black'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Brown hair selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Brown'),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            SizedBox(
+              height: 55,
+              child: FilledButton(
+                onPressed: () {
+                  _showMessage(
+                    context,
+                    'Hair saved successfully!',
+                  );
+                },
+                child: const Text(
+                  'Save Hair',
+                  style: TextStyle(fontSize: 17),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 // ==================================================
 // PROFILE
