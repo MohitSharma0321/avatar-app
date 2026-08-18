@@ -11,58 +11,32 @@ Future<void> main() async {
   runApp(const AvatarApp());
 }
 
+// ==================================================
+// APP
+// ==================================================
+
 class AvatarApp extends StatelessWidget {
   const AvatarApp({super.key});
 
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: const Text('My Avatar'),
-    ),
-    body: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Expanded(
-            child: ModelViewer(
-              src: 'assets/models/New_Project_18082026.glb',
-              alt: 'My 3D Avatar',
-              autoRotate: true,
-              cameraControls: true,
-              backgroundColor: Colors.transparent,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: FilledButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const CreateAvatarScreen(),
-                  ),
-                );
-              },
-              child: const Text(
-                'Create / Customize Avatar',
-              ),
-            ),
-          ),
-        ],
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Avatar',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+        ),
+        useMaterial3: true,
       ),
-    ),
-  );
+      home: const AuthGate(),
+    );
+  }
 }
 
-// --------------------------------------------------
+// ==================================================
 // AUTH GATE
-// --------------------------------------------------
+// ==================================================
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -72,8 +46,7 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState ==
-            ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(
               child: CircularProgressIndicator(),
@@ -91,9 +64,9 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-// --------------------------------------------------
-// WELCOME SCREEN
-// --------------------------------------------------
+// ==================================================
+// WELCOME
+// ==================================================
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -161,8 +134,7 @@ class WelcomeScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              const LoginScreen(),
+                          builder: (_) => const LoginScreen(),
                         ),
                       );
                     },
@@ -176,10 +148,11 @@ class WelcomeScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-// --------------------------------------------------
+// ==================================================
 // CREATE ACCOUNT
-// --------------------------------------------------
+// ==================================================
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -199,20 +172,21 @@ class _CreateAccountScreenState
   bool hidePassword = true;
 
   Future<void> createAccount() async {
-    final email = emailController.text.trim();
-    final password =
-        passwordController.text.trim();
     final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      showMessage(
+      _showMessage(
+        context,
         'Please enter email and password.',
       );
       return;
     }
 
     if (password.length < 6) {
-      showMessage(
+      _showMessage(
+        context,
         'Password must be at least 6 characters.',
       );
       return;
@@ -235,7 +209,8 @@ class _CreateAccountScreenState
 
       if (!mounted) return;
 
-      showMessage(
+      _showMessage(
+        context,
         'Account created successfully!',
       );
 
@@ -244,17 +219,17 @@ class _CreateAccountScreenState
       String message = 'Account creation failed.';
 
       if (e.code == 'email-already-in-use') {
-        message =
-            'This email is already registered.';
+        message = 'This email is already registered.';
       } else if (e.code == 'invalid-email') {
         message = 'Please enter a valid email.';
       } else if (e.code == 'weak-password') {
         message = 'Password is too weak.';
       }
 
-      showMessage(message);
+      _showMessage(context, message);
     } catch (_) {
-      showMessage(
+      _showMessage(
+        context,
         'Something went wrong.',
       );
     }
@@ -264,14 +239,6 @@ class _CreateAccountScreenState
         loading = false;
       });
     }
-  }
-
-  void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
   }
 
   @override
@@ -292,8 +259,7 @@ class _CreateAccountScreenState
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
                 'Create your account',
@@ -310,8 +276,7 @@ class _CreateAccountScreenState
                 decoration: const InputDecoration(
                   labelText: 'Name',
                   border: OutlineInputBorder(),
-                  prefixIcon:
-                      Icon(Icons.person),
+                  prefixIcon: Icon(Icons.person),
                 ),
               ),
 
@@ -319,13 +284,11 @@ class _CreateAccountScreenState
 
               TextField(
                 controller: emailController,
-                keyboardType:
-                    TextInputType.emailAddress,
+                keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
-                  prefixIcon:
-                      Icon(Icons.email),
+                  prefixIcon: Icon(Icons.email),
                 ),
               ),
 
@@ -336,15 +299,12 @@ class _CreateAccountScreenState
                 obscureText: hidePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  border:
-                      const OutlineInputBorder(),
-                  prefixIcon:
-                      const Icon(Icons.lock),
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     onPressed: () {
                       setState(() {
-                        hidePassword =
-                            !hidePassword;
+                        hidePassword = !hidePassword;
                       });
                     },
                     icon: Icon(
@@ -362,19 +322,14 @@ class _CreateAccountScreenState
                 height: 50,
                 child: FilledButton(
                   onPressed:
-                      loading
-                          ? null
-                          : createAccount,
+                      loading ? null : createAccount,
                   child: loading
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child:
-                              CircularProgressIndicator(),
+                          child: CircularProgressIndicator(),
                         )
-                      : const Text(
-                          'Create Account',
-                        ),
+                      : const Text('Create Account'),
                 ),
               ),
             ],
@@ -385,39 +340,32 @@ class _CreateAccountScreenState
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // LOGIN
-// --------------------------------------------------
+// ==================================================
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() =>
-      _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState
     extends State<LoginScreen> {
-  final emailController =
-      TextEditingController();
-
-  final passwordController =
-      TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
 
   bool loading = false;
   bool hidePassword = true;
 
   Future<void> login() async {
-    final email =
-        emailController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
 
-    final password =
-        passwordController.text.trim();
-
-    if (email.isEmpty ||
-        password.isEmpty) {
-      showMessage(
+    if (email.isEmpty || password.isEmpty) {
+      _showMessage(
+        context,
         'Please enter email and password.',
       );
       return;
@@ -438,16 +386,15 @@ class _LoginScreenState
 
       if (e.code == 'user-not-found' ||
           e.code == 'invalid-credential') {
-        message =
-            'Incorrect email or password.';
+        message = 'Incorrect email or password.';
       } else if (e.code == 'invalid-email') {
-        message =
-            'Please enter a valid email.';
+        message = 'Please enter a valid email.';
       }
 
-      showMessage(message);
+      _showMessage(context, message);
     } catch (_) {
-      showMessage(
+      _showMessage(
+        context,
         'Something went wrong.',
       );
     }
@@ -457,14 +404,6 @@ class _LoginScreenState
         loading = false;
       });
     }
-  }
-
-  void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
   }
 
   @override
@@ -484,8 +423,7 @@ class _LoginScreenState
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 30),
 
@@ -509,13 +447,11 @@ class _LoginScreenState
 
               TextField(
                 controller: emailController,
-                keyboardType:
-                    TextInputType.emailAddress,
+                keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
-                  prefixIcon:
-                      Icon(Icons.email),
+                  prefixIcon: Icon(Icons.email),
                 ),
               ),
 
@@ -526,15 +462,12 @@ class _LoginScreenState
                 obscureText: hidePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  border:
-                      const OutlineInputBorder(),
-                  prefixIcon:
-                      const Icon(Icons.lock),
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     onPressed: () {
                       setState(() {
-                        hidePassword =
-                            !hidePassword;
+                        hidePassword = !hidePassword;
                       });
                     },
                     icon: Icon(
@@ -551,14 +484,12 @@ class _LoginScreenState
               SizedBox(
                 height: 50,
                 child: FilledButton(
-                  onPressed:
-                      loading ? null : login,
+                  onPressed: loading ? null : login,
                   child: loading
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child:
-                              CircularProgressIndicator(),
+                          child: CircularProgressIndicator(),
                         )
                       : const Text('Login'),
                 ),
@@ -571,9 +502,9 @@ class _LoginScreenState
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // HOME
-// --------------------------------------------------
+// ==================================================
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -630,9 +561,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // HOME TAB
-// --------------------------------------------------
+// ==================================================
 
 class HomeTab extends StatelessWidget {
   const HomeTab({super.key});
@@ -670,34 +601,22 @@ class HomeTab extends StatelessWidget {
 
             Container(
               width: double.infinity,
-              height: 300,
+              height: 350,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
                 color: Theme.of(context)
                     .colorScheme
                     .surfaceContainerHighest,
               ),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.view_in_ar,
-                      size: 90,
-                    ),
-                    SizedBox(height: 15),
-                    Text(
-                      'Your 3D Avatar',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      '3D model will appear here',
-                    ),
-                  ],
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: ModelViewer(
+                  src:
+                      'assets/models/New_Project_18082026.glb',
+                  alt: 'My 3D Avatar',
+                  autoRotate: true,
+                  cameraControls: true,
+                  backgroundColor: Colors.transparent,
                 ),
               ),
             ),
@@ -754,9 +673,9 @@ class HomeTab extends StatelessWidget {
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // AVATAR SCREEN
-// --------------------------------------------------
+// ==================================================
 
 class AvatarScreen extends StatelessWidget {
   const AvatarScreen({super.key});
@@ -772,37 +691,15 @@ class AvatarScreen extends StatelessWidget {
         child: Column(
           children: [
             Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest,
-                ),
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment:
-                        MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.view_in_ar,
-                        size: 100,
-                      ),
-                      SizedBox(height: 15),
-                      Text(
-                        '3D Avatar Preview',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '3D model coming next',
-                      ),
-                    ],
-                  ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: ModelViewer(
+                  src:
+                      'assets/models/New_Project_18082026.glb',
+                  alt: 'My 3D Avatar',
+                  autoRotate: true,
+                  cameraControls: true,
+                  backgroundColor: Colors.transparent,
                 ),
               ),
             ),
@@ -834,9 +731,9 @@ class AvatarScreen extends StatelessWidget {
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // CREATE AVATAR
-// --------------------------------------------------
+// ==================================================
 
 class CreateAvatarScreen extends StatelessWidget {
   const CreateAvatarScreen({super.key});
@@ -850,23 +747,20 @@ class CreateAvatarScreen extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          SizedBox(
-  height: 280,
-  child: ModelViewer(
-    src: 'assets/models/New_Project_18082026.glb',
-    alt: 'My 3D Avatar',
-    autoRotate: true,
-    cameraControls: true,
-    backgroundColor: Colors.transparent,
-  ),
-),
-              child: const Center(
-                child: Icon(
-                  Icons.view_in_ar,
-                  size: 100,
+            // 3D MODEL
+            SizedBox(
+              height: 350,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: ModelViewer(
+                  src:
+                      'assets/models/New_Project_18082026.glb',
+                  alt: 'My 3D Avatar',
+                  autoRotate: true,
+                  cameraControls: true,
+                  backgroundColor: Colors.transparent,
                 ),
               ),
             ),
@@ -919,13 +813,9 @@ class CreateAvatarScreen extends StatelessWidget {
               height: 55,
               child: FilledButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Avatar saved successfully!',
-                      ),
-                    ),
+                  _showMessage(
+                    context,
+                    'Avatar saved successfully!',
                   );
                 },
                 child: const Text(
@@ -948,7 +838,12 @@ class CreateAvatarScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: OutlinedButton.icon(
-        onPressed: () {},
+        onPressed: () {
+          _showMessage(
+            context,
+            '$title customization coming next.',
+          );
+        },
         icon: Icon(icon),
         label: Align(
           alignment: Alignment.centerLeft,
@@ -965,9 +860,9 @@ class CreateAvatarScreen extends StatelessWidget {
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // PROFILE
-// --------------------------------------------------
+// ==================================================
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -984,15 +879,13 @@ class ProfileScreen extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircleAvatar(
                 radius: 55,
-                backgroundImage:
-                    user?.photoURL != null
-                        ? NetworkImage(user!.photoURL!)
-                        : null,
+                backgroundImage: user?.photoURL != null
+                    ? NetworkImage(user!.photoURL!)
+                    : null,
                 child: user?.photoURL == null
                     ? const Icon(
                         Icons.person,
@@ -1025,9 +918,9 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // SETTINGS
-// --------------------------------------------------
+// ==================================================
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -1073,9 +966,9 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-// --------------------------------------------------
+// ==================================================
 // COMMON MESSAGE
-// --------------------------------------------------
+// ==================================================
 
 void _showMessage(
   BuildContext context,
