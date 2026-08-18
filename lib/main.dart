@@ -731,51 +731,6 @@ class AvatarScreen extends StatelessWidget {
   }
 }
 
-// ==================================================
-// CREATE AVATAR
-// ==================================================
-
-class CreateAvatarScreen extends StatelessWidget {
-  const CreateAvatarScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Avatar'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 3D MODEL
-            SizedBox(
-              height: 350,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: ModelViewer(
-                  src:
-                      'assets/models/New_Project_18082026.glb',
-                  alt: 'My 3D Avatar',
-                  autoRotate: true,
-                  cameraControls: true,
-                  backgroundColor: Colors.transparent,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            const Text(
-              'Customize your Avatar',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 20),
 
 // ==================================================
 // CREATE AVATAR
