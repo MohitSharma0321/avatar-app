@@ -176,7 +176,6 @@ class WelcomeScreen extends StatelessWidget {
       ),
     );
   }
-}
 
 // --------------------------------------------------
 // CREATE ACCOUNT
