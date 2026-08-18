@@ -861,11 +861,13 @@ class CreateAvatarScreen extends StatelessWidget {
       builder: (context) => const ClothesScreen(),
     ),
   );
-          } else if (title == 'Shoes') {
-            _showMessage(
-              context,
-              'Shoes customization selected.',
-            );
+          } if (title == 'Shoes') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const ShoesScreen(),
+    ),
+  );
           } else if (title == 'Accessories') {
             _showMessage(
               context,
@@ -1283,6 +1285,120 @@ class ClothesScreen extends StatelessWidget {
                 },
                 child: const Text(
                   'Save Clothes',
+                  style: TextStyle(fontSize: 17),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// SHOES CUSTOMIZATION
+// ==================================================
+
+class ShoesScreen extends StatelessWidget {
+  const ShoesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Shoes'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Customize Shoes',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'Shoe Style',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Sneakers selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Sneakers'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Sports Shoes selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Sports Shoes'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Formal Shoes selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Formal Shoes'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Boots selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Boots'),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            SizedBox(
+              height: 55,
+              child: FilledButton(
+                onPressed: () {
+                  _showMessage(
+                    context,
+                    'Shoes saved successfully!',
+                  );
+                },
+                child: const Text(
+                  'Save Shoes',
                   style: TextStyle(fontSize: 17),
                 ),
               ),
