@@ -841,10 +841,12 @@ class CreateAvatarScreen extends StatelessWidget {
       child: OutlinedButton.icon(
         onPressed: () {
           if (title == 'Appearance') {
-            _showMessage(
-              context,
-              'Appearance customization selected.',
-            );
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const AppearanceScreen(),
+    ),
+  );
           } else if (title == 'Hair') {
             _showMessage(
               context,
@@ -877,6 +879,133 @@ class CreateAvatarScreen extends StatelessWidget {
             double.infinity,
             55,
           ),
+        ),
+      ),
+    );
+  }
+}
+// ==================================================
+// APPEARANCE CUSTOMIZATION
+// ==================================================
+
+class AppearanceScreen extends StatelessWidget {
+  const AppearanceScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Appearance'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Customize Appearance',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 25),
+
+            // SKIN TONE
+            const Text(
+              'Skin Tone',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Skin tone selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Choose Skin Tone'),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // FACE
+            const Text(
+              'Face',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Face style selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Choose Face'),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // EYES
+            const Text(
+              'Eyes',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Eye style selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Choose Eyes'),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            SizedBox(
+              height: 55,
+              child: FilledButton(
+                onPressed: () {
+                  _showMessage(
+                    context,
+                    'Appearance saved successfully!',
+                  );
+                },
+                child: const Text(
+                  'Save Appearance',
+                  style: TextStyle(fontSize: 17),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
