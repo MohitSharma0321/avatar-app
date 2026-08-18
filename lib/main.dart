@@ -854,14 +854,16 @@ class CreateAvatarScreen extends StatelessWidget {
           crossAxisAlignment:
               CrossAxisAlignment.stretch,
           children: [
-            Container(
-              height: 280,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest,
-              ),
+          SizedBox(
+  height: 280,
+  child: ModelViewer(
+    src: 'assets/models/New_Project_18082026.glb',
+    alt: 'My 3D Avatar',
+    autoRotate: true,
+    cameraControls: true,
+    backgroundColor: Colors.transparent,
+  ),
+),
               child: const Center(
                 child: Icon(
                   Icons.view_in_ar,
