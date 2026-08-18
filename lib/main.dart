@@ -854,11 +854,13 @@ class CreateAvatarScreen extends StatelessWidget {
       builder: (context) => const HairScreen(),
     ),
   );
-          } else if (title == 'Clothes') {
-            _showMessage(
-              context,
-              'Clothes customization selected.',
-            );
+          }if (title == 'Clothes') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const ClothesScreen(),
+    ),
+  );
           } else if (title == 'Shoes') {
             _showMessage(
               context,
@@ -1013,6 +1015,7 @@ class AppearanceScreen extends StatelessWidget {
     );
   }
 }
+
 // ==================================================
 // HAIR CUSTOMIZATION
 // ==================================================
@@ -1141,6 +1144,145 @@ class HairScreen extends StatelessWidget {
                 },
                 child: const Text(
                   'Save Hair',
+                  style: TextStyle(fontSize: 17),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// CLOTHES CUSTOMIZATION
+// ==================================================
+
+class ClothesScreen extends StatelessWidget {
+  const ClothesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Clothes'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Customize Clothes',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'Top',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'T-Shirt selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('T-Shirt'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Shirt selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Shirt'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Jacket selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Jacket'),
+              ),
+            ),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'Bottom',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Jeans selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Jeans'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Pants selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Pants'),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            SizedBox(
+              height: 55,
+              child: FilledButton(
+                onPressed: () {
+                  _showMessage(
+                    context,
+                    'Clothes saved successfully!',
+                  );
+                },
+                child: const Text(
+                  'Save Clothes',
                   style: TextStyle(fontSize: 17),
                 ),
               ),
