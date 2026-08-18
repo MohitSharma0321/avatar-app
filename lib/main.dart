@@ -847,11 +847,13 @@ class CreateAvatarScreen extends StatelessWidget {
       builder: (context) => const AppearanceScreen(),
     ),
   );
-          } else if (title == 'Hair') {
-            _showMessage(
-              context,
-              'Hair customization selected.',
-            );
+          }if (title == 'Hair') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const HairScreen(),
+    ),
+  );
           } else if (title == 'Clothes') {
             _showMessage(
               context,
