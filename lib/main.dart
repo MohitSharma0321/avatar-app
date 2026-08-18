@@ -868,11 +868,13 @@ class CreateAvatarScreen extends StatelessWidget {
       builder: (context) => const ShoesScreen(),
     ),
   );
-          } else if (title == 'Accessories') {
-            _showMessage(
-              context,
-              'Accessories customization selected.',
-            );
+          } if (title == 'Accessories') {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const AccessoriesScreen(),
+    ),
+  );
           }
         },
         icon: Icon(icon),
@@ -1399,6 +1401,133 @@ class ShoesScreen extends StatelessWidget {
                 },
                 child: const Text(
                   'Save Shoes',
+                  style: TextStyle(fontSize: 17),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// ACCESSORIES CUSTOMIZATION
+// ==================================================
+
+class AccessoriesScreen extends StatelessWidget {
+  const AccessoriesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Accessories'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Customize Accessories',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 25),
+
+            const Text(
+              'Accessories',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Watch selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Watch'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Glasses selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Glasses'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Cap selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Cap'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Necklace selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Necklace'),
+              ),
+            ),
+
+            OutlinedButton(
+              onPressed: () {
+                _showMessage(
+                  context,
+                  'Bracelet selected.',
+                );
+              },
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Bracelet'),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            SizedBox(
+              height: 55,
+              child: FilledButton(
+                onPressed: () {
+                  _showMessage(
+                    context,
+                    'Accessories saved successfully!',
+                  );
+                },
+                child: const Text(
+                  'Save Accessories',
                   style: TextStyle(fontSize: 17),
                 ),
               ),
