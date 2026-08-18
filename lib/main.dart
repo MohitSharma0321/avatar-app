@@ -14,20 +14,50 @@ Future<void> main() async {
 class AvatarApp extends StatelessWidget {
   const AvatarApp({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Avatar',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-        ),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('My Avatar'),
+    ),
+    body: Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Expanded(
+            child: ModelViewer(
+              src: 'assets/models/New_Project_18082026.glb',
+              alt: 'My 3D Avatar',
+              autoRotate: true,
+              cameraControls: true,
+              backgroundColor: Colors.transparent,
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: FilledButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const CreateAvatarScreen(),
+                  ),
+                );
+              },
+              child: const Text(
+                'Create / Customize Avatar',
+              ),
+            ),
+          ),
+        ],
       ),
-      home: const AuthGate(),
-    );
-  }
+    ),
+  );
 }
 
 // --------------------------------------------------
