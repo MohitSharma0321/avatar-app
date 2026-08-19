@@ -511,7 +511,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN
+// HOME SCREEN (UPDATED - 3 TABS ONLY)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -524,9 +524,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int currentIndex = 0;
 
+  // Ab yahan sirf 3 pages hain
   final List<Widget> pages = const [
     HomeTab(),
-    SelectCharacterScreen(),
     ProfileScreen(),
     SettingsScreen(),
   ];
@@ -547,11 +547,6 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.palette_outlined),
-            selectedIcon: Icon(Icons.palette),
-            label: 'Character',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_circle_outlined),
