@@ -10,7 +10,7 @@ Future<void> main() async {
 }
 
 // ==================================================
-// TOP-LEVEL HELPER & JAVASCRIPT BRIDGE
+// TOP-LEVEL MESSAGE HELPER
 // ==================================================
 
 void _showMessage(BuildContext context, String message) {
@@ -21,19 +21,84 @@ void _showMessage(BuildContext context, String message) {
   );
 }
 
+// ==================================================
+// PROCEDURAL TEXTURE & EYE BRIDGE
+// ==================================================
+
 String getModelViewerJs() {
-  final r = (AvatarState.skinColor.red / 255.0).toStringAsFixed(2);
-  final g = (AvatarState.skinColor.green / 255.0).toStringAsFixed(2);
-  final b = (AvatarState.skinColor.blue / 255.0).toStringAsFixed(2);
+  final r = AvatarState.skinColor.red;
+  final g = AvatarState.skinColor.green;
+  final b = AvatarState.skinColor.blue;
+  final eyeStyle = AvatarState.eyeStyle;
 
   return '''
+    function generateAvatarTexture(r, g, b, eyeStyle) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+
+      // 1. Skin Base Color
+      ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // 2. Eye Drawing Settings
+      ctx.fillStyle = '#111111';
+      ctx.strokeStyle = '#111111';
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+
+      if (eyeStyle === 'Normal') {
+        // Left & Right Normal Eyes
+        ctx.beginPath(); ctx.ellipse(190, 240, 22, 34, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(322, 240, 22, 34, 0, 0, Math.PI * 2); ctx.fill();
+        // White Highlights
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.arc(182, 228, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(314, 228, 9, 0, Math.PI * 2); ctx.fill();
+      } else if (eyeStyle === 'Anime Style') {
+        // Big Anime Eyes
+        ctx.beginPath(); ctx.ellipse(185, 235, 32, 48, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(327, 235, 32, 48, 0, 0, Math.PI * 2); ctx.fill();
+        // Primary Highlight
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.ellipse(176, 215, 14, 18, -0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(318, 215, 14, 18, -0.2, 0, Math.PI * 2); ctx.fill();
+        // Secondary Highlight
+        ctx.beginPath(); ctx.arc(196, 258, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(338, 258, 7, 0, Math.PI * 2); ctx.fill();
+      } else if (eyeStyle === 'Smile / Closed') {
+        // Curved Smiling Eyes
+        ctx.beginPath(); ctx.arc(190, 250, 30, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+        ctx.beginPath(); ctx.arc(322, 250, 30, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+      } else if (eyeStyle === 'Sharp Eyes') {
+        // Sharp Anime Eyes
+        ctx.beginPath();
+        ctx.moveTo(150, 225); ctx.lineTo(220, 245); ctx.lineTo(165, 260); ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(362, 225); ctx.lineTo(292, 245); ctx.lineTo(347, 260); ctx.closePath(); ctx.fill();
+        // Highlights
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.arc(185, 240, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(327, 240, 5, 0, Math.PI * 2); ctx.fill();
+      }
+      return canvas.toDataURL('image/png');
+    }
+
     const mv = document.querySelector('model-viewer');
     if (mv) {
-      mv.addEventListener('load', () => {
-        if (mv.model && mv.model.materials) {
-          for (let i = 0; i < mv.model.materials.length; i++) {
-            mv.model.materials[i].pbrMetallicRoughness.setBaseColorFactor([$r, $g, $b, 1.0]);
+      mv.addEventListener('load', async () => {
+        try {
+          const dataUrl = generateAvatarTexture($r, $g, $b, '$eyeStyle');
+          const texture = await mv.createTexture(dataUrl);
+          if (mv.model && mv.model.materials) {
+            for (let i = 0; i < mv.model.materials.length; i++) {
+              mv.model.materials[i].pbrMetallicRoughness.baseColorTexture.setTexture(texture);
+              mv.model.materials[i].pbrMetallicRoughness.setBaseColorFactor([1.0, 1.0, 1.0, 1.0]);
+            }
           }
+        } catch (e) {
+          console.error(e);
         }
       });
     }
@@ -498,7 +563,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME
+// HOME SCREEN
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -727,7 +792,7 @@ class _AvatarScreenState extends State<AvatarScreen> {
 }
 
 // ==================================================
-// CREATE / CUSTOMIZE AVATAR (LIVE PREVIEW)
+// CREATE / CUSTOMIZE AVATAR
 // ==================================================
 
 class CreateAvatarScreen extends StatefulWidget {
