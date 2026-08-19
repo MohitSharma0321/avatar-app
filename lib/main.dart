@@ -23,67 +23,43 @@ void _showMessage(BuildContext context, String message) {
 }
 
 // ==================================================
-// GLOBAL AVATAR STATE (3 ORIGINAL CHARACTERS)
+// GLOBAL AVATAR STATE (3 REAL 3D CHARACTERS)
 // ==================================================
 
 class AvatarCharacter {
   final String name;
-  final Color color;
-  final Color badgeColor;
-  final List<double> rgbFactor;
+  final Color themeColor;
+  final String modelPath;
 
   const AvatarCharacter({
     required this.name,
-    required this.color,
-    required this.badgeColor,
-    required this.rgbFactor,
+    required this.themeColor,
+    required this.modelPath,
   });
 }
 
 class AvatarState {
-  static const String modelPath = 'assets/models/New_Project_18082026.glb';
-
   static final List<AvatarCharacter> characters = [
     const AvatarCharacter(
       name: 'ORANGE',
-      color: Color(0xFFFF7A00),
-      badgeColor: Color(0xFFE65100),
-      rgbFactor: [1.0, 0.48, 0.0, 1.0],
+      themeColor: Color(0xFFFF7A00),
+      modelPath: 'assets/models/avatar_orange.glb',
     ),
     const AvatarCharacter(
       name: 'BLUE',
-      color: Color(0xFF2196F3),
-      badgeColor: Color(0xFF1565C0),
-      rgbFactor: [0.13, 0.59, 0.95, 1.0],
+      themeColor: Color(0xFF2196F3),
+      modelPath: 'assets/models/avatar_blue.glb',
     ),
     const AvatarCharacter(
       name: 'GREEN',
-      color: Color(0xFF5DB835),
-      badgeColor: Color(0xFF2E7D32),
-      rgbFactor: [0.36, 0.72, 0.21, 1.0],
+      themeColor: Color(0xFF5DB835),
+      modelPath: 'assets/models/avatar_green.glb',
     ),
   ];
 
   static int selectedIndex = 0; // Default: ORANGE
 
   static AvatarCharacter get current => characters[selectedIndex];
-}
-
-String getModelViewerJs() {
-  final rgb = AvatarState.current.rgbFactor;
-  return '''
-    const mv = document.querySelector('model-viewer');
-    if (mv) {
-      mv.addEventListener('load', () => {
-        if (mv.model && mv.model.materials) {
-          for (let i = 0; i < mv.model.materials.length; i++) {
-            mv.model.materials[i].pbrMetallicRoughness.setBaseColorFactor([${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 1.0]);
-            mv.model.materials[i].pbrMetallicRoughness.setRoughnessFactor(0.35);
-          }
-        }
-      });
-    }
-  ''';
 }
 
 // ==================================================
@@ -641,20 +617,19 @@ class _HomeTabState extends State<HomeTab> {
                 borderRadius: BorderRadius.circular(28),
                 color: const Color(0xFF1E1E1E),
                 border: Border.all(
-                  color: character.color.withOpacity(0.3),
+                  color: character.themeColor.withOpacity(0.4),
                   width: 2,
                 ),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
                 child: ModelViewer(
-                  key: UniqueKey(),
-                  src: AvatarState.modelPath,
+                  key: ValueKey(character.modelPath),
+                  src: character.modelPath,
                   alt: 'My 3D Avatar',
                   autoRotate: true,
                   cameraControls: true,
-                  backgroundColor: Colors.transparent,
-                  relatedJs: getModelViewerJs(),
+                  backgroundColor: const Color(0xFF1E1E1E),
                 ),
               ),
             ),
@@ -664,7 +639,7 @@ class _HomeTabState extends State<HomeTab> {
               height: 56,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: character.color,
+                  backgroundColor: character.themeColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -709,13 +684,15 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final activeChar = AvatarState.characters[tempIndex];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Choose Character'),
       ),
       body: Column(
         children: [
-          // LIVE 3D PREVIEW
+          // 3D PREVIEW
           Expanded(
             child: Container(
               margin: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -723,41 +700,27 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                 borderRadius: BorderRadius.circular(28),
                 color: const Color(0xFF1E1E1E),
                 border: Border.all(
-                  color: AvatarState.characters[tempIndex].color.withOpacity(0.4),
+                  color: activeChar.themeColor.withOpacity(0.4),
                   width: 2,
                 ),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
                 child: ModelViewer(
-                  key: ValueKey(tempIndex),
-                  src: AvatarState.modelPath,
+                  key: ValueKey(activeChar.modelPath),
+                  src: activeChar.modelPath,
                   alt: 'Character Preview',
                   autoRotate: true,
                   cameraControls: true,
-                  backgroundColor: Colors.transparent,
-                  relatedJs: '''
-                    const mv = document.querySelector('model-viewer');
-                    if (mv) {
-                      mv.addEventListener('load', () => {
-                        if (mv.model && mv.model.materials) {
-                          const rgb = ${AvatarState.characters[tempIndex].rgbFactor};
-                          for (let i = 0; i < mv.model.materials.length; i++) {
-                            mv.model.materials[i].pbrMetallicRoughness.setBaseColorFactor([rgb[0], rgb[1], rgb[2], 1.0]);
-                            mv.model.materials[i].pbrMetallicRoughness.setRoughnessFactor(0.35);
-                          }
-                        }
-                      });
-                    }
-                  ''',
+                  backgroundColor: const Color(0xFF1E1E1E),
                 ),
               ),
             ),
           ),
 
-          // COLOR SELECTION TABS
+          // COLOR SELECTION PANEL
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
             decoration: const BoxDecoration(
               color: Color(0xFF181818),
               borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
@@ -796,11 +759,11 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                               height: 52,
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? char.color
-                                    : char.color.withOpacity(0.18),
+                                    ? char.themeColor
+                                    : char.themeColor.withOpacity(0.18),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: isSelected ? Colors.white : char.color,
+                                  color: isSelected ? Colors.white : char.themeColor,
                                   width: isSelected ? 2.5 : 1,
                                 ),
                               ),
@@ -810,7 +773,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
-                                    color: isSelected ? Colors.white : char.color,
+                                    color: isSelected ? Colors.white : char.themeColor,
                                   ),
                                 ),
                               ),
@@ -826,7 +789,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                   height: 55,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: AvatarState.characters[tempIndex].color,
+                      backgroundColor: activeChar.themeColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -840,7 +803,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                       Navigator.pop(context);
                     },
                     child: Text(
-                      'Equip ${AvatarState.characters[tempIndex].name}',
+                      'Equip ${activeChar.name}',
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
@@ -849,7 +812,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
               ],
             ),
           ),
