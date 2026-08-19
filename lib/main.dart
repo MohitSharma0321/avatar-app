@@ -92,7 +92,7 @@ class AuthGate extends StatelessWidget {
 }
 
 // ==================================================
-// WELCOME
+// WELCOME SCREEN
 // ==================================================
 
 class WelcomeScreen extends StatelessWidget {
@@ -691,7 +691,7 @@ class AvatarScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CREATE / CUSTOMIZE AVATAR
+// CREATE / CUSTOMIZE AVATAR (LIVE PREVIEW)
 // ==================================================
 
 class CreateAvatarScreen extends StatefulWidget {
@@ -721,6 +721,7 @@ class _CreateAvatarScreenState extends State<CreateAvatarScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 3D Model with Key for instant refresh
             SizedBox(
               height: 350,
               child: ClipRRect(
