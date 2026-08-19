@@ -10,7 +10,7 @@ Future<void> main() async {
 }
 
 // ==================================================
-// TOP-LEVEL MESSAGE HELPER
+// TOP-LEVEL HELPER & JAVASCRIPT BRIDGE
 // ==================================================
 
 void _showMessage(BuildContext context, String message) {
@@ -19,6 +19,25 @@ void _showMessage(BuildContext context, String message) {
       content: Text(message),
     ),
   );
+}
+
+String getModelViewerJs() {
+  final r = (AvatarState.skinColor.red / 255.0).toStringAsFixed(2);
+  final g = (AvatarState.skinColor.green / 255.0).toStringAsFixed(2);
+  final b = (AvatarState.skinColor.blue / 255.0).toStringAsFixed(2);
+
+  return '''
+    const mv = document.querySelector('model-viewer');
+    if (mv) {
+      mv.addEventListener('load', () => {
+        if (mv.model && mv.model.materials) {
+          for (let i = 0; i < mv.model.materials.length; i++) {
+            mv.model.materials[i].pbrMetallicRoughness.setBaseColorFactor([$r, $g, $b, 1.0]);
+          }
+        }
+      });
+    }
+  ''';
 }
 
 // ==================================================
@@ -541,9 +560,14 @@ class _HomeScreenState extends State<HomeScreen> {
 // HOME TAB
 // ==================================================
 
-class HomeTab extends StatelessWidget {
+class HomeTab extends StatefulWidget {
   const HomeTab({Key? key}) : super(key: key);
 
+  @override
+  State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -581,11 +605,13 @@ class HomeTab extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: ModelViewer(
+                  key: UniqueKey(),
                   src: AvatarState.currentModel,
                   alt: 'My 3D Avatar',
                   autoRotate: true,
                   cameraControls: true,
                   backgroundColor: Colors.transparent,
+                  relatedJs: getModelViewerJs(),
                 ),
               ),
             ),
@@ -594,13 +620,14 @@ class HomeTab extends StatelessWidget {
               width: double.infinity,
               height: 55,
               child: FilledButton.icon(
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const CreateAvatarScreen(),
                     ),
                   );
+                  setState(() {});
                 },
                 icon: const Icon(Icons.add),
                 label: const Text(
@@ -614,13 +641,14 @@ class HomeTab extends StatelessWidget {
               width: double.infinity,
               height: 55,
               child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const AvatarScreen(),
                     ),
                   );
+                  setState(() {});
                 },
                 icon: const Icon(Icons.edit),
                 label: const Text(
@@ -640,9 +668,14 @@ class HomeTab extends StatelessWidget {
 // AVATAR SCREEN
 // ==================================================
 
-class AvatarScreen extends StatelessWidget {
+class AvatarScreen extends StatefulWidget {
   const AvatarScreen({Key? key}) : super(key: key);
 
+  @override
+  State<AvatarScreen> createState() => _AvatarScreenState();
+}
+
+class _AvatarScreenState extends State<AvatarScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -657,11 +690,13 @@ class AvatarScreen extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: ModelViewer(
+                  key: UniqueKey(),
                   src: AvatarState.currentModel,
                   alt: 'My 3D Avatar',
                   autoRotate: true,
                   cameraControls: true,
                   backgroundColor: Colors.transparent,
+                  relatedJs: getModelViewerJs(),
                 ),
               ),
             ),
@@ -670,13 +705,14 @@ class AvatarScreen extends StatelessWidget {
               width: double.infinity,
               height: 55,
               child: FilledButton(
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const CreateAvatarScreen(),
                     ),
                   );
+                  setState(() {});
                 },
                 child: const Text(
                   'Create / Customize Avatar',
@@ -721,7 +757,6 @@ class _CreateAvatarScreenState extends State<CreateAvatarScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 3D Model with Key for instant refresh
             SizedBox(
               height: 350,
               child: ClipRRect(
@@ -733,6 +768,7 @@ class _CreateAvatarScreenState extends State<CreateAvatarScreen> {
                   autoRotate: true,
                   cameraControls: true,
                   backgroundColor: Colors.transparent,
+                  relatedJs: getModelViewerJs(),
                 ),
               ),
             ),
