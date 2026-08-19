@@ -5,10 +5,25 @@ import 'package:model_viewer_plus/model_viewer_plus.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await Firebase.initializeApp();
-
   runApp(const AvatarApp());
+}
+
+// ==================================================
+// GLOBAL AVATAR STATE
+// ==================================================
+
+class AvatarState {
+  static String currentModel = 'assets/models/New_Project_18082026.glb';
+  static Color skinColor = const Color(0xFFFFDFC4);
+  static String faceStyle = 'Classic';
+  static String eyeStyle = 'Normal';
+  static String hairStyle = 'Hair Style 1';
+  static String hairColor = 'Black';
+  static String topClothes = 'T-Shirt';
+  static String bottomClothes = 'Jeans';
+  static String shoesStyle = 'Sneakers';
+  static String accessory = 'Watch';
 }
 
 // ==================================================
@@ -88,9 +103,7 @@ class WelcomeScreen extends StatelessWidget {
                     size: 80,
                   ),
                 ),
-
                 const SizedBox(height: 28),
-
                 const Text(
                   'Avatar',
                   style: TextStyle(
@@ -98,17 +111,13 @@ class WelcomeScreen extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
                 const Text(
                   'Create your avatar and enter your world.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16),
                 ),
-
                 const SizedBox(height: 40),
-
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -116,17 +125,14 @@ class WelcomeScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              const CreateAccountScreen(),
+                          builder: (_) => const CreateAccountScreen(),
                         ),
                       );
                     },
                     child: const Text('Create Account'),
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
@@ -158,12 +164,10 @@ class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
 
   @override
-  State<CreateAccountScreen> createState() =>
-      _CreateAccountScreenState();
+  State<CreateAccountScreen> createState() => _CreateAccountScreenState();
 }
 
-class _CreateAccountScreenState
-    extends State<CreateAccountScreen> {
+class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -177,18 +181,12 @@ class _CreateAccountScreenState
     final password = passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      _showMessage(
-        context,
-        'Please enter email and password.',
-      );
+      _showMessage(context, 'Please enter email and password.');
       return;
     }
 
     if (password.length < 6) {
-      _showMessage(
-        context,
-        'Password must be at least 6 characters.',
-      );
+      _showMessage(context, 'Password must be at least 6 characters.');
       return;
     }
 
@@ -209,11 +207,7 @@ class _CreateAccountScreenState
 
       if (!mounted) return;
 
-      _showMessage(
-        context,
-        'Account created successfully!',
-      );
-
+      _showMessage(context, 'Account created successfully!');
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       String message = 'Account creation failed.';
@@ -228,10 +222,7 @@ class _CreateAccountScreenState
 
       _showMessage(context, message);
     } catch (_) {
-      _showMessage(
-        context,
-        'Something went wrong.',
-      );
+      _showMessage(context, 'Something went wrong.');
     }
 
     if (mounted) {
@@ -268,9 +259,7 @@ class _CreateAccountScreenState
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 24),
-
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(
@@ -279,9 +268,7 @@ class _CreateAccountScreenState
                   prefixIcon: Icon(Icons.person),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               TextField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -291,9 +278,7 @@ class _CreateAccountScreenState
                   prefixIcon: Icon(Icons.email),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               TextField(
                 controller: passwordController,
                 obscureText: hidePassword,
@@ -315,14 +300,11 @@ class _CreateAccountScreenState
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
-
               SizedBox(
                 height: 50,
                 child: FilledButton(
-                  onPressed:
-                      loading ? null : createAccount,
+                  onPressed: loading ? null : createAccount,
                   child: loading
                       ? const SizedBox(
                           width: 22,
@@ -351,8 +333,7 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState
-    extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
@@ -364,10 +345,7 @@ class _LoginScreenState
     final password = passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      _showMessage(
-        context,
-        'Please enter email and password.',
-      );
+      _showMessage(context, 'Please enter email and password.');
       return;
     }
 
@@ -376,16 +354,14 @@ class _LoginScreenState
     });
 
     try {
-      await FirebaseAuth.instance
-          .signInWithEmailAndPassword(
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
     } on FirebaseAuthException catch (e) {
       String message = 'Login failed.';
 
-      if (e.code == 'user-not-found' ||
-          e.code == 'invalid-credential') {
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
         message = 'Incorrect email or password.';
       } else if (e.code == 'invalid-email') {
         message = 'Please enter a valid email.';
@@ -393,10 +369,7 @@ class _LoginScreenState
 
       _showMessage(context, message);
     } catch (_) {
-      _showMessage(
-        context,
-        'Something went wrong.',
-      );
+      _showMessage(context, 'Something went wrong.');
     }
 
     if (mounted) {
@@ -426,14 +399,11 @@ class _LoginScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 30),
-
               const Icon(
                 Icons.account_circle,
                 size: 100,
               ),
-
               const SizedBox(height: 20),
-
               const Text(
                 'Welcome Back',
                 textAlign: TextAlign.center,
@@ -442,9 +412,7 @@ class _LoginScreenState
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 30),
-
               TextField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -454,9 +422,7 @@ class _LoginScreenState
                   prefixIcon: Icon(Icons.email),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               TextField(
                 controller: passwordController,
                 obscureText: hidePassword,
@@ -478,9 +444,7 @@ class _LoginScreenState
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
-
               SizedBox(
                 height: 50,
                 child: FilledButton(
@@ -585,9 +549,7 @@ class HomeTab extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 8),
-
             Text(
               user?.displayName?.isNotEmpty == true
                   ? user!.displayName!
@@ -596,23 +558,18 @@ class HomeTab extends StatelessWidget {
                 fontSize: 17,
               ),
             ),
-
             const SizedBox(height: 30),
-
             Container(
               width: double.infinity,
               height: 350,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: ModelViewer(
-                  src:
-                      'assets/models/New_Project_18082026.glb',
+                  src: AvatarState.currentModel,
                   alt: 'My 3D Avatar',
                   autoRotate: true,
                   cameraControls: true,
@@ -620,9 +577,7 @@ class HomeTab extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 25),
-
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -631,8 +586,7 @@ class HomeTab extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          const CreateAvatarScreen(),
+                      builder: (_) => const CreateAvatarScreen(),
                     ),
                   );
                 },
@@ -643,9 +597,7 @@ class HomeTab extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 15),
-
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -654,8 +606,7 @@ class HomeTab extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          const AvatarScreen(),
+                      builder: (_) => const AvatarScreen(),
                     ),
                   );
                 },
@@ -694,8 +645,7 @@ class AvatarScreen extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: ModelViewer(
-                  src:
-                      'assets/models/New_Project_18082026.glb',
+                  src: AvatarState.currentModel,
                   alt: 'My 3D Avatar',
                   autoRotate: true,
                   cameraControls: true,
@@ -703,9 +653,7 @@ class AvatarScreen extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -714,8 +662,7 @@ class AvatarScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          const CreateAvatarScreen(),
+                      builder: (_) => const CreateAvatarScreen(),
                     ),
                   );
                 },
@@ -731,13 +678,25 @@ class AvatarScreen extends StatelessWidget {
   }
 }
 
-
 // ==================================================
-// CREATE AVATAR
+// CREATE / CUSTOMIZE AVATAR
 // ==================================================
 
-class CreateAvatarScreen extends StatelessWidget {
+class CreateAvatarScreen extends StatefulWidget {
   const CreateAvatarScreen({super.key});
+
+  @override
+  State<CreateAvatarScreen> createState() => _CreateAvatarScreenState();
+}
+
+class _CreateAvatarScreenState extends State<CreateAvatarScreen> {
+  Key modelKey = UniqueKey();
+
+  void _refresh() {
+    setState(() {
+      modelKey = UniqueKey();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -756,8 +715,8 @@ class CreateAvatarScreen extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: ModelViewer(
-                  src:
-                      'assets/models/New_Project_18082026.glb',
+                  key: modelKey,
+                  src: AvatarState.currentModel,
                   alt: 'My 3D Avatar',
                   autoRotate: true,
                   cameraControls: true,
@@ -765,9 +724,7 @@ class CreateAvatarScreen extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 25),
-
             const Text(
               'Customize your Avatar',
               style: TextStyle(
@@ -775,49 +732,74 @@ class CreateAvatarScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 20),
-
             _optionButton(
               context,
               'Appearance',
               Icons.face,
+              () async {
+                final res = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AppearanceScreen()),
+                );
+                if (res == true) _refresh();
+              },
             ),
-
             _optionButton(
               context,
               'Hair',
               Icons.face_retouching_natural,
+              () async {
+                final res = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HairScreen()),
+                );
+                if (res == true) _refresh();
+              },
             ),
-
             _optionButton(
               context,
               'Clothes',
               Icons.checkroom,
+              () async {
+                final res = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ClothesScreen()),
+                );
+                if (res == true) _refresh();
+              },
             ),
-
             _optionButton(
               context,
               'Shoes',
               Icons.directions_walk,
+              () async {
+                final res = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ShoesScreen()),
+                );
+                if (res == true) _refresh();
+              },
             ),
-
             _optionButton(
               context,
               'Accessories',
               Icons.watch,
+              () async {
+                final res = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AccessoriesScreen()),
+                );
+                if (res == true) _refresh();
+              },
             ),
-
             const SizedBox(height: 20),
-
             SizedBox(
               height: 55,
               child: FilledButton(
                 onPressed: () {
-                  _showMessage(
-                    context,
-                    'Avatar saved successfully!',
-                  );
+                  _showMessage(context, 'Avatar saved successfully!');
+                  Navigator.pop(context);
                 },
                 child: const Text(
                   'Save Avatar',
@@ -831,73 +813,159 @@ class CreateAvatarScreen extends StatelessWidget {
     );
   }
 
-  static Widget _optionButton(
+  Widget _optionButton(
     BuildContext context,
     String title,
     IconData icon,
+    VoidCallback onTap,
   ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: OutlinedButton.icon(
-        onPressed: () {
-          if (title == 'Appearance') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const AppearanceScreen(),
-    ),
-  );
-          }if (title == 'Hair') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const HairScreen(),
-    ),
-  );
-          }if (title == 'Clothes') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const ClothesScreen(),
-    ),
-  );
-          } if (title == 'Shoes') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const ShoesScreen(),
-    ),
-  );
-          } if (title == 'Accessories') {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const AccessoriesScreen(),
-    ),
-  );
-          }
-        },
+        onPressed: onTap,
         icon: Icon(icon),
         label: Align(
           alignment: Alignment.centerLeft,
           child: Text(title),
         ),
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(
-            double.infinity,
-            55,
-          ),
+          minimumSize: const Size(double.infinity, 55),
         ),
       ),
     );
   }
 }
+
 // ==================================================
 // APPEARANCE CUSTOMIZATION
 // ==================================================
 
-class AppearanceScreen extends StatelessWidget {
+class AppearanceScreen extends StatefulWidget {
   const AppearanceScreen({super.key});
+
+  @override
+  State<AppearanceScreen> createState() => _AppearanceScreenState();
+}
+
+class _AppearanceScreenState extends State<AppearanceScreen> {
+  Color _selectedTone = AvatarState.skinColor;
+  String _selectedFace = AvatarState.faceStyle;
+  String _selectedEyes = AvatarState.eyeStyle;
+
+  final List<Color> _tones = const [
+    Color(0xFFFFDFC4), // Fair Tone
+    Color(0xFFFFCD94), // Peach Tone
+    Color(0xFFEAC086), // Warm Beige
+    Color(0xFFD89B5F), // Tan Tone
+    Color(0xFF8D5524), // Brown Tone
+    Color(0xFF4A2A18), // Deep Tone
+  ];
+
+  void _showSkinTonePicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          height: 210,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Choose Skin Tone', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: _tones.map((color) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedTone = color;
+                        AvatarState.skinColor = color;
+                      });
+                      Navigator.pop(ctx);
+                    },
+                    child: Container(
+                      width: 45,
+                      height: 45,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _selectedTone == color ? Colors.deepPurple : Colors.grey.shade300,
+                          width: _selectedTone == color ? 3.5 : 1.5,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showFacePicker() {
+    final faces = ['Classic', 'Round Face', 'Chiseled', 'Cute Style'];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.all(16),
+          children: faces.map((face) {
+            return ListTile(
+              title: Text(face),
+              trailing: _selectedFace == face ? const Icon(Icons.check_circle, color: Colors.deepPurple) : null,
+              onTap: () {
+                setState(() {
+                  _selectedFace = face;
+                  AvatarState.faceStyle = face;
+                });
+                Navigator.pop(ctx);
+              },
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  void _showEyesPicker() {
+    final eyes = ['Normal', 'Anime Style', 'Smile / Closed', 'Sharp Eyes'];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.all(16),
+          children: eyes.map((eye) {
+            return ListTile(
+              title: Text(eye),
+              trailing: _selectedEyes == eye ? const Icon(Icons.check_circle, color: Colors.deepPurple) : null,
+              onTap: () {
+                setState(() {
+                  _selectedEyes = eye;
+                  AvatarState.eyeStyle = eye;
+                });
+                Navigator.pop(ctx);
+              },
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -917,82 +985,52 @@ class AppearanceScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 25),
 
             // SKIN TONE
-            const Text(
-              'Skin Tone',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
+            const Text('Skin Tone', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
             OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Skin tone selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Choose Skin Tone'),
+              onPressed: _showSkinTonePicker,
+              style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 55)),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(color: _selectedTone, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Choose Skin Tone'),
+                ],
               ),
             ),
 
             const SizedBox(height: 20),
 
             // FACE
-            const Text(
-              'Face',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
+            const Text('Face', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
             OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Face style selected.',
-                );
-              },
-              child: const Align(
+              onPressed: _showFacePicker,
+              style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 55)),
+              child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Choose Face'),
+                child: Text('Face: $_selectedFace'),
               ),
             ),
 
             const SizedBox(height: 20),
 
             // EYES
-            const Text(
-              'Eyes',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
+            const Text('Eyes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
             OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Eye style selected.',
-                );
-              },
-              child: const Align(
+              onPressed: _showEyesPicker,
+              style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 55)),
+              child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Choose Eyes'),
+                child: Text('Eyes: $_selectedEyes'),
               ),
             ),
 
@@ -1002,15 +1040,10 @@ class AppearanceScreen extends StatelessWidget {
               height: 55,
               child: FilledButton(
                 onPressed: () {
-                  _showMessage(
-                    context,
-                    'Appearance saved successfully!',
-                  );
+                  _showMessage(context, 'Appearance saved successfully!');
+                  Navigator.pop(context, true);
                 },
-                child: const Text(
-                  'Save Appearance',
-                  style: TextStyle(fontSize: 17),
-                ),
+                child: const Text('Save Appearance', style: TextStyle(fontSize: 17)),
               ),
             ),
           ],
@@ -1024,8 +1057,16 @@ class AppearanceScreen extends StatelessWidget {
 // HAIR CUSTOMIZATION
 // ==================================================
 
-class HairScreen extends StatelessWidget {
+class HairScreen extends StatefulWidget {
   const HairScreen({super.key});
+
+  @override
+  State<HairScreen> createState() => _HairScreenState();
+}
+
+class _HairScreenState extends State<HairScreen> {
+  String _selectedStyle = AvatarState.hairStyle;
+  String _selectedColor = AvatarState.hairColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1045,95 +1086,73 @@ class HairScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 25),
 
-            const Text(
-              'Hair Style',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
+            const Text('Hair Style', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
 
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Hair Style 1 selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Hair Style 1'),
-              ),
-            ),
+            ...['Hair Style 1', 'Hair Style 2', 'Hair Style 3'].map((style) {
+              final isSelected = _selectedStyle == style;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 55),
+                    side: BorderSide(
+                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _selectedStyle = style;
+                      AvatarState.hairStyle = style;
+                    });
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(style),
+                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
+                    ],
+                  ),
+                ),
+              );
+            }),
 
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Hair Style 2 selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Hair Style 2'),
-              ),
-            ),
+            const SizedBox(height: 20),
 
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Hair Style 3 selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Hair Style 3'),
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            const Text(
-              'Hair Color',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
+            const Text('Hair Color', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
 
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Black hair selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Black'),
-              ),
-            ),
-
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Brown hair selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Brown'),
-              ),
-            ),
+            ...['Black', 'Brown', 'Blonde'].map((col) {
+              final isSelected = _selectedColor == col;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 55),
+                    side: BorderSide(
+                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _selectedColor = col;
+                      AvatarState.hairColor = col;
+                    });
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(col),
+                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
+                    ],
+                  ),
+                ),
+              );
+            }),
 
             const SizedBox(height: 30),
 
@@ -1141,15 +1160,10 @@ class HairScreen extends StatelessWidget {
               height: 55,
               child: FilledButton(
                 onPressed: () {
-                  _showMessage(
-                    context,
-                    'Hair saved successfully!',
-                  );
+                  _showMessage(context, 'Hair saved successfully!');
+                  Navigator.pop(context, true);
                 },
-                child: const Text(
-                  'Save Hair',
-                  style: TextStyle(fontSize: 17),
-                ),
+                child: const Text('Save Hair', style: TextStyle(fontSize: 17)),
               ),
             ),
           ],
@@ -1163,8 +1177,16 @@ class HairScreen extends StatelessWidget {
 // CLOTHES CUSTOMIZATION
 // ==================================================
 
-class ClothesScreen extends StatelessWidget {
+class ClothesScreen extends StatefulWidget {
   const ClothesScreen({super.key});
+
+  @override
+  State<ClothesScreen> createState() => _ClothesScreenState();
+}
+
+class _ClothesScreenState extends State<ClothesScreen> {
+  String _selectedTop = AvatarState.topClothes;
+  String _selectedBottom = AvatarState.bottomClothes;
 
   @override
   Widget build(BuildContext context) {
@@ -1184,95 +1206,73 @@ class ClothesScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 25),
 
-            const Text(
-              'Top',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
+            const Text('Top', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
 
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'T-Shirt selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('T-Shirt'),
-              ),
-            ),
+            ...['T-Shirt', 'Shirt', 'Jacket'].map((top) {
+              final isSelected = _selectedTop == top;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 55),
+                    side: BorderSide(
+                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _selectedTop = top;
+                      AvatarState.topClothes = top;
+                    });
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(top),
+                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
+                    ],
+                  ),
+                ),
+              );
+            }),
 
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Shirt selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Shirt'),
-              ),
-            ),
+            const SizedBox(height: 20),
 
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Jacket selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Jacket'),
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            const Text(
-              'Bottom',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
+            const Text('Bottom', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
 
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Jeans selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Jeans'),
-              ),
-            ),
-
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Pants selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Pants'),
-              ),
-            ),
+            ...['Jeans', 'Pants', 'Shorts'].map((bottom) {
+              final isSelected = _selectedBottom == bottom;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 55),
+                    side: BorderSide(
+                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _selectedBottom = bottom;
+                      AvatarState.bottomClothes = bottom;
+                    });
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(bottom),
+                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
+                    ],
+                  ),
+                ),
+              );
+            }),
 
             const SizedBox(height: 30),
 
@@ -1280,15 +1280,10 @@ class ClothesScreen extends StatelessWidget {
               height: 55,
               child: FilledButton(
                 onPressed: () {
-                  _showMessage(
-                    context,
-                    'Clothes saved successfully!',
-                  );
+                  _showMessage(context, 'Clothes saved successfully!');
+                  Navigator.pop(context, true);
                 },
-                child: const Text(
-                  'Save Clothes',
-                  style: TextStyle(fontSize: 17),
-                ),
+                child: const Text('Save Clothes', style: TextStyle(fontSize: 17)),
               ),
             ),
           ],
@@ -1302,8 +1297,15 @@ class ClothesScreen extends StatelessWidget {
 // SHOES CUSTOMIZATION
 // ==================================================
 
-class ShoesScreen extends StatelessWidget {
+class ShoesScreen extends StatefulWidget {
   const ShoesScreen({super.key});
+
+  @override
+  State<ShoesScreen> createState() => _ShoesScreenState();
+}
+
+class _ShoesScreenState extends State<ShoesScreen> {
+  String _selectedShoe = AvatarState.shoesStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -1323,70 +1325,39 @@ class ShoesScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 25),
 
-            const Text(
-              'Shoe Style',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
+            const Text('Shoe Style', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
 
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Sneakers selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Sneakers'),
-              ),
-            ),
-
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Sports Shoes selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Sports Shoes'),
-              ),
-            ),
-
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Formal Shoes selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Formal Shoes'),
-              ),
-            ),
-
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Boots selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Boots'),
-              ),
-            ),
+            ...['Sneakers', 'Sports Shoes', 'Formal Shoes', 'Boots'].map((shoe) {
+              final isSelected = _selectedShoe == shoe;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 55),
+                    side: BorderSide(
+                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _selectedShoe = shoe;
+                      AvatarState.shoesStyle = shoe;
+                    });
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(shoe),
+                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
+                    ],
+                  ),
+                ),
+              );
+            }),
 
             const SizedBox(height: 30),
 
@@ -1394,15 +1365,10 @@ class ShoesScreen extends StatelessWidget {
               height: 55,
               child: FilledButton(
                 onPressed: () {
-                  _showMessage(
-                    context,
-                    'Shoes saved successfully!',
-                  );
+                  _showMessage(context, 'Shoes saved successfully!');
+                  Navigator.pop(context, true);
                 },
-                child: const Text(
-                  'Save Shoes',
-                  style: TextStyle(fontSize: 17),
-                ),
+                child: const Text('Save Shoes', style: TextStyle(fontSize: 17)),
               ),
             ),
           ],
@@ -1416,8 +1382,15 @@ class ShoesScreen extends StatelessWidget {
 // ACCESSORIES CUSTOMIZATION
 // ==================================================
 
-class AccessoriesScreen extends StatelessWidget {
+class AccessoriesScreen extends StatefulWidget {
   const AccessoriesScreen({super.key});
+
+  @override
+  State<AccessoriesScreen> createState() => _AccessoriesScreenState();
+}
+
+class _AccessoriesScreenState extends State<AccessoriesScreen> {
+  String _selectedAccessory = AvatarState.accessory;
 
   @override
   Widget build(BuildContext context) {
@@ -1437,83 +1410,39 @@ class AccessoriesScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 25),
 
-            const Text(
-              'Accessories',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
+            const Text('Accessories', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
 
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Watch selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Watch'),
-              ),
-            ),
-
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Glasses selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Glasses'),
-              ),
-            ),
-
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Cap selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Cap'),
-              ),
-            ),
-
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Necklace selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Necklace'),
-              ),
-            ),
-
-            OutlinedButton(
-              onPressed: () {
-                _showMessage(
-                  context,
-                  'Bracelet selected.',
-                );
-              },
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Bracelet'),
-              ),
-            ),
+            ...['Watch', 'Glasses', 'Cap', 'Necklace', 'Bracelet'].map((item) {
+              final isSelected = _selectedAccessory == item;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 55),
+                    side: BorderSide(
+                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _selectedAccessory = item;
+                      AvatarState.accessory = item;
+                    });
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(item),
+                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
+                    ],
+                  ),
+                ),
+              );
+            }),
 
             const SizedBox(height: 30),
 
@@ -1521,15 +1450,10 @@ class AccessoriesScreen extends StatelessWidget {
               height: 55,
               child: FilledButton(
                 onPressed: () {
-                  _showMessage(
-                    context,
-                    'Accessories saved successfully!',
-                  );
+                  _showMessage(context, 'Accessories saved successfully!');
+                  Navigator.pop(context, true);
                 },
-                child: const Text(
-                  'Save Accessories',
-                  style: TextStyle(fontSize: 17),
-                ),
+                child: const Text('Save Accessories', style: TextStyle(fontSize: 17)),
               ),
             ),
           ],
@@ -1537,9 +1461,8 @@ class AccessoriesScreen extends StatelessWidget {
       ),
     );
   }
-}
 
-// ==================================================
+  // ==================================================
 // PROFILE
 // ==================================================
 
@@ -1572,9 +1495,7 @@ class ProfileScreen extends StatelessWidget {
                       )
                     : null,
               ),
-
               const SizedBox(height: 20),
-
               Text(
                 user?.displayName ?? 'User',
                 style: const TextStyle(
@@ -1582,9 +1503,7 @@ class ProfileScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               Text(
                 user?.email ?? '',
                 textAlign: TextAlign.center,
@@ -1616,22 +1535,18 @@ class SettingsScreen extends StatelessWidget {
             leading: Icon(Icons.person),
             title: Text('Account'),
           ),
-
           const ListTile(
             leading: Icon(Icons.notifications),
             title: Text('Notifications'),
           ),
-
           const ListTile(
             leading: Icon(Icons.lock),
             title: Text('Privacy'),
           ),
-
           const ListTile(
             leading: Icon(Icons.info),
             title: Text('About Avatar'),
           ),
-
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
