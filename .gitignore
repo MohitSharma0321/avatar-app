@@ -12,34 +12,61 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# IntelliJ / VS Code
 *.iml
 *.ipr
 *.iws
 .idea/
+.vscode/
+*.local
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
+# Flutter / Dart
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
 /build/
 /coverage/
 
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
+# Android Specific
+android/**/gradle-wrapper.jar
+android/.gradle
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/**/GeneratedPluginRegistrant.java
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Obfuscation & Symbols
+app.*.symbols
+app.*.map.json
+*.pdb
+*.sym
+
+# ==================================================
+# 🔐 CRITICAL SECURITY RULES (NEVER PUSH TO GITHUB)
+# ==================================================
+
+# Environment Secrets & API Keys
+.env
+*.env
+*.env.*
+secrets/
+
+# Android Keystores & Signing Passwords
+*.keystore
+*.jks
+key.properties
+
+# Cloud & Firebase Private Admin Keys
+firebase-service-account.json
+service-account.json
+*.key
+*.pem
