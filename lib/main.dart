@@ -10,6 +10,18 @@ Future<void> main() async {
 }
 
 // ==================================================
+// TOP-LEVEL MESSAGE HELPER
+// ==================================================
+
+void _showMessage(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+    ),
+  );
+}
+
+// ==================================================
 // GLOBAL AVATAR STATE
 // ==================================================
 
@@ -31,7 +43,7 @@ class AvatarState {
 // ==================================================
 
 class AvatarApp extends StatelessWidget {
-  const AvatarApp({super.key});
+  const AvatarApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +66,7 @@ class AvatarApp extends StatelessWidget {
 // ==================================================
 
 class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
+  const AuthGate({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +96,7 @@ class AuthGate extends StatelessWidget {
 // ==================================================
 
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key});
+  const WelcomeScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +173,7 @@ class WelcomeScreen extends StatelessWidget {
 // ==================================================
 
 class CreateAccountScreen extends StatefulWidget {
-  const CreateAccountScreen({super.key});
+  const CreateAccountScreen({Key? key}) : super(key: key);
 
   @override
   State<CreateAccountScreen> createState() => _CreateAccountScreenState();
@@ -327,7 +339,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 // ==================================================
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({Key? key}) : super(key: key);
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -471,7 +483,7 @@ class _LoginScreenState extends State<LoginScreen> {
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({Key? key}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -530,7 +542,7 @@ class _HomeScreenState extends State<HomeScreen> {
 // ==================================================
 
 class HomeTab extends StatelessWidget {
-  const HomeTab({super.key});
+  const HomeTab({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -629,7 +641,7 @@ class HomeTab extends StatelessWidget {
 // ==================================================
 
 class AvatarScreen extends StatelessWidget {
-  const AvatarScreen({super.key});
+  const AvatarScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -683,7 +695,7 @@ class AvatarScreen extends StatelessWidget {
 // ==================================================
 
 class CreateAvatarScreen extends StatefulWidget {
-  const CreateAvatarScreen({super.key});
+  const CreateAvatarScreen({Key? key}) : super(key: key);
 
   @override
   State<CreateAvatarScreen> createState() => _CreateAvatarScreenState();
@@ -709,7 +721,6 @@ class _CreateAvatarScreenState extends State<CreateAvatarScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 3D MODEL
             SizedBox(
               height: 350,
               child: ClipRRect(
@@ -841,7 +852,7 @@ class _CreateAvatarScreenState extends State<CreateAvatarScreen> {
 // ==================================================
 
 class AppearanceScreen extends StatefulWidget {
-  const AppearanceScreen({super.key});
+  const AppearanceScreen({Key? key}) : super(key: key);
 
   @override
   State<AppearanceScreen> createState() => _AppearanceScreenState();
@@ -853,12 +864,12 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
   String _selectedEyes = AvatarState.eyeStyle;
 
   final List<Color> _tones = const [
-    Color(0xFFFFDFC4), // Fair Tone
-    Color(0xFFFFCD94), // Peach Tone
-    Color(0xFFEAC086), // Warm Beige
-    Color(0xFFD89B5F), // Tan Tone
-    Color(0xFF8D5524), // Brown Tone
-    Color(0xFF4A2A18), // Deep Tone
+    Color(0xFFFFDFC4),
+    Color(0xFFFFCD94),
+    Color(0xFFEAC086),
+    Color(0xFFD89B5F),
+    Color(0xFF8D5524),
+    Color(0xFF4A2A18),
   ];
 
   void _showSkinTonePicker() {
@@ -986,8 +997,6 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
               ),
             ),
             const SizedBox(height: 25),
-
-            // SKIN TONE
             const Text('Skin Tone', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             OutlinedButton(
@@ -1005,10 +1014,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // FACE
             const Text('Face', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             OutlinedButton(
@@ -1019,10 +1025,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
                 child: Text('Face: $_selectedFace'),
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // EYES
             const Text('Eyes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             OutlinedButton(
@@ -1033,9 +1036,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
                 child: Text('Eyes: $_selectedEyes'),
               ),
             ),
-
             const SizedBox(height: 30),
-
             SizedBox(
               height: 55,
               child: FilledButton(
@@ -1058,7 +1059,7 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
 // ==================================================
 
 class HairScreen extends StatefulWidget {
-  const HairScreen({super.key});
+  const HairScreen({Key? key}) : super(key: key);
 
   @override
   State<HairScreen> createState() => _HairScreenState();
@@ -1087,10 +1088,8 @@ class _HairScreenState extends State<HairScreen> {
               ),
             ),
             const SizedBox(height: 25),
-
             const Text('Hair Style', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
             ...['Hair Style 1', 'Hair Style 2', 'Hair Style 3'].map((style) {
               final isSelected = _selectedStyle == style;
               return Padding(
@@ -1119,12 +1118,9 @@ class _HairScreenState extends State<HairScreen> {
                 ),
               );
             }),
-
             const SizedBox(height: 20),
-
             const Text('Hair Color', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
             ...['Black', 'Brown', 'Blonde'].map((col) {
               final isSelected = _selectedColor == col;
               return Padding(
@@ -1153,9 +1149,7 @@ class _HairScreenState extends State<HairScreen> {
                 ),
               );
             }),
-
             const SizedBox(height: 30),
-
             SizedBox(
               height: 55,
               child: FilledButton(
@@ -1178,7 +1172,7 @@ class _HairScreenState extends State<HairScreen> {
 // ==================================================
 
 class ClothesScreen extends StatefulWidget {
-  const ClothesScreen({super.key});
+  const ClothesScreen({Key? key}) : super(key: key);
 
   @override
   State<ClothesScreen> createState() => _ClothesScreenState();
@@ -1207,10 +1201,8 @@ class _ClothesScreenState extends State<ClothesScreen> {
               ),
             ),
             const SizedBox(height: 25),
-
             const Text('Top', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
             ...['T-Shirt', 'Shirt', 'Jacket'].map((top) {
               final isSelected = _selectedTop == top;
               return Padding(
@@ -1239,12 +1231,9 @@ class _ClothesScreenState extends State<ClothesScreen> {
                 ),
               );
             }),
-
             const SizedBox(height: 20),
-
             const Text('Bottom', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
             ...['Jeans', 'Pants', 'Shorts'].map((bottom) {
               final isSelected = _selectedBottom == bottom;
               return Padding(
@@ -1273,9 +1262,7 @@ class _ClothesScreenState extends State<ClothesScreen> {
                 ),
               );
             }),
-
             const SizedBox(height: 30),
-
             SizedBox(
               height: 55,
               child: FilledButton(
@@ -1298,7 +1285,7 @@ class _ClothesScreenState extends State<ClothesScreen> {
 // ==================================================
 
 class ShoesScreen extends StatefulWidget {
-  const ShoesScreen({super.key});
+  const ShoesScreen({Key? key}) : super(key: key);
 
   @override
   State<ShoesScreen> createState() => _ShoesScreenState();
@@ -1326,10 +1313,8 @@ class _ShoesScreenState extends State<ShoesScreen> {
               ),
             ),
             const SizedBox(height: 25),
-
             const Text('Shoe Style', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
             ...['Sneakers', 'Sports Shoes', 'Formal Shoes', 'Boots'].map((shoe) {
               final isSelected = _selectedShoe == shoe;
               return Padding(
@@ -1358,9 +1343,7 @@ class _ShoesScreenState extends State<ShoesScreen> {
                 ),
               );
             }),
-
             const SizedBox(height: 30),
-
             SizedBox(
               height: 55,
               child: FilledButton(
@@ -1383,7 +1366,7 @@ class _ShoesScreenState extends State<ShoesScreen> {
 // ==================================================
 
 class AccessoriesScreen extends StatefulWidget {
-  const AccessoriesScreen({super.key});
+  const AccessoriesScreen({Key? key}) : super(key: key);
 
   @override
   State<AccessoriesScreen> createState() => _AccessoriesScreenState();
@@ -1411,10 +1394,8 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
               ),
             ),
             const SizedBox(height: 25),
-
             const Text('Accessories', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-
             ...['Watch', 'Glasses', 'Cap', 'Necklace', 'Bracelet'].map((item) {
               final isSelected = _selectedAccessory == item;
               return Padding(
@@ -1443,9 +1424,7 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
                 ),
               );
             }),
-
             const SizedBox(height: 30),
-
             SizedBox(
               height: 55,
               child: FilledButton(
@@ -1461,13 +1440,14 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
       ),
     );
   }
+}
 
-  // ==================================================
+// ==================================================
 // PROFILE
 // ==================================================
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -1521,7 +1501,7 @@ class ProfileScreen extends StatelessWidget {
 // ==================================================
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -1558,19 +1538,4 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-// ==================================================
-// COMMON MESSAGE
-// ==================================================
-
-void _showMessage(
-  BuildContext context,
-  String message,
-) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(message),
-    ),
-  );
 }
