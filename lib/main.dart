@@ -17,109 +17,73 @@ void _showMessage(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(message),
+      behavior: SnackBarBehavior.floating,
     ),
   );
 }
 
 // ==================================================
-// PROCEDURAL TEXTURE & EYE BRIDGE
+// GLOBAL AVATAR STATE (3 ORIGINAL CHARACTERS)
 // ==================================================
 
+class AvatarCharacter {
+  final String name;
+  final Color color;
+  final Color badgeColor;
+  final List<double> rgbFactor;
+
+  const AvatarCharacter({
+    required this.name,
+    required this.color,
+    required this.badgeColor,
+    required this.rgbFactor,
+  });
+}
+
+class AvatarState {
+  static const String modelPath = 'assets/models/New_Project_18082026.glb';
+
+  static final List<AvatarCharacter> characters = [
+    const AvatarCharacter(
+      name: 'ORANGE',
+      color: Color(0xFFFF7A00),
+      badgeColor: Color(0xFFE65100),
+      rgbFactor: [1.0, 0.48, 0.0, 1.0],
+    ),
+    const AvatarCharacter(
+      name: 'BLUE',
+      color: Color(0xFF2196F3),
+      badgeColor: Color(0xFF1565C0),
+      rgbFactor: [0.13, 0.59, 0.95, 1.0],
+    ),
+    const AvatarCharacter(
+      name: 'GREEN',
+      color: Color(0xFF5DB835),
+      badgeColor: Color(0xFF2E7D32),
+      rgbFactor: [0.36, 0.72, 0.21, 1.0],
+    ),
+  ];
+
+  static int selectedIndex = 0; // Default: ORANGE
+
+  static AvatarCharacter get current => characters[selectedIndex];
+}
+
 String getModelViewerJs() {
-  final r = AvatarState.skinColor.red;
-  final g = AvatarState.skinColor.green;
-  final b = AvatarState.skinColor.blue;
-  final eyeStyle = AvatarState.eyeStyle;
-
+  final rgb = AvatarState.current.rgbFactor;
   return '''
-    function generateAvatarTexture(r, g, b, eyeStyle) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-
-      // 1. Skin Base Color
-      ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
-      ctx.fillRect(0, 0, 512, 512);
-
-      // 2. Eye Drawing Settings
-      ctx.fillStyle = '#111111';
-      ctx.strokeStyle = '#111111';
-      ctx.lineWidth = 10;
-      ctx.lineCap = 'round';
-
-      if (eyeStyle === 'Normal') {
-        // Left & Right Normal Eyes
-        ctx.beginPath(); ctx.ellipse(190, 240, 22, 34, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(322, 240, 22, 34, 0, 0, Math.PI * 2); ctx.fill();
-        // White Highlights
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath(); ctx.arc(182, 228, 9, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(314, 228, 9, 0, Math.PI * 2); ctx.fill();
-      } else if (eyeStyle === 'Anime Style') {
-        // Big Anime Eyes
-        ctx.beginPath(); ctx.ellipse(185, 235, 32, 48, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(327, 235, 32, 48, 0, 0, Math.PI * 2); ctx.fill();
-        // Primary Highlight
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath(); ctx.ellipse(176, 215, 14, 18, -0.2, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(318, 215, 14, 18, -0.2, 0, Math.PI * 2); ctx.fill();
-        // Secondary Highlight
-        ctx.beginPath(); ctx.arc(196, 258, 7, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(338, 258, 7, 0, Math.PI * 2); ctx.fill();
-      } else if (eyeStyle === 'Smile / Closed') {
-        // Curved Smiling Eyes
-        ctx.beginPath(); ctx.arc(190, 250, 30, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
-        ctx.beginPath(); ctx.arc(322, 250, 30, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
-      } else if (eyeStyle === 'Sharp Eyes') {
-        // Sharp Anime Eyes
-        ctx.beginPath();
-        ctx.moveTo(150, 225); ctx.lineTo(220, 245); ctx.lineTo(165, 260); ctx.closePath(); ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(362, 225); ctx.lineTo(292, 245); ctx.lineTo(347, 260); ctx.closePath(); ctx.fill();
-        // Highlights
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath(); ctx.arc(185, 240, 5, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(327, 240, 5, 0, Math.PI * 2); ctx.fill();
-      }
-      return canvas.toDataURL('image/png');
-    }
-
     const mv = document.querySelector('model-viewer');
     if (mv) {
-      mv.addEventListener('load', async () => {
-        try {
-          const dataUrl = generateAvatarTexture($r, $g, $b, '$eyeStyle');
-          const texture = await mv.createTexture(dataUrl);
-          if (mv.model && mv.model.materials) {
-            for (let i = 0; i < mv.model.materials.length; i++) {
-              mv.model.materials[i].pbrMetallicRoughness.baseColorTexture.setTexture(texture);
-              mv.model.materials[i].pbrMetallicRoughness.setBaseColorFactor([1.0, 1.0, 1.0, 1.0]);
-            }
+      mv.addEventListener('load', () => {
+        if (mv.model && mv.model.materials) {
+          for (let i = 0; i < mv.model.materials.length; i++) {
+            mv.model.materials[i].pbrMetallicRoughness.setBaseColorFactor([${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 1.0]);
+            mv.model.materials[i].pbrMetallicRoughness.setRoughnessFactor(0.35);
           }
-        } catch (e) {
-          console.error(e);
         }
       });
     }
   ''';
-}
-
-// ==================================================
-// GLOBAL AVATAR STATE
-// ==================================================
-
-class AvatarState {
-  static String currentModel = 'assets/models/New_Project_18082026.glb';
-  static Color skinColor = const Color(0xFFFFDFC4);
-  static String faceStyle = 'Classic';
-  static String eyeStyle = 'Normal';
-  static String hairStyle = 'Hair Style 1';
-  static String hairColor = 'Black';
-  static String topClothes = 'T-Shirt';
-  static String bottomClothes = 'Jeans';
-  static String shoesStyle = 'Sneakers';
-  static String accessory = 'Watch';
 }
 
 // ==================================================
@@ -135,8 +99,11 @@ class AvatarApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Avatar',
       theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF121212),
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
         ),
         useMaterial3: true,
       ),
@@ -194,9 +161,11 @@ class WelcomeScreen extends StatelessWidget {
               children: [
                 const CircleAvatar(
                   radius: 70,
+                  backgroundColor: Color(0xFF1E1E1E),
                   child: Icon(
                     Icons.person,
                     size: 80,
+                    color: Colors.white70,
                   ),
                 ),
                 const SizedBox(height: 28),
@@ -205,17 +174,19 @@ class WelcomeScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 36,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
                   ),
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Create your avatar and enter your world.',
+                  'Choose your original character and enter your world.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16),
+                  style: TextStyle(fontSize: 16, color: Colors.white70),
                 ),
                 const SizedBox(height: 40),
                 SizedBox(
                   width: double.infinity,
+                  height: 52,
                   child: FilledButton(
                     onPressed: () {
                       Navigator.push(
@@ -225,12 +196,13 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       );
                     },
-                    child: const Text('Create Account'),
+                    child: const Text('Create Account', style: TextStyle(fontSize: 16)),
                   ),
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
+                  height: 52,
                   child: OutlinedButton(
                     onPressed: () {
                       Navigator.push(
@@ -240,7 +212,7 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       );
                     },
-                    child: const Text('Login'),
+                    child: const Text('Login', style: TextStyle(fontSize: 16)),
                   ),
                 ),
               ],
@@ -578,7 +550,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> pages = const [
     HomeTab(),
-    AvatarScreen(),
+    SelectCharacterScreen(),
     ProfileScreen(),
     SettingsScreen(),
   ];
@@ -601,9 +573,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Avatar',
+            icon: Icon(Icons.palette_outlined),
+            selectedIcon: Icon(Icons.palette),
+            label: 'Character',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_circle_outlined),
@@ -636,6 +608,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final character = AvatarState.current;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -644,34 +617,39 @@ class _HomeTabState extends State<HomeTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Welcome to Avatar',
+              'My Avatar',
               style: TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               user?.displayName?.isNotEmpty == true
                   ? user!.displayName!
                   : user?.email ?? 'User',
               style: const TextStyle(
-                fontSize: 17,
+                fontSize: 16,
+                color: Colors.white70,
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 25),
             Container(
               width: double.infinity,
-              height: 350,
+              height: 380,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(28),
+                color: const Color(0xFF1E1E1E),
+                border: Border.all(
+                  color: character.color.withOpacity(0.3),
+                  width: 2,
+                ),
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(28),
                 child: ModelViewer(
                   key: UniqueKey(),
-                  src: AvatarState.currentModel,
+                  src: AvatarState.modelPath,
                   alt: 'My 3D Avatar',
                   autoRotate: true,
                   cameraControls: true,
@@ -683,42 +661,28 @@ class _HomeTabState extends State<HomeTab> {
             const SizedBox(height: 25),
             SizedBox(
               width: double.infinity,
-              height: 55,
+              height: 56,
               child: FilledButton.icon(
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const CreateAvatarScreen(),
-                    ),
-                  );
-                  setState(() {});
-                },
-                icon: const Icon(Icons.add),
-                label: const Text(
-                  'Create Avatar',
-                  style: TextStyle(fontSize: 17),
+                style: FilledButton.styleFrom(
+                  backgroundColor: character.color,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 15),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: OutlinedButton.icon(
                 onPressed: () async {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const AvatarScreen(),
+                      builder: (_) => const SelectCharacterScreen(),
                     ),
                   );
                   setState(() {});
                 },
-                icon: const Icon(Icons.edit),
-                label: const Text(
-                  'Customize Avatar',
-                  style: TextStyle(fontSize: 17),
+                icon: const Icon(Icons.swap_horiz, size: 26),
+                label: Text(
+                  'Change Character (${character.name})',
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -730,815 +694,166 @@ class _HomeTabState extends State<HomeTab> {
 }
 
 // ==================================================
-// AVATAR SCREEN
+// 3-COLOR CHARACTER SELECTOR SCREEN
 // ==================================================
 
-class AvatarScreen extends StatefulWidget {
-  const AvatarScreen({Key? key}) : super(key: key);
+class SelectCharacterScreen extends StatefulWidget {
+  const SelectCharacterScreen({Key? key}) : super(key: key);
 
   @override
-  State<AvatarScreen> createState() => _AvatarScreenState();
+  State<SelectCharacterScreen> createState() => _SelectCharacterScreenState();
 }
 
-class _AvatarScreenState extends State<AvatarScreen> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Avatar'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: ModelViewer(
-                  key: UniqueKey(),
-                  src: AvatarState.currentModel,
-                  alt: 'My 3D Avatar',
-                  autoRotate: true,
-                  cameraControls: true,
-                  backgroundColor: Colors.transparent,
-                  relatedJs: getModelViewerJs(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: FilledButton(
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const CreateAvatarScreen(),
-                    ),
-                  );
-                  setState(() {});
-                },
-                child: const Text(
-                  'Create / Customize Avatar',
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ==================================================
-// CREATE / CUSTOMIZE AVATAR
-// ==================================================
-
-class CreateAvatarScreen extends StatefulWidget {
-  const CreateAvatarScreen({Key? key}) : super(key: key);
-
-  @override
-  State<CreateAvatarScreen> createState() => _CreateAvatarScreenState();
-}
-
-class _CreateAvatarScreenState extends State<CreateAvatarScreen> {
-  Key modelKey = UniqueKey();
-
-  void _refresh() {
-    setState(() {
-      modelKey = UniqueKey();
-    });
-  }
+class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
+  int tempIndex = AvatarState.selectedIndex;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Avatar'),
+        title: const Text('Choose Character'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: 350,
+      body: Column(
+        children: [
+          // LIVE 3D PREVIEW
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                color: const Color(0xFF1E1E1E),
+                border: Border.all(
+                  color: AvatarState.characters[tempIndex].color.withOpacity(0.4),
+                  width: 2,
+                ),
+              ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(28),
                 child: ModelViewer(
-                  key: modelKey,
-                  src: AvatarState.currentModel,
-                  alt: 'My 3D Avatar',
+                  key: ValueKey(tempIndex),
+                  src: AvatarState.modelPath,
+                  alt: 'Character Preview',
                   autoRotate: true,
                   cameraControls: true,
                   backgroundColor: Colors.transparent,
-                  relatedJs: getModelViewerJs(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 25),
-            const Text(
-              'Customize your Avatar',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            _optionButton(
-              context,
-              'Appearance',
-              Icons.face,
-              () async {
-                final res = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AppearanceScreen()),
-                );
-                if (res == true) _refresh();
-              },
-            ),
-            _optionButton(
-              context,
-              'Hair',
-              Icons.face_retouching_natural,
-              () async {
-                final res = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HairScreen()),
-                );
-                if (res == true) _refresh();
-              },
-            ),
-            _optionButton(
-              context,
-              'Clothes',
-              Icons.checkroom,
-              () async {
-                final res = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ClothesScreen()),
-                );
-                if (res == true) _refresh();
-              },
-            ),
-            _optionButton(
-              context,
-              'Shoes',
-              Icons.directions_walk,
-              () async {
-                final res = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ShoesScreen()),
-                );
-                if (res == true) _refresh();
-              },
-            ),
-            _optionButton(
-              context,
-              'Accessories',
-              Icons.watch,
-              () async {
-                final res = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AccessoriesScreen()),
-                );
-                if (res == true) _refresh();
-              },
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 55,
-              child: FilledButton(
-                onPressed: () {
-                  _showMessage(context, 'Avatar saved successfully!');
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  'Save Avatar',
-                  style: TextStyle(fontSize: 17),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _optionButton(
-    BuildContext context,
-    String title,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon),
-        label: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(title),
-        ),
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(double.infinity, 55),
-        ),
-      ),
-    );
-  }
-}
-
-// ==================================================
-// APPEARANCE CUSTOMIZATION
-// ==================================================
-
-class AppearanceScreen extends StatefulWidget {
-  const AppearanceScreen({Key? key}) : super(key: key);
-
-  @override
-  State<AppearanceScreen> createState() => _AppearanceScreenState();
-}
-
-class _AppearanceScreenState extends State<AppearanceScreen> {
-  Color _selectedTone = AvatarState.skinColor;
-  String _selectedFace = AvatarState.faceStyle;
-  String _selectedEyes = AvatarState.eyeStyle;
-
-  final List<Color> _tones = const [
-    Color(0xFFFFDFC4),
-    Color(0xFFFFCD94),
-    Color(0xFFEAC086),
-    Color(0xFFD89B5F),
-    Color(0xFF8D5524),
-    Color(0xFF4A2A18),
-  ];
-
-  void _showSkinTonePicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          height: 210,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Choose Skin Tone', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: _tones.map((color) {
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedTone = color;
-                        AvatarState.skinColor = color;
+                  relatedJs: '''
+                    const mv = document.querySelector('model-viewer');
+                    if (mv) {
+                      mv.addEventListener('load', () => {
+                        if (mv.model && mv.model.materials) {
+                          const rgb = ${AvatarState.characters[tempIndex].rgbFactor};
+                          for (let i = 0; i < mv.model.materials.length; i++) {
+                            mv.model.materials[i].pbrMetallicRoughness.setBaseColorFactor([rgb[0], rgb[1], rgb[2], 1.0]);
+                            mv.model.materials[i].pbrMetallicRoughness.setRoughnessFactor(0.35);
+                          }
+                        }
                       });
-                      Navigator.pop(ctx);
-                    },
-                    child: Container(
-                      width: 45,
-                      height: 45,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _selectedTone == color ? Colors.deepPurple : Colors.grey.shade300,
-                          width: _selectedTone == color ? 3.5 : 1.5,
+                    }
+                  ''',
+                ),
+              ),
+            ),
+          ),
+
+          // COLOR SELECTION TABS
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            decoration: const BoxDecoration(
+              color: Color(0xFF181818),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'COLOR OPTIONS',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                    color: Colors.white60,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: List.generate(
+                    AvatarState.characters.length,
+                    (index) {
+                      final char = AvatarState.characters[index];
+                      final isSelected = tempIndex == index;
+
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                tempIndex = index;
+                              });
+                            },
+                            child: Container(
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? char.color
+                                    : char.color.withOpacity(0.18),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isSelected ? Colors.white : char.color,
+                                  width: isSelected ? 2.5 : 1,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  char.name,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected ? Colors.white : char.color,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 55,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AvatarState.characters[tempIndex].color,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
-            ],
+                    onPressed: () {
+                      AvatarState.selectedIndex = tempIndex;
+                      _showMessage(
+                        context,
+                        '${AvatarState.current.name} Avatar equipped!',
+                      );
+                      Navigator.pop(context);
+                    },
+                    child: Text(
+                      'Equip ${AvatarState.characters[tempIndex].name}',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
           ),
-        );
-      },
-    );
-  }
-
-  void _showFacePicker() {
-    final faces = ['Classic', 'Round Face', 'Chiseled', 'Cute Style'];
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.all(16),
-          children: faces.map((face) {
-            return ListTile(
-              title: Text(face),
-              trailing: _selectedFace == face ? const Icon(Icons.check_circle, color: Colors.deepPurple) : null,
-              onTap: () {
-                setState(() {
-                  _selectedFace = face;
-                  AvatarState.faceStyle = face;
-                });
-                Navigator.pop(ctx);
-              },
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  void _showEyesPicker() {
-    final eyes = ['Normal', 'Anime Style', 'Smile / Closed', 'Sharp Eyes'];
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.all(16),
-          children: eyes.map((eye) {
-            return ListTile(
-              title: Text(eye),
-              trailing: _selectedEyes == eye ? const Icon(Icons.check_circle, color: Colors.deepPurple) : null,
-              onTap: () {
-                setState(() {
-                  _selectedEyes = eye;
-                  AvatarState.eyeStyle = eye;
-                });
-                Navigator.pop(ctx);
-              },
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Appearance'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Customize Appearance',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 25),
-            const Text('Skin Tone', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: _showSkinTonePicker,
-              style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 55)),
-              child: Row(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(color: _selectedTone, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('Choose Skin Tone'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text('Face', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: _showFacePicker,
-              style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 55)),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Face: $_selectedFace'),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text('Eyes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: _showEyesPicker,
-              style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 55)),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Eyes: $_selectedEyes'),
-              ),
-            ),
-            const SizedBox(height: 30),
-            SizedBox(
-              height: 55,
-              child: FilledButton(
-                onPressed: () {
-                  _showMessage(context, 'Appearance saved successfully!');
-                  Navigator.pop(context, true);
-                },
-                child: const Text('Save Appearance', style: TextStyle(fontSize: 17)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ==================================================
-// HAIR CUSTOMIZATION
-// ==================================================
-
-class HairScreen extends StatefulWidget {
-  const HairScreen({Key? key}) : super(key: key);
-
-  @override
-  State<HairScreen> createState() => _HairScreenState();
-}
-
-class _HairScreenState extends State<HairScreen> {
-  String _selectedStyle = AvatarState.hairStyle;
-  String _selectedColor = AvatarState.hairColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hair'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Customize Hair',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 25),
-            const Text('Hair Style', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ...['Hair Style 1', 'Hair Style 2', 'Hair Style 3'].map((style) {
-              final isSelected = _selectedStyle == style;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 55),
-                    side: BorderSide(
-                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedStyle = style;
-                      AvatarState.hairStyle = style;
-                    });
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(style),
-                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
-                    ],
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 20),
-            const Text('Hair Color', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ...['Black', 'Brown', 'Blonde'].map((col) {
-              final isSelected = _selectedColor == col;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 55),
-                    side: BorderSide(
-                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedColor = col;
-                      AvatarState.hairColor = col;
-                    });
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(col),
-                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
-                    ],
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 30),
-            SizedBox(
-              height: 55,
-              child: FilledButton(
-                onPressed: () {
-                  _showMessage(context, 'Hair saved successfully!');
-                  Navigator.pop(context, true);
-                },
-                child: const Text('Save Hair', style: TextStyle(fontSize: 17)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ==================================================
-// CLOTHES CUSTOMIZATION
-// ==================================================
-
-class ClothesScreen extends StatefulWidget {
-  const ClothesScreen({Key? key}) : super(key: key);
-
-  @override
-  State<ClothesScreen> createState() => _ClothesScreenState();
-}
-
-class _ClothesScreenState extends State<ClothesScreen> {
-  String _selectedTop = AvatarState.topClothes;
-  String _selectedBottom = AvatarState.bottomClothes;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Clothes'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Customize Clothes',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 25),
-            const Text('Top', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ...['T-Shirt', 'Shirt', 'Jacket'].map((top) {
-              final isSelected = _selectedTop == top;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 55),
-                    side: BorderSide(
-                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedTop = top;
-                      AvatarState.topClothes = top;
-                    });
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(top),
-                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
-                    ],
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 20),
-            const Text('Bottom', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ...['Jeans', 'Pants', 'Shorts'].map((bottom) {
-              final isSelected = _selectedBottom == bottom;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 55),
-                    side: BorderSide(
-                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedBottom = bottom;
-                      AvatarState.bottomClothes = bottom;
-                    });
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(bottom),
-                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
-                    ],
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 30),
-            SizedBox(
-              height: 55,
-              child: FilledButton(
-                onPressed: () {
-                  _showMessage(context, 'Clothes saved successfully!');
-                  Navigator.pop(context, true);
-                },
-                child: const Text('Save Clothes', style: TextStyle(fontSize: 17)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ==================================================
-// SHOES CUSTOMIZATION
-// ==================================================
-
-class ShoesScreen extends StatefulWidget {
-  const ShoesScreen({Key? key}) : super(key: key);
-
-  @override
-  State<ShoesScreen> createState() => _ShoesScreenState();
-}
-
-class _ShoesScreenState extends State<ShoesScreen> {
-  String _selectedShoe = AvatarState.shoesStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Shoes'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Customize Shoes',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 25),
-            const Text('Shoe Style', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ...['Sneakers', 'Sports Shoes', 'Formal Shoes', 'Boots'].map((shoe) {
-              final isSelected = _selectedShoe == shoe;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 55),
-                    side: BorderSide(
-                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedShoe = shoe;
-                      AvatarState.shoesStyle = shoe;
-                    });
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(shoe),
-                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
-                    ],
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 30),
-            SizedBox(
-              height: 55,
-              child: FilledButton(
-                onPressed: () {
-                  _showMessage(context, 'Shoes saved successfully!');
-                  Navigator.pop(context, true);
-                },
-                child: const Text('Save Shoes', style: TextStyle(fontSize: 17)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ==================================================
-// ACCESSORIES CUSTOMIZATION
-// ==================================================
-
-class AccessoriesScreen extends StatefulWidget {
-  const AccessoriesScreen({Key? key}) : super(key: key);
-
-  @override
-  State<AccessoriesScreen> createState() => _AccessoriesScreenState();
-}
-
-class _AccessoriesScreenState extends State<AccessoriesScreen> {
-  String _selectedAccessory = AvatarState.accessory;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Accessories'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Customize Accessories',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 25),
-            const Text('Accessories', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ...['Watch', 'Glasses', 'Cap', 'Necklace', 'Bracelet'].map((item) {
-              final isSelected = _selectedAccessory == item;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 55),
-                    side: BorderSide(
-                      color: isSelected ? Colors.deepPurple : Colors.grey.shade400,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _selectedAccessory = item;
-                      AvatarState.accessory = item;
-                    });
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(item),
-                      if (isSelected) const Icon(Icons.check_circle, color: Colors.deepPurple),
-                    ],
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 30),
-            SizedBox(
-              height: 55,
-              child: FilledButton(
-                onPressed: () {
-                  _showMessage(context, 'Accessories saved successfully!');
-                  Navigator.pop(context, true);
-                },
-                child: const Text('Save Accessories', style: TextStyle(fontSize: 17)),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
