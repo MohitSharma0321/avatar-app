@@ -438,8 +438,11 @@ class _LoginScreenState
         email: email,
         password: password,
       );
-    } on FirebaseAuthException catch (e) {
-      String message = 'Login failed.';
+} on FirebaseAuthException catch (e) {
+  String message = 'Firebase error: ${e.code}';
+
+  print('FIREBASE LOGIN ERROR: ${e.code}');
+  print('FIREBASE LOGIN MESSAGE: ${e.message}');
 
       if (e.code == 'user-not-found' ||
           e.code == 'invalid-credential') {
