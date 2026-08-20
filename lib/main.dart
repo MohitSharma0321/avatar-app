@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1014,6 +1015,49 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final List<Map<String, String>> messages = [];
   bool isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadChatHistory();
+  }
+
+  // Load chat history from phone storage
+  Future<void> _loadChatHistory() async {
+    if (widget.userName == 'Avatar Friend') {
+      final prefs = await SharedPreferences.getInstance();
+      final String? saved = prefs.getString('avatar_friend_history');
+      if (saved != null) {
+        final List<dynamic> decoded = jsonDecode(saved);
+        setState(() {
+          messages.clear();
+          for (var item in decoded) {
+            messages.add(Map<String, String>.from(item));
+          }
+        });
+      }
+    }
+  }
+
+  // Save chat history to phone storage
+  Future<void> _saveChatHistory() async {
+    if (widget.userName == 'Avatar Friend') {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('avatar_friend_history', jsonEncode(messages));
+    }
+  }
+
+  // Clear chat history
+  Future<void> _clearChatHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('avatar_friend_history');
+    setState(() {
+      messages.clear();
+    });
+    if (mounted) {
+      _showMessage(context, 'Chat history cleared.');
+    }
+  }
+
   void sendMessage() async {
     final message = messageController.text.trim();
     if (message.isEmpty) return;
@@ -1021,6 +1065,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     setState(() {
       messages.add({'sender': 'user', 'text': message});
     });
+    _saveChatHistory();
 
     messageController.clear();
 
@@ -1037,6 +1082,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         messages.add({'sender': 'bot', 'text': reply});
         isLoading = false;
       });
+      _saveChatHistory();
     }
   }
 
@@ -1093,6 +1139,33 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           ],
         ),
         actions: [
+          if (isAvatarFriend)
+            IconButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Clear Chat?'),
+                    content: const Text('Are you sure you want to delete all messages?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _clearChatHistory();
+                        },
+                        child: const Text('Clear', style: TextStyle(color: Colors.redAccent)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Clear Chat',
+            ),
           IconButton(
             onPressed: () {
               _showMessage(
