@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -722,7 +723,7 @@ class _HomeTabState extends State<HomeTab> {
 }
 
 // ==================================================
-// CHAT SCREEN (ONLY BONDED CONTACTS & SUGGESTIONS)
+// CHAT SCREEN
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -804,7 +805,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
               final allDocs = allUsersSnap.data?.docs ?? [];
 
-              // Filter users you have a bond with
               final bondedUsers = allDocs.where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 final uid = data['uid'] ?? doc.id;
@@ -817,7 +817,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 return true;
               }).toList();
 
-              // Suggested users (registered users not bonded yet)
               final suggestedUsers = allDocs.where((doc) {
                 final uid = doc.id;
                 return uid != currentUid && !myBonds.contains(uid);
@@ -825,7 +824,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
               return ListView(
                 children: [
-                  // Search Bar
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                     child: TextField(
@@ -976,7 +974,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ],
 
-                  // 3. Suggested Bonds (People on Avatar)
+                  // 3. Suggested Bonds Section
                   if (suggestedUsers.isNotEmpty) ...[
                     const Padding(
                       padding: EdgeInsets.fromLTRB(18, 24, 18, 10),
@@ -1069,7 +1067,7 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 // ==================================================
-// NEW CHAT / DISCOVER SCREEN (SEARCH & BOND)
+// NEW CHAT / DISCOVER SCREEN
 // ==================================================
 
 class NewChatScreen extends StatefulWidget {
@@ -1223,7 +1221,6 @@ class _NewChatScreenState extends State<NewChatScreen> {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Bond Toggle Button
                               OutlinedButton(
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(color: peerAvatar.themeColor),
@@ -1279,7 +1276,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
 }
 
 // ==================================================
-// USER PROFILE PREVIEW SCREEN (OPENED ON NAME TAP)
+// USER PROFILE PREVIEW SCREEN
 // ==================================================
 
 class UserProfileViewScreen extends StatelessWidget {
@@ -1314,7 +1311,6 @@ class UserProfileViewScreen extends StatelessWidget {
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  // 3D Avatar of User
                   Container(
                     width: double.infinity,
                     height: 320,
@@ -1435,7 +1431,7 @@ class UserProfileViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN
+// CHAT CONVERSATION SCREEN (WITH TTS VOICE)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1457,7 +1453,10 @@ class ChatConversationScreen extends StatefulWidget {
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final TextEditingController messageController = TextEditingController();
   final List<Map<String, String>> localMessages = [];
+  final FlutterTts flutterTts = FlutterTts();
+  
   bool isLoading = false;
+  bool isVoiceEnabled = true;
 
   bool get isAvatarFriend => widget.userName == 'Avatar Friend';
   String get currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -1466,9 +1465,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   @override
   void initState() {
     super.initState();
+    _initTts();
     if (isAvatarFriend) {
       _loadChatHistory();
     }
+  }
+
+  Future<void> _initTts() async {
+    await flutterTts.setSpeechRate(0.5);
+    await flutterTts.setPitch(1.0);
+  }
+
+  Future<void> _speak(String text) async {
+    if (!isVoiceEnabled || !isAvatarFriend) return;
+    // Clean symbols like markdown asterisks before speaking
+    final cleanText = text.replaceAll('*', '').replaceAll('#', '').replaceAll('`', '');
+    await flutterTts.stop();
+    await flutterTts.speak(cleanText);
   }
 
   Future<void> _loadChatHistory() async {
@@ -1491,6 +1504,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   Future<void> _clearChatHistory() async {
+    await flutterTts.stop();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('avatar_friend_history');
     setState(() {
@@ -1523,6 +1537,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         isLoading = false;
       });
       _saveChatHistory();
+      _speak(reply);
     } else {
       await FirebaseFirestore.instance
           .collection('chats')
@@ -1539,6 +1554,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   void dispose() {
+    flutterTts.stop();
     messageController.dispose();
     super.dispose();
   }
@@ -1592,7 +1608,26 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           ],
         ),
         actions: [
-          if (isAvatarFriend)
+          if (isAvatarFriend) ...[
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  isVoiceEnabled = !isVoiceEnabled;
+                });
+                if (!isVoiceEnabled) {
+                  flutterTts.stop();
+                }
+                _showMessage(
+                  context,
+                  isVoiceEnabled ? 'Avatar Voice Enabled 🔊' : 'Avatar Voice Muted 🔇',
+                );
+              },
+              icon: Icon(
+                isVoiceEnabled ? Icons.volume_up : Icons.volume_off,
+                color: isVoiceEnabled ? currentAvatar.themeColor : Colors.white54,
+              ),
+              tooltip: 'Toggle Voice',
+            ),
             IconButton(
               onPressed: () {
                 showDialog(
@@ -1619,6 +1654,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               icon: const Icon(Icons.delete_outline),
               tooltip: 'Clear Chat',
             ),
+          ],
           IconButton(
             onPressed: () {
               _showMessage(context, 'Voice call will be connected next.');
@@ -1722,7 +1758,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Your personalized 3D AI companion',
+                'Your personalized 3D AI companion with voice',
                 style: TextStyle(fontSize: 14, color: Colors.white60),
               ),
             ],
@@ -1772,9 +1808,27 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     )
                   : null,
             ),
-            child: Text(
-              msg['text'] ?? '',
-              style: const TextStyle(fontSize: 15),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    msg['text'] ?? '',
+                    style: const TextStyle(fontSize: 15),
+                  ),
+                ),
+                if (!isUser) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _speak(msg['text'] ?? ''),
+                    child: Icon(
+                      Icons.volume_up,
+                      size: 16,
+                      color: currentAvatar.themeColor.withOpacity(0.8),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         );
