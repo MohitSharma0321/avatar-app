@@ -26,6 +26,11 @@ void _showMessage(BuildContext context, String message) {
   );
 }
 
+// Helper to generate a unique room ID for 2 users
+String getChatRoomId(String a, String b) {
+  return a.compareTo(b) < 0 ? '${a}_$b' : '${b}_$a';
+}
+
 // ==================================================
 // AVATAR FRIEND AI SERVICE
 // ==================================================
@@ -89,6 +94,13 @@ class AvatarState {
   static int selectedIndex = 0;
 
   static AvatarCharacter get current => characters[selectedIndex];
+
+  static AvatarCharacter getByName(String? name) {
+    return characters.firstWhere(
+      (c) => c.name.toUpperCase() == (name ?? '').toUpperCase(),
+      orElse: () => characters[0],
+    );
+  }
 }
 
 // ==================================================
@@ -295,7 +307,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           await user.updateDisplayName(name);
         }
 
-        // Firestore Database mein user record save karna
+        // Save new user profile to Firestore
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'name': name.isNotEmpty ? name : email.split('@')[0],
@@ -758,21 +770,6 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController searchController = TextEditingController();
 
-  final List<Map<String, dynamic>> conversations = [
-    {
-      'name': 'Avatar Friend',
-      'message': 'Start a new conversation',
-      'time': '',
-      'icon': Icons.smart_toy_outlined,
-    },
-  ];
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
-
   void openNewChat() {
     Navigator.push(
       context,
@@ -780,6 +777,12 @@ class _ChatScreenState extends State<ChatScreen> {
         builder: (_) => const NewChatScreen(),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -821,81 +824,76 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           Expanded(
-            child: conversations.isEmpty
-                ? _emptyChat()
-                : ListView.builder(
-                    itemCount: conversations.length,
-                    itemBuilder: (context, index) {
-                      final chat = conversations[index];
-                      final isAvatarFriend = chat['name'] == 'Avatar Friend';
-
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 6,
-                        ),
-                        leading: isAvatarFriend
-                            ? Container(
-                                width: 54,
-                                height: 54,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: currentAvatar.themeColor,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: ClipOval(
-                                  child: ModelViewer(
-                                    key: ValueKey('list_${currentAvatar.modelPath}'),
-                                    src: currentAvatar.modelPath,
-                                    alt: 'Avatar Thumbnail',
-                                    autoRotate: true,
-                                    cameraControls: false,
-                                    backgroundColor: const Color(0xFF1E1E1E),
-                                  ),
-                                ),
-                              )
-                            : CircleAvatar(
-                                radius: 27,
-                                backgroundColor: Colors.deepPurple.withOpacity(0.2),
-                                child: Icon(
-                                  chat['icon'] as IconData,
-                                  color: Colors.deepPurpleAccent,
-                                ),
-                              ),
-                        title: Text(
-                          chat['name'] as String,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        subtitle: Text(
-                          chat['message'] as String,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: Text(
-                          chat['time'] as String,
-                          style: const TextStyle(
-                            color: Colors.white54,
-                            fontSize: 12,
-                          ),
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatConversationScreen(
-                                userName: chat['name'] as String,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
+            child: ListView(
+              children: [
+                // Avatar Friend AI Chat Tile
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 6,
                   ),
+                  leading: Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: currentAvatar.themeColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: ModelViewer(
+                        key: ValueKey('list_${currentAvatar.modelPath}'),
+                        src: currentAvatar.modelPath,
+                        alt: 'Avatar Thumbnail',
+                        autoRotate: true,
+                        cameraControls: false,
+                        backgroundColor: const Color(0xFF1E1E1E),
+                      ),
+                    ),
+                  ),
+                  title: const Text(
+                    'Avatar Friend',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Your personalized 3D AI companion',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: currentAvatar.themeColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'AI',
+                      style: TextStyle(
+                        color: currentAvatar.themeColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChatConversationScreen(
+                          userName: 'Avatar Friend',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(height: 1, color: Colors.white10),
+              ],
+            ),
           ),
         ],
       ),
@@ -905,69 +903,48 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-
-  Widget _emptyChat() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(30),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.chat_bubble_outline,
-              size: 90,
-              color: Colors.white38,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'No chats yet',
-              style: TextStyle(
-                fontSize: 23,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Start a conversation with another Avatar user.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white60,
-              ),
-            ),
-            const SizedBox(height: 22),
-            FilledButton.icon(
-              onPressed: openNewChat,
-              icon: const Icon(Icons.add),
-              label: const Text('New Chat'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ==================================================
-// NEW CHAT
+// NEW CHAT SCREEN (SEARCH REAL USERS VIA FIRESTORE)
 // ==================================================
 
-class NewChatScreen extends StatelessWidget {
+class NewChatScreen extends StatefulWidget {
   const NewChatScreen({Key? key}) : super(key: key);
 
   @override
+  State<NewChatScreen> createState() => _NewChatScreenState();
+}
+
+class _NewChatScreenState extends State<NewChatScreen> {
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = '';
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final TextEditingController searchController = TextEditingController();
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Chat'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          children: [
-            TextField(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
               controller: searchController,
+              onChanged: (val) {
+                setState(() {
+                  searchQuery = val.trim().toLowerCase();
+                });
+              },
               decoration: InputDecoration(
                 hintText: 'Search by name or email',
                 prefixIcon: const Icon(Icons.search),
@@ -979,45 +956,120 @@ class NewChatScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 25),
-            const Icon(
-              Icons.people_outline,
-              size: 80,
-              color: Colors.white38,
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('users').snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No other users registered yet.',
+                      style: TextStyle(color: Colors.white60),
+                    ),
+                  );
+                }
+
+                final users = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final uid = data['uid'] ?? doc.id;
+                  if (uid == currentUserId) return false;
+
+                  final name = (data['name'] ?? '').toString().toLowerCase();
+                  final email = (data['email'] ?? '').toString().toLowerCase();
+
+                  if (searchQuery.isEmpty) return true;
+                  return name.contains(searchQuery) || email.contains(searchQuery);
+                }).toList();
+
+                if (users.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No users matched your search.',
+                      style: TextStyle(color: Colors.white60),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: users.length,
+                  itemBuilder: (context, index) {
+                    final userData = users[index].data() as Map<String, dynamic>;
+                    final userName = userData['name'] ?? 'User';
+                    final userEmail = userData['email'] ?? '';
+                    final peerUid = userData['uid'] ?? users[index].id;
+                    final avatarName = userData['avatar'] ?? 'ORANGE';
+                    final peerAvatar = AvatarState.getByName(avatarName);
+
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                      leading: CircleAvatar(
+                        radius: 25,
+                        backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
+                        child: Text(
+                          userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                          style: TextStyle(
+                            color: peerAvatar.themeColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        userName,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      subtitle: Text(
+                        userEmail,
+                        style: const TextStyle(color: Colors.white60, fontSize: 13),
+                      ),
+                      trailing: Icon(
+                        Icons.chat_bubble_outline,
+                        color: peerAvatar.themeColor,
+                        size: 22,
+                      ),
+                      onTap: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatConversationScreen(
+                              userName: userName,
+                              peerUid: peerUid,
+                              peerAvatar: avatarName,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
             ),
-            const SizedBox(height: 15),
-            const Text(
-              'Find an Avatar user',
-              style: TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'User search and online chat will be connected to Firebase next.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white60,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
 // ==================================================
-// CHAT CONVERSATION
+// CHAT CONVERSATION (SUPPORTS BOTH AI & 1-ON-1 FIRESTORE)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
   final String userName;
+  final String? peerUid;
+  final String? peerAvatar;
 
   const ChatConversationScreen({
     Key? key,
     required this.userName,
+    this.peerUid,
+    this.peerAvatar,
   }) : super(key: key);
 
   @override
@@ -1026,46 +1078,45 @@ class ChatConversationScreen extends StatefulWidget {
 
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final TextEditingController messageController = TextEditingController();
-  final List<Map<String, String>> messages = [];
+  final List<Map<String, String>> localMessages = [];
   bool isLoading = false;
+
+  bool get isAvatarFriend => widget.userName == 'Avatar Friend';
+  String get currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
+  String get chatRoomId => getChatRoomId(currentUid, widget.peerUid ?? '');
 
   @override
   void initState() {
     super.initState();
-    _loadChatHistory();
+    if (isAvatarFriend) {
+      _loadChatHistory();
+    }
   }
 
-  // Load chat history from phone storage
   Future<void> _loadChatHistory() async {
-    if (widget.userName == 'Avatar Friend') {
-      final prefs = await SharedPreferences.getInstance();
-      final String? saved = prefs.getString('avatar_friend_history');
-      if (saved != null) {
-        final List<dynamic> decoded = jsonDecode(saved);
-        setState(() {
-          messages.clear();
-          for (var item in decoded) {
-            messages.add(Map<String, String>.from(item));
-          }
-        });
-      }
+    final prefs = await SharedPreferences.getInstance();
+    final String? saved = prefs.getString('avatar_friend_history');
+    if (saved != null) {
+      final List<dynamic> decoded = jsonDecode(saved);
+      setState(() {
+        localMessages.clear();
+        for (var item in decoded) {
+          localMessages.add(Map<String, String>.from(item));
+        }
+      });
     }
   }
 
-  // Save chat history to phone storage
   Future<void> _saveChatHistory() async {
-    if (widget.userName == 'Avatar Friend') {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('avatar_friend_history', jsonEncode(messages));
-    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('avatar_friend_history', jsonEncode(localMessages));
   }
 
-  // Clear chat history
   Future<void> _clearChatHistory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('avatar_friend_history');
     setState(() {
-      messages.clear();
+      localMessages.clear();
     });
     if (mounted) {
       _showMessage(context, 'Chat history cleared.');
@@ -1073,30 +1124,39 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   void sendMessage() async {
-    final message = messageController.text.trim();
-    if (message.isEmpty) return;
-
-    setState(() {
-      messages.add({'sender': 'user', 'text': message});
-    });
-    _saveChatHistory();
+    final text = messageController.text.trim();
+    if (text.isEmpty) return;
 
     messageController.clear();
 
-    if (widget.userName == 'Avatar Friend') {
+    if (isAvatarFriend) {
       setState(() {
+        localMessages.add({'sender': 'user', 'text': text});
         isLoading = true;
       });
+      _saveChatHistory();
 
-      final reply = await askAvatarFriend(message);
+      final reply = await askAvatarFriend(text);
 
       if (!mounted) return;
 
       setState(() {
-        messages.add({'sender': 'bot', 'text': reply});
+        localMessages.add({'sender': 'bot', 'text': reply});
         isLoading = false;
       });
       _saveChatHistory();
+    } else {
+      // 1-on-1 Firestore Live message
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatRoomId)
+          .collection('messages')
+          .add({
+        'senderId': currentUid,
+        'receiverId': widget.peerUid,
+        'text': text,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
     }
   }
 
@@ -1108,8 +1168,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isAvatarFriend = widget.userName == 'Avatar Friend';
     final currentAvatar = AvatarState.current;
+    final peerAvatarObj = AvatarState.getByName(widget.peerAvatar);
 
     return Scaffold(
       appBar: AppBar(
@@ -1141,11 +1201,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             else
               CircleAvatar(
                 radius: 19,
-                backgroundColor: Colors.deepPurple.withOpacity(0.3),
-                child: const Icon(
-                  Icons.person,
-                  size: 21,
-                  color: Colors.white,
+                backgroundColor: peerAvatarObj.themeColor.withOpacity(0.3),
+                child: Text(
+                  widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
+                  style: TextStyle(
+                    color: peerAvatarObj.themeColor,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             const SizedBox(width: 12),
@@ -1194,130 +1256,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       body: Column(
         children: [
           Expanded(
-            child: messages.isEmpty
-                ? Center(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (isAvatarFriend) ...[
-                            Container(
-                              width: 150,
-                              height: 150,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFF1E1E1E),
-                                border: Border.all(
-                                  color: currentAvatar.themeColor,
-                                  width: 3,
-                                ),
-                              ),
-                              child: ClipOval(
-                                child: ModelViewer(
-                                  key: ValueKey('chat_${currentAvatar.modelPath}'),
-                                  src: currentAvatar.modelPath,
-                                  alt: 'Avatar 3D Preview',
-                                  autoRotate: true,
-                                  cameraControls: false,
-                                  backgroundColor: const Color(0xFF1E1E1E),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 18),
-                            Text(
-                              'Say hello to ${currentAvatar.name} Avatar!',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: currentAvatar.themeColor,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Your personalized 3D AI companion',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white60,
-                              ),
-                            ),
-                          ] else ...[
-                            const Icon(
-                              Icons.chat_bubble_outline,
-                              size: 70,
-                              color: Colors.white24,
-                            ),
-                            const SizedBox(height: 15),
-                            const Text(
-                              'Start chatting',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: messages.length + (isLoading ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == messages.length && isLoading) {
-                        return Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E1E1E),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                        );
-                      }
-
-                      final msg = messages[index];
-                      final isUser = msg['sender'] == 'user';
-
-                      return Align(
-                        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 11,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isUser
-                                ? Colors.deepPurple
-                                : const Color(0xFF1E1E1E),
-                            borderRadius: BorderRadius.circular(18),
-                            border: (!isUser && isAvatarFriend)
-                                ? Border.all(
-                                    color: currentAvatar.themeColor.withOpacity(0.3),
-                                    width: 1,
-                                  )
-                                : null,
-                          ),
-                          child: Text(
-                            msg['text'] ?? '',
-                            style: const TextStyle(
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+            child: isAvatarFriend ? _buildAiChat(currentAvatar) : _buildRealUserChat(),
           ),
 
           // MESSAGE BAR
@@ -1356,7 +1295,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   const SizedBox(width: 6),
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: isAvatarFriend ? currentAvatar.themeColor : Colors.deepPurple,
+                    backgroundColor: isAvatarFriend
+                        ? currentAvatar.themeColor
+                        : Colors.deepPurple,
                     child: IconButton(
                       onPressed: sendMessage,
                       icon: const Icon(
@@ -1371,6 +1312,177 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // AI Chat Layout
+  Widget _buildAiChat(AvatarCharacter currentAvatar) {
+    if (localMessages.isEmpty) {
+      return Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF1E1E1E),
+                  border: Border.all(
+                    color: currentAvatar.themeColor,
+                    width: 3,
+                  ),
+                ),
+                child: ClipOval(
+                  child: ModelViewer(
+                    key: ValueKey('chat_${currentAvatar.modelPath}'),
+                    src: currentAvatar.modelPath,
+                    alt: 'Avatar 3D Preview',
+                    autoRotate: true,
+                    cameraControls: false,
+                    backgroundColor: const Color(0xFF1E1E1E),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Say hello to ${currentAvatar.name} Avatar!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: currentAvatar.themeColor,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Your personalized 3D AI companion',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white60,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: localMessages.length + (isLoading ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == localMessages.length && isLoading) {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+
+        final msg = localMessages[index];
+        final isUser = msg['sender'] == 'user';
+
+        return Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            decoration: BoxDecoration(
+              color: isUser ? Colors.deepPurple : const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(18),
+              border: (!isUser)
+                  ? Border.all(
+                      color: currentAvatar.themeColor.withOpacity(0.3),
+                      width: 1,
+                    )
+                  : null,
+            ),
+            child: Text(
+              msg['text'] ?? '',
+              style: const TextStyle(fontSize: 15),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // 1-on-1 Firestore Live Chat Layout
+  Widget _buildRealUserChat() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatRoomId)
+          .collection('messages')
+          .orderBy('timestamp', descending: false)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.chat_bubble_outline,
+                  size: 70,
+                  color: Colors.white24,
+                ),
+                const SizedBox(height: 15),
+                Text(
+                  'Say hello to ${widget.userName}!',
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final messages = snapshot.data!.docs;
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: messages.length,
+          itemBuilder: (context, index) {
+            final data = messages[index].data() as Map<String, dynamic>;
+            final isMe = data['senderId'] == currentUid;
+
+            return Align(
+              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                decoration: BoxDecoration(
+                  color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Text(
+                  data['text'] ?? '',
+                  style: const TextStyle(fontSize: 15),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -1507,8 +1619,19 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
                       AvatarState.selectedIndex = tempIndex;
+
+                      // Sync selected avatar with Firestore
+                      final user = FirebaseAuth.instance.currentUser;
+                      if (user != null) {
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(user.uid)
+                            .update({'avatar': AvatarState.current.name});
+                      }
+
+                      if (!mounted) return;
 
                       _showMessage(
                         context,
