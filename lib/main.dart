@@ -302,6 +302,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'name': name,
+          'bio': 'Hey there! I am using Avatar.',
           'avatar': AvatarState.current.name,
           'bonds': [],
           'createdAt': FieldValue.serverTimestamp(),
@@ -1292,6 +1293,7 @@ class UserProfileViewScreen extends StatelessWidget {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final peerUid = userData['uid'] ?? '';
     final name = userData['name'] ?? 'User';
+    final bio = userData['bio'] ?? 'Hey there! I am using Avatar.';
     final avatarName = userData['avatar'] ?? 'ORANGE';
     final peerAvatar = AvatarState.getByName(avatarName);
 
@@ -1334,7 +1336,7 @@ class UserProfileViewScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   Text(
                     name,
                     style: const TextStyle(
@@ -1344,11 +1346,27 @@ class UserProfileViewScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${peerAvatar.name} Avatar',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: peerAvatar.themeColor,
-                      fontWeight: FontWeight.w600,
+                    bio,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: peerAvatar.themeColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${peerAvatar.name} Avatar',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: peerAvatar.themeColor,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 30),
@@ -1431,7 +1449,7 @@ class UserProfileViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN (WITH TTS VOICE)
+// CHAT CONVERSATION SCREEN
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1478,7 +1496,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   Future<void> _speak(String text) async {
     if (!isVoiceEnabled || !isAvatarFriend) return;
-    // Clean symbols like markdown asterisks before speaking
     final cleanText = text.replaceAll('*', '').replaceAll('#', '').replaceAll('`', '');
     await flutterTts.stop();
     await flutterTts.speak(cleanText);
@@ -2073,48 +2090,247 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
 }
 
 // ==================================================
-// PROFILE
+// PROFILE SCREEN (WITH EDIT PROFILE & BONDS COUNT)
 // ==================================================
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  void _openEditProfileSheet(String currentName, String currentBio) {
+    final nameCtrl = TextEditingController(text: currentName);
+    final bioCtrl = TextEditingController(text: currentBio);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          left: 20,
+          right: 20,
+          top: 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Edit Profile',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 18),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Username',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: bioCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Bio / Status',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 50,
+              child: FilledButton(
+                onPressed: () async {
+                  final newName = nameCtrl.text.trim();
+                  final newBio = bioCtrl.text.trim();
+                  final user = FirebaseAuth.instance.currentUser;
+
+                  if (user != null && newName.isNotEmpty) {
+                    await user.updateDisplayName(newName);
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(user.uid)
+                        .update({
+                      'name': newName,
+                      'bio': newBio,
+                    });
+                  }
+
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    _showMessage(context, 'Profile updated successfully!');
+                  }
+                },
+                child: const Text('Save Changes'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final currentAvatar = AvatarState.current;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: 55,
-                backgroundImage:
-                    user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
-                child: user?.photoURL == null
-                    ? const Icon(
-                        Icons.person,
-                        size: 60,
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                user?.displayName ?? 'User',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+            icon: const Icon(Icons.settings),
           ),
-        ),
+        ],
+      ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
+        builder: (context, snapshot) {
+          final data = snapshot.data?.data() as Map<String, dynamic>?;
+          final name = data?['name'] ?? user?.displayName ?? 'User';
+          final bio = data?['bio'] ?? 'Hey there! I am using Avatar.';
+          final List<dynamic> bonds = data?['bonds'] ?? [];
+
+          return SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  // 3D Avatar Display
+                  Container(
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF1E1E1E),
+                      border: Border.all(
+                        color: currentAvatar.themeColor,
+                        width: 3,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: ModelViewer(
+                        key: ValueKey('profile_${currentAvatar.modelPath}'),
+                        src: currentAvatar.modelPath,
+                        alt: 'Avatar Profile',
+                        autoRotate: true,
+                        cameraControls: false,
+                        backgroundColor: const Color(0xFF1E1E1E),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    name,
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    bio,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Stats Row (Bonds Count & Avatar Badge)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1E1E),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              '${bonds.length}',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: currentAvatar.themeColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Bonds',
+                              style: TextStyle(color: Colors.white60, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E1E1E),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              currentAvatar.name,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: currentAvatar.themeColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Equipped',
+                              style: TextStyle(color: Colors.white60, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Edit Profile Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: currentAvatar.themeColor),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () => _openEditProfileSheet(name, bio),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text(
+                        'Edit Profile',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -2152,8 +2368,8 @@ class SettingsScreen extends StatelessWidget {
             title: Text('About Avatar'),
           ),
           ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Logout'),
+            leading: const Icon(Icons.logout, color: Colors.redAccent),
+            title: const Text('Logout', style: TextStyle(color: Colors.redAccent)),
             onTap: () async {
               await FirebaseAuth.instance.signOut();
             },
