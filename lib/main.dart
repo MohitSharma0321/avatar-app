@@ -422,7 +422,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 }
 
 // ==================================================
-// LOGIN
+// LOGIN (AUTO-REDIRECTS ON SUCCESS)
 // ==================================================
 
 class LoginScreen extends StatefulWidget {
@@ -457,6 +457,10 @@ class _LoginScreenState extends State<LoginScreen> {
         email: email,
         password: password,
       );
+
+      if (!mounted) return;
+      // Auto close login screen and jump to Home
+      Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       String message = 'Login failed.';
       if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
@@ -562,7 +566,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN
+// HOME SCREEN (CLEAN 3-TAB NAVIGATION)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -579,7 +583,6 @@ class _HomeScreenState extends State<HomeScreen> {
     HomeTab(),
     ChatScreen(),
     ProfileScreen(),
-    SettingsScreen(),
   ];
 
   @override
@@ -608,11 +611,6 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.account_circle_outlined),
             selectedIcon: Icon(Icons.account_circle),
             label: 'Profile',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
           ),
         ],
       ),
@@ -1449,7 +1447,7 @@ class UserProfileViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN
+// CHAT CONVERSATION SCREEN (AUTO-SCROLL ON KEYBOARD)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1470,6 +1468,7 @@ class ChatConversationScreen extends StatefulWidget {
 
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final TextEditingController messageController = TextEditingController();
+  final ScrollController scrollController = ScrollController();
   final List<Map<String, String>> localMessages = [];
   final FlutterTts flutterTts = FlutterTts();
   
@@ -1487,6 +1486,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     if (isAvatarFriend) {
       _loadChatHistory();
     }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollController.hasClients) {
+        scrollController.animateTo(
+          scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _initTts() async {
@@ -1512,6 +1523,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           localMessages.add(Map<String, String>.from(item));
         }
       });
+      _scrollToBottom();
     }
   }
 
@@ -1544,6 +1556,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         isLoading = true;
       });
       _saveChatHistory();
+      _scrollToBottom();
 
       final reply = await askAvatarFriend(text);
 
@@ -1554,6 +1567,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         isLoading = false;
       });
       _saveChatHistory();
+      _scrollToBottom();
       _speak(reply);
     } else {
       await FirebaseFirestore.instance
@@ -1566,11 +1580,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         'text': text,
         'timestamp': FieldValue.serverTimestamp(),
       });
+      _scrollToBottom();
     }
   }
 
   @override
   void dispose() {
+    scrollController.dispose();
     flutterTts.stop();
     messageController.dispose();
     super.dispose();
@@ -1582,6 +1598,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final peerAvatarObj = AvatarState.getByName(widget.peerAvatar);
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         titleSpacing: 0,
         title: Row(
@@ -1702,6 +1719,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     child: TextField(
                       controller: messageController,
                       textInputAction: TextInputAction.send,
+                      onTap: () {
+                        // Auto scroll up when keyboard opens
+                        Future.delayed(const Duration(milliseconds: 300), _scrollToBottom);
+                      },
                       onSubmitted: (_) => sendMessage(),
                       decoration: InputDecoration(
                         hintText: 'Message...',
@@ -1785,6 +1806,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
 
     return ListView.builder(
+      controller: scrollController,
       padding: const EdgeInsets.all(16),
       itemCount: localMessages.length + (isLoading ? 1 : 0),
       itemBuilder: (context, index) {
@@ -1891,8 +1913,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         }
 
         final messages = snapshot.data!.docs;
+        _scrollToBottom();
 
         return ListView.builder(
+          controller: scrollController,
           padding: const EdgeInsets.all(16),
           itemCount: messages.length,
           itemBuilder: (context, index) {
@@ -2090,7 +2114,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
 }
 
 // ==================================================
-// PROFILE SCREEN (WITH EDIT PROFILE & BONDS COUNT)
+// PROFILE SCREEN (INSTANT REAL-TIME SYNC & AUTO-CLOSE)
 // ==================================================
 
 class ProfileScreen extends StatefulWidget {
@@ -2154,6 +2178,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   final user = FirebaseAuth.instance.currentUser;
 
                   if (user != null && newName.isNotEmpty) {
+                    Navigator.pop(ctx); // Close sheet instantly
+
                     await user.updateDisplayName(newName);
                     await FirebaseFirestore.instance
                         .collection('users')
@@ -2162,11 +2188,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       'name': newName,
                       'bio': newBio,
                     });
-                  }
 
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    _showMessage(context, 'Profile updated successfully!');
+                    if (mounted) {
+                      _showMessage(context, 'Profile updated successfully!');
+                    }
                   }
                 },
                 child: const Text('Save Changes'),
@@ -2247,7 +2272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Stats Row (Bonds Count & Avatar Badge)
+                  // Stats Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -2337,7 +2362,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 // ==================================================
-// SETTINGS
+// SETTINGS SCREEN
 // ==================================================
 
 class SettingsScreen extends StatelessWidget {
@@ -2372,6 +2397,9 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Logout', style: TextStyle(color: Colors.redAccent)),
             onTap: () async {
               await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.popUntil(context, (route) => route.isFirst);
+              }
             },
           ),
         ],
