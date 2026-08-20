@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -287,8 +288,21 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         password: password,
       );
 
-      if (name.isNotEmpty) {
-        await credential.user?.updateDisplayName(name);
+      final user = credential.user;
+
+      if (user != null) {
+        if (name.isNotEmpty) {
+          await user.updateDisplayName(name);
+        }
+
+        // Firestore Database mein user record save karna
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'name': name.isNotEmpty ? name : email.split('@')[0],
+          'email': email,
+          'avatar': AvatarState.current.name,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
 
       if (!mounted) return;
