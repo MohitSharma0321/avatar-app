@@ -1,4 +1,4 @@
-  import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -819,18 +819,36 @@ class _ChatScreenState extends State<ChatScreen> {
                           horizontal: 18,
                           vertical: 6,
                         ),
-                        leading: CircleAvatar(
-                          radius: 27,
-                          backgroundColor: isAvatarFriend
-                              ? currentAvatar.themeColor.withOpacity(0.2)
-                              : Colors.deepPurple.withOpacity(0.2),
-                          child: Icon(
-                            isAvatarFriend ? Icons.person : (chat['icon'] as IconData),
-                            color: isAvatarFriend
-                                ? currentAvatar.themeColor
-                                : Colors.deepPurpleAccent,
-                          ),
-                        ),
+                        leading: isAvatarFriend
+                            ? Container(
+                                width: 54,
+                                height: 54,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: currentAvatar.themeColor,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: ClipOval(
+                                  child: ModelViewer(
+                                    key: ValueKey('list_${currentAvatar.modelPath}'),
+                                    src: currentAvatar.modelPath,
+                                    alt: 'Avatar Thumbnail',
+                                    autoRotate: true,
+                                    cameraControls: false,
+                                    backgroundColor: const Color(0xFF1E1E1E),
+                                  ),
+                                ),
+                              )
+                            : CircleAvatar(
+                                radius: 27,
+                                backgroundColor: Colors.deepPurple.withOpacity(0.2),
+                                child: Icon(
+                                  chat['icon'] as IconData,
+                                  color: Colors.deepPurpleAccent,
+                                ),
+                              ),
                         title: Text(
                           chat['name'] as String,
                           style: const TextStyle(
@@ -1038,18 +1056,39 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 19,
-              backgroundColor: isAvatarFriend
-                  ? currentAvatar.themeColor
-                  : Colors.deepPurple.withOpacity(0.3),
-              child: Icon(
-                Icons.person,
-                size: 21,
-                color: Colors.white,
+            if (isAvatarFriend)
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: currentAvatar.themeColor,
+                    width: 1.5,
+                  ),
+                ),
+                child: ClipOval(
+                  child: ModelViewer(
+                    key: ValueKey('appbar_${currentAvatar.modelPath}'),
+                    src: currentAvatar.modelPath,
+                    alt: 'Avatar Thumbnail',
+                    autoRotate: true,
+                    cameraControls: false,
+                    backgroundColor: const Color(0xFF1E1E1E),
+                  ),
+                ),
+              )
+            else
+              CircleAvatar(
+                radius: 19,
+                backgroundColor: Colors.deepPurple.withOpacity(0.3),
+                child: const Icon(
+                  Icons.person,
+                  size: 21,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Text(widget.userName),
           ],
         ),
@@ -1509,4 +1548,3 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 }
-   
