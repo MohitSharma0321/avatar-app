@@ -439,10 +439,15 @@ class _LoginScreenState
         password: password,
       );
 } on FirebaseAuthException catch (e) {
-  _showMessage(
-    context,
-    'Firebase error: ${e.code}\n${e.message ?? "No message"}',
-  );
+  String message = 'Login failed.';
+
+  if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+    message = 'Incorrect email or password.';
+  } else if (e.code == 'invalid-email') {
+    message = 'Please enter a valid email.';
+  }
+
+  _showMessage(context, message);
 } catch (e) {
   _showMessage(
     context,
