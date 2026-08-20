@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
+import 'package:http/http.dart' as http;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +22,31 @@ void _showMessage(BuildContext context, String message) {
       behavior: SnackBarBehavior.floating,
     ),
   );
+}
+
+// ==================================================
+// AVATAR FRIEND AI SERVICE
+// ==================================================
+
+Future<String> askAvatarFriend(String userMessage) async {
+  final url = Uri.parse('https://avatar-friend-ai.projectkhurafat.workers.dev/');
+
+  try {
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'message': userMessage}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['reply'] ?? 'Koi response nahi mila.';
+    } else {
+      return 'Server error: ${response.statusCode}';
+    }
+  } catch (e) {
+    return 'Connection error: Internet check karein.';
+  }
 }
 
 // ==================================================
@@ -171,8 +198,7 @@ class WelcomeScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              const CreateAccountScreen(),
+                          builder: (_) => const CreateAccountScreen(),
                         ),
                       );
                     },
@@ -218,12 +244,10 @@ class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({Key? key}) : super(key: key);
 
   @override
-  State<CreateAccountScreen> createState() =>
-      _CreateAccountScreenState();
+  State<CreateAccountScreen> createState() => _CreateAccountScreenState();
 }
 
-class _CreateAccountScreenState
-    extends State<CreateAccountScreen> {
+class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -257,8 +281,7 @@ class _CreateAccountScreenState
     });
 
     try {
-      final credential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -319,8 +342,7 @@ class _CreateAccountScreenState
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
                 'Create your account',
@@ -341,8 +363,7 @@ class _CreateAccountScreenState
               const SizedBox(height: 16),
               TextField(
                 controller: emailController,
-                keyboardType:
-                    TextInputType.emailAddress,
+                keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
@@ -364,9 +385,7 @@ class _CreateAccountScreenState
                       });
                     },
                     icon: Icon(
-                      hidePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
+                      hidePassword ? Icons.visibility : Icons.visibility_off,
                     ),
                   ),
                 ),
@@ -375,14 +394,12 @@ class _CreateAccountScreenState
               SizedBox(
                 height: 50,
                 child: FilledButton(
-                  onPressed:
-                      loading ? null : createAccount,
+                  onPressed: loading ? null : createAccount,
                   child: loading
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child:
-                              CircularProgressIndicator(),
+                          child: CircularProgressIndicator(),
                         )
                       : const Text('Create Account'),
                 ),
@@ -403,12 +420,10 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
   @override
-  State<LoginScreen> createState() =>
-      _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState
-    extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
@@ -417,8 +432,7 @@ class _LoginScreenState
 
   Future<void> login() async {
     final email = emailController.text.trim();
-    final password =
-        passwordController.text.trim();
+    final password = passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
       _showMessage(
@@ -433,30 +447,24 @@ class _LoginScreenState
     });
 
     try {
-      await FirebaseAuth.instance
-          .signInWithEmailAndPassword(
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-} on FirebaseAuthException catch (e) {
-  String message = 'Login failed.';
+    } on FirebaseAuthException catch (e) {
+      String message = 'Login failed.';
 
-  if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
-    message = 'Incorrect email or password.';
-  } else if (e.code == 'invalid-email') {
-    message = 'Please enter a valid email.';
-  }
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+        message = 'Incorrect email or password.';
+      } else if (e.code == 'invalid-email') {
+        message = 'Please enter a valid email.';
+      }
 
-  _showMessage(context, message);
-} catch (e) {
-  _showMessage(
-    context,
-    'Other error: $e',
-  );
-    } catch (_) {
+      _showMessage(context, message);
+    } catch (e) {
       _showMessage(
         context,
-        'Something went wrong.',
+        'Other error: $e',
       );
     }
 
@@ -484,8 +492,7 @@ class _LoginScreenState
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 30),
               const Icon(
@@ -504,13 +511,11 @@ class _LoginScreenState
               const SizedBox(height: 30),
               TextField(
                 controller: emailController,
-                keyboardType:
-                    TextInputType.emailAddress,
+                keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
                   labelText: 'Email',
                   border: OutlineInputBorder(),
-                  prefixIcon:
-                      Icon(Icons.email),
+                  prefixIcon: Icon(Icons.email),
                 ),
               ),
               const SizedBox(height: 16),
@@ -519,21 +524,16 @@ class _LoginScreenState
                 obscureText: hidePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  border:
-                      const OutlineInputBorder(),
-                  prefixIcon:
-                      const Icon(Icons.lock),
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
                     onPressed: () {
                       setState(() {
-                        hidePassword =
-                            !hidePassword;
+                        hidePassword = !hidePassword;
                       });
                     },
                     icon: Icon(
-                      hidePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
+                      hidePassword ? Icons.visibility : Icons.visibility_off,
                     ),
                   ),
                 ),
@@ -542,14 +542,12 @@ class _LoginScreenState
               SizedBox(
                 height: 50,
                 child: FilledButton(
-                  onPressed:
-                      loading ? null : login,
+                  onPressed: loading ? null : login,
                   child: loading
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child:
-                              CircularProgressIndicator(),
+                          child: CircularProgressIndicator(),
                         )
                       : const Text('Login'),
                 ),
@@ -571,12 +569,10 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() =>
-      _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState
-    extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> {
   int currentIndex = 0;
 
   final List<Widget> pages = const [
@@ -605,24 +601,21 @@ class _HomeScreenState
           ),
           NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon:
-                Icon(Icons.chat_bubble),
+            selectedIcon: Icon(Icons.chat_bubble),
             label: 'Chat',
           ),
           NavigationDestination(
             icon: Icon(
               Icons.account_circle_outlined,
             ),
-            selectedIcon:
-                Icon(Icons.account_circle),
+            selectedIcon: Icon(Icons.account_circle),
             label: 'Profile',
           ),
           NavigationDestination(
             icon: Icon(
               Icons.settings_outlined,
             ),
-            selectedIcon:
-                Icon(Icons.settings),
+            selectedIcon: Icon(Icons.settings),
             label: 'Settings',
           ),
         ],
@@ -639,25 +632,20 @@ class HomeTab extends StatefulWidget {
   const HomeTab({Key? key}) : super(key: key);
 
   @override
-  State<HomeTab> createState() =>
-      _HomeTabState();
+  State<HomeTab> createState() => _HomeTabState();
 }
 
 class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
-    final user =
-        FirebaseAuth.instance.currentUser;
-
-    final character =
-        AvatarState.current;
+    final user = FirebaseAuth.instance.currentUser;
+    final character = AvatarState.current;
 
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'My Avatar',
@@ -681,29 +669,22 @@ class _HomeTabState extends State<HomeTab> {
               width: double.infinity,
               height: 380,
               decoration: BoxDecoration(
-                borderRadius:
-                    BorderRadius.circular(28),
-                color:
-                    const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(28),
+                color: const Color(0xFF1E1E1E),
                 border: Border.all(
-                  color: character.themeColor
-                      .withOpacity(0.4),
+                  color: character.themeColor.withOpacity(0.4),
                   width: 2,
                 ),
               ),
               child: ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(28),
                 child: ModelViewer(
-                  key: ValueKey(
-                    character.modelPath,
-                  ),
+                  key: ValueKey(character.modelPath),
                   src: character.modelPath,
                   alt: 'My 3D Avatar',
                   autoRotate: true,
                   cameraControls: true,
-                  backgroundColor:
-                      const Color(0xFF1E1E1E),
+                  backgroundColor: const Color(0xFF1E1E1E),
                 ),
               ),
             ),
@@ -713,21 +694,17 @@ class _HomeTabState extends State<HomeTab> {
               height: 56,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor:
-                      character.themeColor,
+                  backgroundColor: character.themeColor,
                   foregroundColor: Colors.white,
-                  shape:
-                      RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 onPressed: () async {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          const SelectCharacterScreen(),
+                      builder: (_) => const SelectCharacterScreen(),
                     ),
                   );
                   setState(() {});
@@ -760,23 +737,18 @@ class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
 
   @override
-  State<ChatScreen> createState() =>
-      _ChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState
-    extends State<ChatScreen> {
-  final TextEditingController
-      searchController =
-      TextEditingController();
+class _ChatScreenState extends State<ChatScreen> {
+  final TextEditingController searchController = TextEditingController();
 
-  final List<Map<String, dynamic>>
-      conversations = [
+  final List<Map<String, dynamic>> conversations = [
     {
       'name': 'Avatar Friend',
       'message': 'Start a new conversation',
       'time': '',
-      'icon': Icons.person,
+      'icon': Icons.smart_toy_outlined,
     },
   ];
 
@@ -816,30 +788,17 @@ class _ChatScreenState
       body: Column(
         children: [
           Padding(
-            padding:
-                const EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              12,
-            ),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: TextField(
               controller: searchController,
-              decoration:
-                  InputDecoration(
-                hintText:
-                    'Search people or chats',
-                prefixIcon:
-                    const Icon(Icons.search),
+              decoration: InputDecoration(
+                hintText: 'Search people or chats',
+                prefixIcon: const Icon(Icons.search),
                 filled: true,
-                fillColor:
-                    const Color(0xFF1E1E1E),
-                border:
-                    OutlineInputBorder(
-                  borderRadius:
-                      BorderRadius.circular(18),
-                  borderSide:
-                      BorderSide.none,
+                fillColor: const Color(0xFF1E1E1E),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
@@ -848,51 +807,39 @@ class _ChatScreenState
             child: conversations.isEmpty
                 ? _emptyChat()
                 : ListView.builder(
-                    itemCount:
-                        conversations.length,
-                    itemBuilder:
-                        (context, index) {
-                      final chat =
-                          conversations[index];
+                    itemCount: conversations.length,
+                    itemBuilder: (context, index) {
+                      final chat = conversations[index];
 
                       return ListTile(
-                        contentPadding:
-                            const EdgeInsets
-                                .symmetric(
+                        contentPadding: const EdgeInsets.symmetric(
                           horizontal: 18,
                           vertical: 6,
                         ),
-                        leading:
-                            CircleAvatar(
+                        leading: CircleAvatar(
                           radius: 27,
+                          backgroundColor: Colors.deepPurple.withOpacity(0.2),
                           child: Icon(
-                            chat['icon']
-                                as IconData,
+                            chat['icon'] as IconData,
+                            color: Colors.deepPurpleAccent,
                           ),
                         ),
                         title: Text(
-                          chat['name']
-                              as String,
-                          style:
-                              const TextStyle(
-                            fontWeight:
-                                FontWeight.bold,
+                          chat['name'] as String,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
                         subtitle: Text(
-                          chat['message']
-                              as String,
+                          chat['message'] as String,
                           maxLines: 1,
-                          overflow:
-                              TextOverflow.ellipsis,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         trailing: Text(
                           chat['time'] as String,
-                          style:
-                              const TextStyle(
-                            color:
-                                Colors.white54,
+                          style: const TextStyle(
+                            color: Colors.white54,
                             fontSize: 12,
                           ),
                         ),
@@ -900,11 +847,8 @@ class _ChatScreenState
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  ChatConversationScreen(
-                                userName:
-                                    chat['name']
-                                        as String,
+                              builder: (_) => ChatConversationScreen(
+                                userName: chat['name'] as String,
                               ),
                             ),
                           );
@@ -915,8 +859,7 @@ class _ChatScreenState
           ),
         ],
       ),
-      floatingActionButton:
-          FloatingActionButton(
+      floatingActionButton: FloatingActionButton(
         onPressed: openNewChat,
         child: const Icon(Icons.chat),
       ),
@@ -926,11 +869,9 @@ class _ChatScreenState
   Widget _emptyChat() {
     return Center(
       child: Padding(
-        padding:
-            const EdgeInsets.all(30),
+        padding: const EdgeInsets.all(30),
         child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
               Icons.chat_bubble_outline,
@@ -971,14 +912,11 @@ class _ChatScreenState
 // ==================================================
 
 class NewChatScreen extends StatelessWidget {
-  const NewChatScreen({Key? key})
-      : super(key: key);
+  const NewChatScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final TextEditingController
-        searchController =
-        TextEditingController();
+    final TextEditingController searchController = TextEditingController();
 
     return Scaffold(
       appBar: AppBar(
@@ -990,21 +928,14 @@ class NewChatScreen extends StatelessWidget {
           children: [
             TextField(
               controller: searchController,
-              decoration:
-                  InputDecoration(
-                hintText:
-                    'Search by name or email',
-                prefixIcon:
-                    const Icon(Icons.search),
+              decoration: InputDecoration(
+                hintText: 'Search by name or email',
+                prefixIcon: const Icon(Icons.search),
                 filled: true,
-                fillColor:
-                    const Color(0xFF1E1E1E),
-                border:
-                    OutlineInputBorder(
-                  borderRadius:
-                      BorderRadius.circular(18),
-                  borderSide:
-                      BorderSide.none,
+                fillColor: const Color(0xFF1E1E1E),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
@@ -1041,8 +972,7 @@ class NewChatScreen extends StatelessWidget {
 // CHAT CONVERSATION
 // ==================================================
 
-class ChatConversationScreen
-    extends StatefulWidget {
+class ChatConversationScreen extends StatefulWidget {
   final String userName;
 
   const ChatConversationScreen({
@@ -1051,30 +981,38 @@ class ChatConversationScreen
   }) : super(key: key);
 
   @override
-  State<ChatConversationScreen>
-      createState() =>
-          _ChatConversationScreenState();
+  State<ChatConversationScreen> createState() => _ChatConversationScreenState();
 }
 
-class _ChatConversationScreenState
-    extends State<ChatConversationScreen> {
-  final TextEditingController
-      messageController =
-      TextEditingController();
+class _ChatConversationScreenState extends State<ChatConversationScreen> {
+  final TextEditingController messageController = TextEditingController();
+  final List<Map<String, String>> messages = [];
+  bool isLoading = false;
 
-  final List<String> messages = [];
-
-  void sendMessage() {
-    final message =
-        messageController.text.trim();
-
+  void sendMessage() async {
+    final message = messageController.text.trim();
     if (message.isEmpty) return;
 
     setState(() {
-      messages.add(message);
+      messages.add({'sender': 'user', 'text': message});
     });
 
     messageController.clear();
+
+    if (widget.userName == 'Avatar Friend') {
+      setState(() {
+        isLoading = true;
+      });
+
+      final reply = await askAvatarFriend(message);
+
+      if (!mounted) return;
+
+      setState(() {
+        messages.add({'sender': 'bot', 'text': reply});
+        isLoading = false;
+      });
+    }
   }
 
   @override
@@ -1085,15 +1023,21 @@ class _ChatConversationScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isAvatarFriend = widget.userName == 'Avatar Friend';
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
         title: Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 19,
-              child:
-                  Icon(Icons.person, size: 21),
+              backgroundColor: Colors.deepPurple.withOpacity(0.3),
+              child: Icon(
+                isAvatarFriend ? Icons.smart_toy : Icons.person,
+                size: 21,
+                color: Colors.deepPurpleAccent,
+              ),
             ),
             const SizedBox(width: 10),
             Text(widget.userName),
@@ -1115,67 +1059,70 @@ class _ChatConversationScreenState
         children: [
           Expanded(
             child: messages.isEmpty
-                ? const Center(
+                ? Center(
                     child: Column(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons
-                              .chat_bubble_outline,
+                          isAvatarFriend ? Icons.smart_toy_outlined : Icons.chat_bubble_outline,
                           size: 70,
-                          color:
-                              Colors.white24,
+                          color: Colors.white24,
                         ),
-                        SizedBox(height: 15),
+                        const SizedBox(height: 15),
                         Text(
-                          'Start chatting',
-                          style:
-                              TextStyle(
+                          isAvatarFriend ? 'Say hello to Avatar Friend!' : 'Start chatting',
+                          style: const TextStyle(
                             fontSize: 20,
-                            fontWeight:
-                                FontWeight.bold,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                   )
                 : ListView.builder(
-                    padding:
-                        const EdgeInsets.all(16),
-                    itemCount:
-                        messages.length,
-                    itemBuilder:
-                        (context, index) {
-                      return Align(
-                        alignment:
-                            Alignment.centerRight,
-                        child: Container(
-                          margin:
-                              const EdgeInsets
-                                  .only(
-                            bottom: 10,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: messages.length + (isLoading ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == messages.length && isLoading) {
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E1E1E),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
                           ),
-                          padding:
-                              const EdgeInsets
-                                  .symmetric(
+                        );
+                      }
+
+                      final msg = messages[index];
+                      final isUser = msg['sender'] == 'user';
+
+                      return Align(
+                        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 11,
                           ),
-                          decoration:
-                              BoxDecoration(
-                            color:
-                                Colors.deepPurple,
-                            borderRadius:
-                                BorderRadius
-                                    .circular(
-                              18,
-                            ),
+                          decoration: BoxDecoration(
+                            color: isUser ? Colors.deepPurple : const Color(0xFF1E1E1E),
+                            borderRadius: BorderRadius.circular(18),
                           ),
                           child: Text(
-                            messages[index],
-                            style:
-                                const TextStyle(
+                            msg['text'] ?? '',
+                            style: const TextStyle(
                               fontSize: 15,
                             ),
                           ),
@@ -1188,13 +1135,7 @@ class _ChatConversationScreenState
           // MESSAGE BAR
           SafeArea(
             child: Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(
-                10,
-                6,
-                10,
-                10,
-              ),
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
               child: Row(
                 children: [
                   IconButton(
@@ -1210,30 +1151,16 @@ class _ChatConversationScreenState
                   ),
                   Expanded(
                     child: TextField(
-                      controller:
-                          messageController,
-                      textInputAction:
-                          TextInputAction.send,
-                      onSubmitted: (_) =>
-                          sendMessage(),
-                      decoration:
-                          InputDecoration(
-                        hintText:
-                            'Message...',
+                      controller: messageController,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => sendMessage(),
+                      decoration: InputDecoration(
+                        hintText: 'Message...',
                         filled: true,
-                        fillColor:
-                            const Color(
-                          0xFF1E1E1E,
-                        ),
-                        border:
-                            OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            24,
-                          ),
-                          borderSide:
-                              BorderSide.none,
+                        fillColor: const Color(0xFF1E1E1E),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
                         ),
                       ),
                     ),
@@ -1241,11 +1168,9 @@ class _ChatConversationScreenState
                   const SizedBox(width: 6),
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor:
-                        Colors.deepPurple,
+                    backgroundColor: Colors.deepPurple,
                     child: IconButton(
-                      onPressed:
-                          sendMessage,
+                      onPressed: sendMessage,
                       icon: const Icon(
                         Icons.send,
                         size: 20,
@@ -1266,99 +1191,72 @@ class _ChatConversationScreenState
 // CHARACTER SELECTOR
 // ==================================================
 
-class SelectCharacterScreen
-    extends StatefulWidget {
+class SelectCharacterScreen extends StatefulWidget {
   const SelectCharacterScreen({
     Key? key,
   }) : super(key: key);
 
   @override
-  State<SelectCharacterScreen>
-      createState() =>
-          _SelectCharacterScreenState();
+  State<SelectCharacterScreen> createState() => _SelectCharacterScreenState();
 }
 
-class _SelectCharacterScreenState
-    extends State<SelectCharacterScreen> {
-  int tempIndex =
-      AvatarState.selectedIndex;
+class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
+  int tempIndex = AvatarState.selectedIndex;
 
   @override
   Widget build(BuildContext context) {
-    final activeChar =
-        AvatarState.characters[tempIndex];
+    final activeChar = AvatarState.characters[tempIndex];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Choose Character',
-        ),
+        title: const Text('Choose Character'),
       ),
       body: Column(
         children: [
           Expanded(
             child: Container(
-              margin:
-                  const EdgeInsets.fromLTRB(
-                20,
-                10,
-                20,
-                20,
-              ),
+              margin: const EdgeInsets.fromLTRB(20, 10, 20, 20),
               decoration: BoxDecoration(
-                borderRadius:
-                    BorderRadius.circular(28),
-                color:
-                    const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(28),
+                color: const Color(0xFF1E1E1E),
                 border: Border.all(
-                  color: activeChar.themeColor
-                      .withOpacity(0.4),
+                  color: activeChar.themeColor.withOpacity(0.4),
                   width: 2,
                 ),
               ),
               child: ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(28),
                 child: ModelViewer(
-                  key: ValueKey(
-                    activeChar.modelPath,
-                  ),
+                  key: ValueKey(activeChar.modelPath),
                   src: activeChar.modelPath,
                   alt: 'Character Preview',
                   autoRotate: true,
                   cameraControls: true,
-                  backgroundColor:
-                      const Color(0xFF1E1E1E),
+                  backgroundColor: const Color(0xFF1E1E1E),
                 ),
               ),
             ),
           ),
           Container(
-            padding:
-                const EdgeInsets.symmetric(
+            padding: const EdgeInsets.symmetric(
               horizontal: 20,
               vertical: 18,
             ),
-            decoration:
-                const BoxDecoration(
+            decoration: const BoxDecoration(
               color: Color(0xFF181818),
-              borderRadius:
-                  BorderRadius.vertical(
+              borderRadius: BorderRadius.vertical(
                 top: Radius.circular(30),
               ),
             ),
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
                   'COLOR OPTIONS',
-                  textAlign:
-                      TextAlign.center,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight:
-                        FontWeight.bold,
+                    fontWeight: FontWeight.bold,
                     letterSpacing: 1.5,
                     color: Colors.white60,
                   ),
@@ -1366,76 +1264,39 @@ class _SelectCharacterScreenState
                 const SizedBox(height: 16),
                 Row(
                   children: List.generate(
-                    AvatarState.characters
-                        .length,
+                    AvatarState.characters.length,
                     (index) {
-                      final char =
-                          AvatarState.characters[
-                              index];
-
-                      final isSelected =
-                          tempIndex == index;
+                      final char = AvatarState.characters[index];
+                      final isSelected = tempIndex == index;
 
                       return Expanded(
                         child: Padding(
-                          padding:
-                              const EdgeInsets
-                                  .symmetric(
-                            horizontal: 4,
-                          ),
-                          child:
-                              GestureDetector(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: GestureDetector(
                             onTap: () {
                               setState(() {
-                                tempIndex =
-                                    index;
+                                tempIndex = index;
                               });
                             },
                             child: Container(
                               height: 52,
-                              decoration:
-                                  BoxDecoration(
+                              decoration: BoxDecoration(
                                 color: isSelected
-                                    ? char
-                                        .themeColor
-                                    : char
-                                        .themeColor
-                                        .withOpacity(
-                                        0.18,
-                                      ),
-                                borderRadius:
-                                    BorderRadius
-                                        .circular(
-                                  14,
-                                ),
-                                border:
-                                    Border.all(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : char
-                                          .themeColor,
-                                  width:
-                                      isSelected
-                                          ? 2.5
-                                          : 1,
+                                    ? char.themeColor
+                                    : char.themeColor.withOpacity(0.18),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isSelected ? Colors.white : char.themeColor,
+                                  width: isSelected ? 2.5 : 1,
                                 ),
                               ),
-                              child:
-                                  Center(
+                              child: Center(
                                 child: Text(
                                   char.name,
-                                  style:
-                                      TextStyle(
-                                    fontSize:
-                                        15,
-                                    fontWeight:
-                                        FontWeight
-                                            .bold,
-                                    color: isSelected
-                                        ? Colors
-                                            .white
-                                        : char
-                                            .themeColor,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected ? Colors.white : char.themeColor,
                                   ),
                                 ),
                               ),
@@ -1450,22 +1311,14 @@ class _SelectCharacterScreenState
                 SizedBox(
                   height: 55,
                   child: FilledButton(
-                    style:
-                        FilledButton.styleFrom(
-                      backgroundColor:
-                          activeChar.themeColor,
-                      shape:
-                          RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(
-                          16,
-                        ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: activeChar.themeColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     onPressed: () {
-                      AvatarState
-                              .selectedIndex =
-                          tempIndex;
+                      AvatarState.selectedIndex = tempIndex;
 
                       _showMessage(
                         context,
@@ -1476,11 +1329,9 @@ class _SelectCharacterScreenState
                     },
                     child: Text(
                       'Equip ${activeChar.name}',
-                      style:
-                          const TextStyle(
+                      style: const TextStyle(
                         fontSize: 17,
-                        fontWeight:
-                            FontWeight.bold,
+                        fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
@@ -1500,15 +1351,12 @@ class _SelectCharacterScreenState
 // PROFILE
 // ==================================================
 
-class ProfileScreen
-    extends StatelessWidget {
-  const ProfileScreen({Key? key})
-      : super(key: key);
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final user =
-        FirebaseAuth.instance.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -1516,43 +1364,33 @@ class ProfileScreen
       ),
       body: Center(
         child: Padding(
-          padding:
-              const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircleAvatar(
                 radius: 55,
                 backgroundImage:
-                    user?.photoURL != null
-                        ? NetworkImage(
-                            user!.photoURL!,
-                          )
-                        : null,
-                child:
-                    user?.photoURL == null
-                        ? const Icon(
-                            Icons.person,
-                            size: 60,
-                          )
-                        : null,
+                    user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+                child: user?.photoURL == null
+                    ? const Icon(
+                        Icons.person,
+                        size: 60,
+                      )
+                    : null,
               ),
               const SizedBox(height: 20),
               Text(
                 user?.displayName ?? 'User',
-                style:
-                    const TextStyle(
+                style: const TextStyle(
                   fontSize: 24,
-                  fontWeight:
-                      FontWeight.bold,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 user?.email ?? '',
-                textAlign:
-                    TextAlign.center,
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -1566,10 +1404,8 @@ class ProfileScreen
 // SETTINGS
 // ==================================================
 
-class SettingsScreen
-    extends StatelessWidget {
-  const SettingsScreen({Key? key})
-      : super(key: key);
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -1580,37 +1416,28 @@ class SettingsScreen
       body: ListView(
         children: [
           const ListTile(
-            leading:
-                Icon(Icons.person),
+            leading: Icon(Icons.person),
             title: Text('Account'),
           ),
           const ListTile(
             leading: Icon(
               Icons.notifications,
             ),
-            title:
-                Text('Notifications'),
+            title: Text('Notifications'),
           ),
           const ListTile(
-            leading:
-                Icon(Icons.lock),
-            title:
-                Text('Privacy'),
+            leading: Icon(Icons.lock),
+            title: Text('Privacy'),
           ),
           const ListTile(
-            leading:
-                Icon(Icons.info),
-            title:
-                Text('About Avatar'),
+            leading: Icon(Icons.info),
+            title: Text('About Avatar'),
           ),
           ListTile(
-            leading:
-                const Icon(Icons.logout),
-            title:
-                const Text('Logout'),
+            leading: const Icon(Icons.logout),
+            title: const Text('Logout'),
             onTap: () async {
-              await FirebaseAuth.instance
-                  .signOut();
+              await FirebaseAuth.instance.signOut();
             },
           ),
         ],
