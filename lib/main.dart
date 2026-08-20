@@ -14,7 +14,7 @@ Future<void> main() async {
 }
 
 // ==================================================
-// TOP-LEVEL MESSAGE HELPER
+// TOP-LEVEL HELPERS
 // ==================================================
 
 void _showMessage(BuildContext context, String message) {
@@ -26,7 +26,6 @@ void _showMessage(BuildContext context, String message) {
   );
 }
 
-// Helper to generate a unique room ID for 2 users
 String getChatRoomId(String a, String b) {
   return a.compareTo(b) < 0 ? '${a}_$b' : '${b}_$a';
 }
@@ -196,7 +195,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Choose your original character and enter your world.',
+                  'Choose your original character and make bonds.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
@@ -274,19 +273,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      _showMessage(
-        context,
-        'Please enter email and password.',
-      );
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      _showMessage(context, 'Please enter name, email and password.');
       return;
     }
 
     if (password.length < 6) {
-      _showMessage(
-        context,
-        'Password must be at least 6 characters.',
-      );
+      _showMessage(context, 'Password must be at least 6 characters.');
       return;
     }
 
@@ -303,31 +296,22 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       final user = credential.user;
 
       if (user != null) {
-        if (name.isNotEmpty) {
-          await user.updateDisplayName(name);
-        }
+        await user.updateDisplayName(name);
 
-        // Save new user profile to Firestore
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
-          'name': name.isNotEmpty ? name : email.split('@')[0],
-          'email': email,
+          'name': name,
           'avatar': AvatarState.current.name,
+          'bonds': [],
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
 
       if (!mounted) return;
-
-      _showMessage(
-        context,
-        'Account created successfully!',
-      );
-
+      _showMessage(context, 'Account created successfully!');
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       String message = 'Account creation failed.';
-
       if (e.code == 'email-already-in-use') {
         message = 'This email is already registered.';
       } else if (e.code == 'invalid-email') {
@@ -335,13 +319,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       } else if (e.code == 'weak-password') {
         message = 'Password is too weak.';
       }
-
       _showMessage(context, message);
     } catch (_) {
-      _showMessage(
-        context,
-        'Something went wrong.',
-      );
+      _showMessage(context, 'Something went wrong.');
     }
 
     if (mounted) {
@@ -382,7 +362,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Name',
+                  labelText: 'Your Username / Name',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.person),
                 ),
@@ -462,10 +442,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      _showMessage(
-        context,
-        'Please enter email and password.',
-      );
+      _showMessage(context, 'Please enter email and password.');
       return;
     }
 
@@ -480,19 +457,14 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } on FirebaseAuthException catch (e) {
       String message = 'Login failed.';
-
       if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
         message = 'Incorrect email or password.';
       } else if (e.code == 'invalid-email') {
         message = 'Please enter a valid email.';
       }
-
       _showMessage(context, message);
     } catch (e) {
-      _showMessage(
-        context,
-        'Other error: $e',
-      );
+      _showMessage(context, 'Other error: $e');
     }
 
     if (mounted) {
@@ -589,7 +561,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
 // ==================================================
 // HOME SCREEN
-// HOME → CHAT → PROFILE → SETTINGS
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -632,16 +603,12 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Chat',
           ),
           NavigationDestination(
-            icon: Icon(
-              Icons.account_circle_outlined,
-            ),
+            icon: Icon(Icons.account_circle_outlined),
             selectedIcon: Icon(Icons.account_circle),
             label: 'Profile',
           ),
           NavigationDestination(
-            icon: Icon(
-              Icons.settings_outlined,
-            ),
+            icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',
           ),
@@ -683,9 +650,7 @@ class _HomeTabState extends State<HomeTab> {
             ),
             const SizedBox(height: 6),
             Text(
-              user?.displayName?.isNotEmpty == true
-                  ? user!.displayName!
-                  : user?.email ?? 'User',
+              user?.displayName?.isNotEmpty == true ? user!.displayName! : 'User',
               style: const TextStyle(
                 fontSize: 16,
                 color: Colors.white70,
@@ -757,7 +722,7 @@ class _HomeTabState extends State<HomeTab> {
 }
 
 // ==================================================
-// CHAT SCREEN
+// CHAT SCREEN (ONLY BONDED CONTACTS & SUGGESTIONS)
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -769,6 +734,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController searchController = TextEditingController();
+  String searchQuery = '';
 
   void openNewChat() {
     Navigator.push(
@@ -777,6 +743,25 @@ class _ChatScreenState extends State<ChatScreen> {
         builder: (_) => const NewChatScreen(),
       ),
     );
+  }
+
+  Future<void> toggleBond(String peerUid, bool isBonded) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid == null) return;
+
+    final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
+
+    if (isBonded) {
+      await userRef.update({
+        'bonds': FieldValue.arrayRemove([peerUid])
+      });
+      if (mounted) _showMessage(context, 'Bond removed.');
+    } else {
+      await userRef.update({
+        'bonds': FieldValue.arrayUnion([peerUid])
+      });
+      if (mounted) _showMessage(context, 'Bond created!');
+    }
   }
 
   @override
@@ -788,125 +773,303 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final currentAvatar = AvatarState.current;
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Chat',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+          'Chats',
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
             onPressed: openNewChat,
-            icon: const Icon(Icons.edit),
-            tooltip: 'New Chat',
+            icon: const Icon(Icons.person_add_alt_1),
+            tooltip: 'Discover & Search',
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: TextField(
-              controller: searchController,
-              decoration: InputDecoration(
-                hintText: 'Search people or chats',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: const Color(0xFF1E1E1E),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              children: [
-                // Avatar Friend AI Chat Tile
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 6,
-                  ),
-                  leading: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: currentAvatar.themeColor,
-                        width: 2,
-                      ),
-                    ),
-                    child: ClipOval(
-                      child: ModelViewer(
-                        key: ValueKey('list_${currentAvatar.modelPath}'),
-                        src: currentAvatar.modelPath,
-                        alt: 'Avatar Thumbnail',
-                        autoRotate: true,
-                        cameraControls: false,
-                        backgroundColor: const Color(0xFF1E1E1E),
-                      ),
-                    ),
-                  ),
-                  title: const Text(
-                    'Avatar Friend',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  subtitle: const Text(
-                    'Your personalized 3D AI companion',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: currentAvatar.themeColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'AI',
-                      style: TextStyle(
-                        color: currentAvatar.themeColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ChatConversationScreen(
-                          userName: 'Avatar Friend',
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
+        builder: (context, userSnap) {
+          final myData = userSnap.data?.data() as Map<String, dynamic>?;
+          final List<dynamic> myBonds = myData?['bonds'] ?? [];
+
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('users').snapshots(),
+            builder: (context, allUsersSnap) {
+              if (allUsersSnap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final allDocs = allUsersSnap.data?.docs ?? [];
+
+              // Filter users you have a bond with
+              final bondedUsers = allDocs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final uid = data['uid'] ?? doc.id;
+                final name = (data['name'] ?? '').toString().toLowerCase();
+
+                if (uid == currentUid || !myBonds.contains(uid)) return false;
+                if (searchQuery.isNotEmpty) {
+                  return name.contains(searchQuery.toLowerCase());
+                }
+                return true;
+              }).toList();
+
+              // Suggested users (registered users not bonded yet)
+              final suggestedUsers = allDocs.where((doc) {
+                final uid = doc.id;
+                return uid != currentUid && !myBonds.contains(uid);
+              }).toList();
+
+              return ListView(
+                children: [
+                  // Search Bar
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: TextField(
+                      controller: searchController,
+                      onChanged: (v) => setState(() => searchQuery = v.trim()),
+                      decoration: InputDecoration(
+                        hintText: 'Search bonded chats...',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: const Color(0xFF1E1E1E),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide.none,
                         ),
                       ),
-                    );
-                  },
-                ),
-                const Divider(height: 1, color: Colors.white10),
-              ],
-            ),
-          ),
-        ],
+                    ),
+                  ),
+
+                  // 1. Avatar Friend AI Tile
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                    leading: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: currentAvatar.themeColor,
+                          width: 2,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: ModelViewer(
+                          key: ValueKey('list_${currentAvatar.modelPath}'),
+                          src: currentAvatar.modelPath,
+                          alt: 'Avatar Thumbnail',
+                          autoRotate: true,
+                          cameraControls: false,
+                          backgroundColor: const Color(0xFF1E1E1E),
+                        ),
+                      ),
+                    ),
+                    title: const Text(
+                      'Avatar Friend',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    subtitle: const Text(
+                      'Your personalized 3D AI companion',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: currentAvatar.themeColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'AI',
+                        style: TextStyle(
+                          color: currentAvatar.themeColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ChatConversationScreen(
+                            userName: 'Avatar Friend',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, color: Colors.white10),
+
+                  // 2. Bonded Users List
+                  if (bondedUsers.isNotEmpty) ...[
+                    ...bondedUsers.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final peerUid = data['uid'] ?? doc.id;
+                      final name = data['name'] ?? 'User';
+                      final peerAvatar = AvatarState.getByName(data['avatar']);
+
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                        leading: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => UserProfileViewScreen(userData: data),
+                              ),
+                            );
+                          },
+                          child: CircleAvatar(
+                            radius: 25,
+                            backgroundColor: peerAvatar.themeColor.withOpacity(0.25),
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                              style: TextStyle(
+                                color: peerAvatar.themeColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        subtitle: const Text(
+                          'Bonded with you',
+                          style: TextStyle(color: Colors.white60, fontSize: 13),
+                        ),
+                        trailing: Icon(
+                          Icons.chat_bubble_outline,
+                          color: peerAvatar.themeColor,
+                          size: 22,
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatConversationScreen(
+                                userName: name,
+                                peerUid: peerUid,
+                                peerAvatar: data['avatar'],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }).toList(),
+                  ] else if (searchQuery.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(
+                        child: Text(
+                          'No bonded contacts match your search.',
+                          style: TextStyle(color: Colors.white60),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // 3. Suggested Bonds (People on Avatar)
+                  if (suggestedUsers.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(18, 24, 18, 10),
+                      child: Text(
+                        'SUGGESTED BONDS',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ),
+                    ...suggestedUsers.take(10).map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final peerUid = data['uid'] ?? doc.id;
+                      final name = data['name'] ?? 'User';
+                      final peerAvatar = AvatarState.getByName(data['avatar']);
+
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                        leading: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => UserProfileViewScreen(userData: data),
+                              ),
+                            );
+                          },
+                          child: CircleAvatar(
+                            radius: 23,
+                            backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                              style: TextStyle(
+                                color: peerAvatar.themeColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        title: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => UserProfileViewScreen(userData: data),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        trailing: SizedBox(
+                          height: 34,
+                          child: FilledButton.tonal(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
+                              foregroundColor: peerAvatar.themeColor,
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onPressed: () => toggleBond(peerUid, false),
+                            child: const Text(
+                              '+ Bond',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ],
+              );
+            },
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: openNewChat,
-        child: const Icon(Icons.chat),
+        child: const Icon(Icons.search),
       ),
     );
   }
 }
 
 // ==================================================
-// NEW CHAT SCREEN (SEARCH REAL USERS VIA FIRESTORE)
+// NEW CHAT / DISCOVER SCREEN (SEARCH & BOND)
 // ==================================================
 
 class NewChatScreen extends StatefulWidget {
@@ -920,6 +1083,25 @@ class _NewChatScreenState extends State<NewChatScreen> {
   final TextEditingController searchController = TextEditingController();
   String searchQuery = '';
 
+  Future<void> toggleBond(String peerUid, bool isBonded) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid == null) return;
+
+    final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
+
+    if (isBonded) {
+      await userRef.update({
+        'bonds': FieldValue.arrayRemove([peerUid])
+      });
+      if (mounted) _showMessage(context, 'Bond removed.');
+    } else {
+      await userRef.update({
+        'bonds': FieldValue.arrayUnion([peerUid])
+      });
+      if (mounted) _showMessage(context, 'Bond created! You can now message.');
+    }
+  }
+
   @override
   void dispose() {
     searchController.dispose();
@@ -928,136 +1110,332 @@ class _NewChatScreenState extends State<NewChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New Chat'),
+        title: const Text('Discover & Bond'),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: searchController,
-              onChanged: (val) {
-                setState(() {
-                  searchQuery = val.trim().toLowerCase();
-                });
-              },
-              decoration: InputDecoration(
-                hintText: 'Search by name or email',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: const Color(0xFF1E1E1E),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
+        builder: (context, userSnap) {
+          final myData = userSnap.data?.data() as Map<String, dynamic>?;
+          final List<dynamic> myBonds = myData?['bonds'] ?? [];
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: searchController,
+                  onChanged: (val) {
+                    setState(() {
+                      searchQuery = val.trim().toLowerCase();
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Search by account name...',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: const Color(0xFF1E1E1E),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection('users').snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No other users registered yet.',
-                      style: TextStyle(color: Colors.white60),
-                    ),
-                  );
-                }
+                    final users = (snapshot.data?.docs ?? []).where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final uid = data['uid'] ?? doc.id;
+                      if (uid == currentUid) return false;
 
-                final users = snapshot.data!.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final uid = data['uid'] ?? doc.id;
-                  if (uid == currentUserId) return false;
+                      final name = (data['name'] ?? '').toString().toLowerCase();
+                      if (searchQuery.isEmpty) return true;
+                      return name.contains(searchQuery);
+                    }).toList();
 
-                  final name = (data['name'] ?? '').toString().toLowerCase();
-                  final email = (data['email'] ?? '').toString().toLowerCase();
-
-                  if (searchQuery.isEmpty) return true;
-                  return name.contains(searchQuery) || email.contains(searchQuery);
-                }).toList();
-
-                if (users.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No users matched your search.',
-                      style: TextStyle(color: Colors.white60),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: users.length,
-                  itemBuilder: (context, index) {
-                    final userData = users[index].data() as Map<String, dynamic>;
-                    final userName = userData['name'] ?? 'User';
-                    final userEmail = userData['email'] ?? '';
-                    final peerUid = userData['uid'] ?? users[index].id;
-                    final avatarName = userData['avatar'] ?? 'ORANGE';
-                    final peerAvatar = AvatarState.getByName(avatarName);
-
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                      leading: CircleAvatar(
-                        radius: 25,
-                        backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
+                    if (users.isEmpty) {
+                      return const Center(
                         child: Text(
-                          userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                          style: TextStyle(
-                            color: peerAvatar.themeColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
+                          'No users found.',
+                          style: TextStyle(color: Colors.white60),
                         ),
-                      ),
-                      title: Text(
-                        userName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      subtitle: Text(
-                        userEmail,
-                        style: const TextStyle(color: Colors.white60, fontSize: 13),
-                      ),
-                      trailing: Icon(
-                        Icons.chat_bubble_outline,
-                        color: peerAvatar.themeColor,
-                        size: 22,
-                      ),
-                      onTap: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatConversationScreen(
-                              userName: userName,
-                              peerUid: peerUid,
-                              peerAvatar: avatarName,
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: users.length,
+                      itemBuilder: (context, index) {
+                        final userData = users[index].data() as Map<String, dynamic>;
+                        final userName = userData['name'] ?? 'User';
+                        final peerUid = userData['uid'] ?? users[index].id;
+                        final avatarName = userData['avatar'] ?? 'ORANGE';
+                        final peerAvatar = AvatarState.getByName(avatarName);
+                        final isBonded = myBonds.contains(peerUid);
+
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                          leading: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => UserProfileViewScreen(userData: userData),
+                                ),
+                              );
+                            },
+                            child: CircleAvatar(
+                              radius: 25,
+                              backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
+                              child: Text(
+                                userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                                style: TextStyle(
+                                  color: peerAvatar.themeColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
                             ),
+                          ),
+                          title: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => UserProfileViewScreen(userData: userData),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              userName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Bond Toggle Button
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: peerAvatar.themeColor),
+                                  foregroundColor: isBonded ? Colors.white70 : peerAvatar.themeColor,
+                                  backgroundColor: isBonded
+                                      ? Colors.white12
+                                      : peerAvatar.themeColor.withOpacity(0.15),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () => toggleBond(peerUid, isBonded),
+                                child: Text(
+                                  isBonded ? 'Bonded' : '+ Bond',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              if (isBonded) ...[
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  onPressed: () {
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ChatConversationScreen(
+                                          userName: userName,
+                                          peerUid: peerUid,
+                                          peerAvatar: avatarName,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: Icon(
+                                    Icons.chat_bubble_outline,
+                                    color: peerAvatar.themeColor,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         );
                       },
                     );
                   },
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
 // ==================================================
-// CHAT CONVERSATION (SUPPORTS BOTH AI & 1-ON-1 FIRESTORE)
+// USER PROFILE PREVIEW SCREEN (OPENED ON NAME TAP)
+// ==================================================
+
+class UserProfileViewScreen extends StatelessWidget {
+  final Map<String, dynamic> userData;
+
+  const UserProfileViewScreen({
+    Key? key,
+    required this.userData,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final peerUid = userData['uid'] ?? '';
+    final name = userData['name'] ?? 'User';
+    final avatarName = userData['avatar'] ?? 'ORANGE';
+    final peerAvatar = AvatarState.getByName(avatarName);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(name),
+      ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
+        builder: (context, snapshot) {
+          final myData = snapshot.data?.data() as Map<String, dynamic>?;
+          final List<dynamic> myBonds = myData?['bonds'] ?? [];
+          final isBonded = myBonds.contains(peerUid);
+
+          return SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  // 3D Avatar of User
+                  Container(
+                    width: double.infinity,
+                    height: 320,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      color: const Color(0xFF1E1E1E),
+                      border: Border.all(
+                        color: peerAvatar.themeColor.withOpacity(0.4),
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: ModelViewer(
+                        key: ValueKey('preview_${peerAvatar.modelPath}'),
+                        src: peerAvatar.modelPath,
+                        alt: '$name Avatar',
+                        autoRotate: true,
+                        cameraControls: true,
+                        backgroundColor: const Color(0xFF1E1E1E),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${peerAvatar.name} Avatar',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: peerAvatar.themeColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 52,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: isBonded
+                                  ? const Color(0xFF2A2A2A)
+                                  : peerAvatar.themeColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: () async {
+                              final userRef = FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(currentUid);
+                              if (isBonded) {
+                                await userRef.update({
+                                  'bonds': FieldValue.arrayRemove([peerUid])
+                                });
+                              } else {
+                                await userRef.update({
+                                  'bonds': FieldValue.arrayUnion([peerUid])
+                                });
+                              }
+                            },
+                            child: Text(
+                              isBonded ? 'Break Bond' : '+ Make Bond',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (isBonded) ...[
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          height: 52,
+                          child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: peerAvatar.themeColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatConversationScreen(
+                                    userName: name,
+                                    peerUid: peerUid,
+                                    peerAvatar: avatarName,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.chat_bubble_outline),
+                            label: const Text('Message'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ==================================================
+// CHAT CONVERSATION SCREEN
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1146,7 +1524,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       });
       _saveChatHistory();
     } else {
-      // 1-on-1 Firestore Live message
       await FirebaseFirestore.instance
           .collection('chats')
           .doc(chatRoomId)
@@ -1244,10 +1621,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             ),
           IconButton(
             onPressed: () {
-              _showMessage(
-                context,
-                'Voice call will be connected next.',
-              );
+              _showMessage(context, 'Voice call will be connected next.');
             },
             icon: const Icon(Icons.call),
           ),
@@ -1267,14 +1641,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 children: [
                   IconButton(
                     onPressed: () {
-                      _showMessage(
-                        context,
-                        'Media sharing will be connected next.',
-                      );
+                      _showMessage(context, 'Media sharing will be connected next.');
                     },
-                    icon: const Icon(
-                      Icons.add_circle_outline,
-                    ),
+                    icon: const Icon(Icons.add_circle_outline),
                   ),
                   Expanded(
                     child: TextField(
@@ -1300,10 +1669,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         : Colors.deepPurple,
                     child: IconButton(
                       onPressed: sendMessage,
-                      icon: const Icon(
-                        Icons.send,
-                        size: 20,
-                      ),
+                      icon: const Icon(Icons.send, size: 20),
                     ),
                   ),
                 ],
@@ -1357,10 +1723,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               const SizedBox(height: 6),
               const Text(
                 'Your personalized 3D AI companion',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white60,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.white60),
               ),
             ],
           ),
@@ -1492,9 +1855,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 // ==================================================
 
 class SelectCharacterScreen extends StatefulWidget {
-  const SelectCharacterScreen({
-    Key? key,
-  }) : super(key: key);
+  const SelectCharacterScreen({Key? key}) : super(key: key);
 
   @override
   State<SelectCharacterScreen> createState() => _SelectCharacterScreenState();
@@ -1509,9 +1870,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Choose Character',
-        ),
+        title: const Text('Choose Character'),
       ),
       body: Column(
         children: [
@@ -1622,7 +1981,6 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                     onPressed: () async {
                       AvatarState.selectedIndex = tempIndex;
 
-                      // Sync selected avatar with Firestore
                       final user = FirebaseAuth.instance.currentUser;
                       if (user != null) {
                         await FirebaseFirestore.instance
@@ -1700,11 +2058,6 @@ class ProfileScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                user?.email ?? '',
-                textAlign: TextAlign.center,
-              ),
             ],
           ),
         ),
@@ -1733,9 +2086,7 @@ class SettingsScreen extends StatelessWidget {
             title: Text('Account'),
           ),
           const ListTile(
-            leading: Icon(
-              Icons.notifications,
-            ),
+            leading: Icon(Icons.notifications),
             title: Text('Notifications'),
           ),
           const ListTile(
