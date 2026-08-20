@@ -1,4 +1,4 @@
-import 'dart:convert';
+  import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -769,6 +769,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentAvatar = AvatarState.current;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -810,6 +812,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     itemCount: conversations.length,
                     itemBuilder: (context, index) {
                       final chat = conversations[index];
+                      final isAvatarFriend = chat['name'] == 'Avatar Friend';
 
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(
@@ -818,10 +821,14 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                         leading: CircleAvatar(
                           radius: 27,
-                          backgroundColor: Colors.deepPurple.withOpacity(0.2),
+                          backgroundColor: isAvatarFriend
+                              ? currentAvatar.themeColor.withOpacity(0.2)
+                              : Colors.deepPurple.withOpacity(0.2),
                           child: Icon(
-                            chat['icon'] as IconData,
-                            color: Colors.deepPurpleAccent,
+                            isAvatarFriend ? Icons.person : (chat['icon'] as IconData),
+                            color: isAvatarFriend
+                                ? currentAvatar.themeColor
+                                : Colors.deepPurpleAccent,
                           ),
                         ),
                         title: Text(
@@ -1024,6 +1031,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   @override
   Widget build(BuildContext context) {
     final isAvatarFriend = widget.userName == 'Avatar Friend';
+    final currentAvatar = AvatarState.current;
 
     return Scaffold(
       appBar: AppBar(
@@ -1032,11 +1040,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           children: [
             CircleAvatar(
               radius: 19,
-              backgroundColor: Colors.deepPurple.withOpacity(0.3),
+              backgroundColor: isAvatarFriend
+                  ? currentAvatar.themeColor
+                  : Colors.deepPurple.withOpacity(0.3),
               child: Icon(
-                isAvatarFriend ? Icons.smart_toy : Icons.person,
+                Icons.person,
                 size: 21,
-                color: Colors.deepPurpleAccent,
+                color: Colors.white,
               ),
             ),
             const SizedBox(width: 10),
@@ -1060,23 +1070,67 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           Expanded(
             child: messages.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          isAvatarFriend ? Icons.smart_toy_outlined : Icons.chat_bubble_outline,
-                          size: 70,
-                          color: Colors.white24,
-                        ),
-                        const SizedBox(height: 15),
-                        Text(
-                          isAvatarFriend ? 'Say hello to Avatar Friend!' : 'Start chatting',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (isAvatarFriend) ...[
+                            Container(
+                              width: 150,
+                              height: 150,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF1E1E1E),
+                                border: Border.all(
+                                  color: currentAvatar.themeColor,
+                                  width: 3,
+                                ),
+                              ),
+                              child: ClipOval(
+                                child: ModelViewer(
+                                  key: ValueKey('chat_${currentAvatar.modelPath}'),
+                                  src: currentAvatar.modelPath,
+                                  alt: 'Avatar 3D Preview',
+                                  autoRotate: true,
+                                  cameraControls: false,
+                                  backgroundColor: const Color(0xFF1E1E1E),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            Text(
+                              'Say hello to ${currentAvatar.name} Avatar!',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: currentAvatar.themeColor,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Your personalized 3D AI companion',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white60,
+                              ),
+                            ),
+                          ] else ...[
+                            const Icon(
+                              Icons.chat_bubble_outline,
+                              size: 70,
+                              color: Colors.white24,
+                            ),
+                            const SizedBox(height: 15),
+                            const Text(
+                              'Start chatting',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   )
                 : ListView.builder(
@@ -1117,8 +1171,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             vertical: 11,
                           ),
                           decoration: BoxDecoration(
-                            color: isUser ? Colors.deepPurple : const Color(0xFF1E1E1E),
+                            color: isUser
+                                ? Colors.deepPurple
+                                : const Color(0xFF1E1E1E),
                             borderRadius: BorderRadius.circular(18),
+                            border: (!isUser && isAvatarFriend)
+                                ? Border.all(
+                                    color: currentAvatar.themeColor.withOpacity(0.3),
+                                    width: 1,
+                                  )
+                                : null,
                           ),
                           child: Text(
                             msg['text'] ?? '',
@@ -1168,7 +1230,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   const SizedBox(width: 6),
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: isAvatarFriend ? currentAvatar.themeColor : Colors.deepPurple,
                     child: IconButton(
                       onPressed: sendMessage,
                       icon: const Icon(
@@ -1209,7 +1271,9 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Choose Character'),
+        title: const Text(
+          'Choose Character',
+        ),
       ),
       body: Column(
         children: [
@@ -1445,3 +1509,4 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 }
+   
