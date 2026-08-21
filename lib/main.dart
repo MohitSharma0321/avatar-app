@@ -7,6 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -16,11 +20,288 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+// ==================================================
+// FCM BACKGROUND HANDLER
+// ==================================================
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await NotificationService.initialize();
   await AvatarState.loadSavedAvatar();
   runApp(const AvatarApp());
+}
+
+// ==================================================
+// FCM NOTIFICATION SERVICE
+// ==================================================
+
+class NotificationService {
+  static final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  static final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  static Future<void> initialize() async {
+    await _fcm.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initSettings =
+        InitializationSettings(android: androidSettings);
+
+    await _localNotifications.initialize(initSettings);
+
+    final token = await _fcm.getToken();
+    if (token != null) {
+      await saveTokenToFirestore(token);
+    }
+
+    _fcm.onTokenRefresh.listen((newToken) {
+      saveTokenToFirestore(newToken);
+    });
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      RemoteNotification? notification = message.notification;
+      AndroidNotification? android = message.notification?.android;
+
+      if (notification != null && android != null) {
+        _localNotifications.show(
+          notification.hashCode,
+          notification.title,
+          notification.body,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'avatar_chat_channel',
+              'Chat Notifications',
+              importance: Importance.max,
+              priority: Priority.high,
+              showWhen: true,
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  static Future<void> saveTokenToFirestore(String token) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'fcmToken': token,
+      }, SetOptions(merge: true));
+    }
+  }
+}
+
+// ==================================================
+// WEBRTC SIGNALING SERVICE
+// ==================================================
+
+typedef StreamCallback = void Function(MediaStream stream);
+
+class WebRtcSignalingService {
+  final Map<String, dynamic> configuration = {
+    'iceServers': [
+      {'urls': 'stun:stun.l.google.com:19302'},
+      {'urls': 'stun:stun1.l.google.com:19302'},
+    ]
+  };
+
+  RTCPeerConnection? peerConnection;
+  MediaStream? localStream;
+  MediaStream? remoteStream;
+  String? currentCallId;
+  StreamSubscription? callDocSubscription;
+  StreamSubscription? candidateSubscription;
+
+  Future<MediaStream> openAudioStream() async {
+    await Permission.microphone.request();
+    localStream = await navigator.mediaDevices.getUserMedia({
+      'audio': true,
+      'video': false,
+    });
+    return localStream!;
+  }
+
+  Future<String> createCall({
+    required String callerId,
+    required String calleeId,
+    required String callerName,
+    required String callerAvatar,
+    required StreamCallback onRemoteStreamReceived,
+    required VoidCallback onCallEnded,
+  }) async {
+    final firestore = FirebaseFirestore.instance;
+    final callDoc = firestore.collection('calls').doc();
+    currentCallId = callDoc.id;
+
+    peerConnection = await createPeerConnection(configuration);
+
+    localStream?.getTracks().forEach((track) {
+      peerConnection?.addTrack(track, localStream!);
+    });
+
+    peerConnection?.onTrack = (RTCTrackEvent event) {
+      if (event.streams.isNotEmpty) {
+        remoteStream = event.streams[0];
+        onRemoteStreamReceived(event.streams[0]);
+      }
+    };
+
+    peerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
+      callDoc.collection('callerCandidates').add(candidate.toMap());
+    };
+
+    RTCSessionDescription offer = await peerConnection!.createOffer();
+    await peerConnection!.setLocalDescription(offer);
+
+    await callDoc.set({
+      'callId': currentCallId,
+      'callerId': callerId,
+      'calleeId': calleeId,
+      'callerName': callerName,
+      'callerAvatar': callerAvatar,
+      'offer': offer.toMap(),
+      'status': 'calling',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    callDocSubscription = callDoc.snapshots().listen((snapshot) async {
+      final data = snapshot.data();
+      if (data != null) {
+        if (data['status'] == 'ended') {
+          onCallEnded();
+        } else if (data['answer'] != null &&
+            peerConnection?.getRemoteDescription() == null) {
+          var answer = RTCSessionDescription(
+            data['answer']['sdp'],
+            data['answer']['type'],
+          );
+          await peerConnection?.setRemoteDescription(answer);
+        }
+      }
+    });
+
+    candidateSubscription = callDoc
+        .collection('calleeCandidates')
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          var data = change.doc.data();
+          peerConnection?.addCandidate(
+            RTCIceCandidate(
+              data?['candidate'],
+              data?['sdpMid'],
+              data?['sdpMLineIndex'],
+            ),
+          );
+        }
+      }
+    });
+
+    return currentCallId!;
+  }
+
+  Future<void> answerCall({
+    required String callId,
+    required StreamCallback onRemoteStreamReceived,
+    required VoidCallback onCallEnded,
+  }) async {
+    currentCallId = callId;
+    final callDoc = FirebaseFirestore.instance.collection('calls').doc(callId);
+
+    peerConnection = await createPeerConnection(configuration);
+
+    localStream?.getTracks().forEach((track) {
+      peerConnection?.addTrack(track, localStream!);
+    });
+
+    peerConnection?.onTrack = (RTCTrackEvent event) {
+      if (event.streams.isNotEmpty) {
+        remoteStream = event.streams[0];
+        onRemoteStreamReceived(event.streams[0]);
+      }
+    };
+
+    peerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
+      callDoc.collection('calleeCandidates').add(candidate.toMap());
+    };
+
+    final callData = (await callDoc.get()).data();
+    if (callData != null && callData['offer'] != null) {
+      var offer = RTCSessionDescription(
+        callData['offer']['sdp'],
+        callData['offer']['type'],
+      );
+      await peerConnection?.setRemoteDescription(offer);
+
+      var answer = await peerConnection!.createAnswer();
+      await peerConnection!.setLocalDescription(answer);
+
+      await callDoc.update({
+        'answer': answer.toMap(),
+        'status': 'connected',
+      });
+    }
+
+    callDocSubscription = callDoc.snapshots().listen((snapshot) {
+      final data = snapshot.data();
+      if (data != null && data['status'] == 'ended') {
+        onCallEnded();
+      }
+    });
+
+    candidateSubscription = callDoc
+        .collection('callerCandidates')
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          var data = change.doc.data();
+          peerConnection?.addCandidate(
+            RTCIceCandidate(
+              data?['candidate'],
+              data?['sdpMid'],
+              data?['sdpMLineIndex'],
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> hangUp() async {
+    callDocSubscription?.cancel();
+    candidateSubscription?.cancel();
+
+    if (currentCallId != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('calls')
+            .doc(currentCallId)
+            .update({'status': 'ended'});
+      } catch (_) {}
+    }
+
+    localStream?.getTracks().forEach((track) => track.stop());
+    remoteStream?.getTracks().forEach((track) => track.stop());
+    await peerConnection?.close();
+    peerConnection = null;
+    localStream = null;
+    remoteStream = null;
+    currentCallId = null;
+  }
 }
 
 // ==================================================
@@ -380,6 +661,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+        await NotificationService.initialize();
       }
 
       if (!mounted) return;
@@ -509,6 +791,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (credential.user != null) {
         await ensureUserDoc(credential.user!);
+        await NotificationService.initialize();
       }
 
       if (!mounted) return;
@@ -596,7 +879,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN
+// HOME SCREEN (WITH INCOMING CALL LISTENER)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -608,6 +891,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int currentIndex = 0;
+  StreamSubscription? callSubscription;
 
   final List<Widget> pages = const [
     HomeTab(),
@@ -621,7 +905,101 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       ensureUserDoc(user);
+      _listenForIncomingCalls(user.uid);
     }
+  }
+
+  void _listenForIncomingCalls(String myUid) {
+    callSubscription = FirebaseFirestore.instance
+        .collection('calls')
+        .where('calleeId', isEqualTo: myUid)
+        .where('status', isEqualTo: 'calling')
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final data = change.doc.data();
+          if (data != null && mounted) {
+            _showIncomingCallDialog(data, change.doc.id);
+          }
+        }
+      }
+    });
+  }
+
+  void _showIncomingCallDialog(Map<String, dynamic> callData, String callId) {
+    final callerAvatar = AvatarState.getByName(callData['callerAvatar']);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: Text('${callData['callerName'] ?? 'User'} is Calling...'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: callerAvatar.themeColor, width: 2),
+              ),
+              child: ClipOval(
+                child: ModelViewer(
+                  key: ValueKey('incoming_${callerAvatar.modelPath}'),
+                  src: callerAvatar.modelPath,
+                  alt: 'Caller Avatar',
+                  autoRotate: true,
+                  cameraControls: false,
+                  backgroundColor: const Color(0xFF1E1E1E),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text('Incoming Real-time Voice Call'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              FirebaseFirestore.instance
+                  .collection('calls')
+                  .doc(callId)
+                  .update({'status': 'ended'});
+              Navigator.pop(ctx);
+            },
+            child: const Text('Decline', style: TextStyle(color: Colors.redAccent)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CallScreen(
+                    peerName: callData['callerName'] ?? 'User',
+                    peerAvatar: callData['callerAvatar'] ?? 'ORANGE',
+                    peerUid: callData['callerId'] ?? '',
+                    callId: callId,
+                    isIncoming: true,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    callSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -745,20 +1123,31 @@ class HomeTab extends StatelessWidget {
 }
 
 // ==================================================
-// 1-ON-1 ACTIVE CALLING SCREEN
+// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN
 // ==================================================
 
 class CallScreen extends StatefulWidget {
   final String peerName;
   final String peerAvatar;
+  final String peerUid;
+  final String? callId;
+  final bool isIncoming;
 
-  const CallScreen({Key? key, required this.peerName, required this.peerAvatar}) : super(key: key);
+  const CallScreen({
+    Key? key,
+    required this.peerName,
+    required this.peerAvatar,
+    required this.peerUid,
+    this.callId,
+    this.isIncoming = false,
+  }) : super(key: key);
 
   @override
   State<CallScreen> createState() => _CallScreenState();
 }
 
 class _CallScreenState extends State<CallScreen> {
+  final WebRtcSignalingService _signaling = WebRtcSignalingService();
   bool isMuted = false;
   bool isSpeaker = false;
   bool isConnected = false;
@@ -768,14 +1157,62 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
-    // Simulate connection after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() => isConnected = true);
-        callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-          if (mounted) setState(() => callSeconds++);
-        });
-      }
+    _startWebRtcCall();
+  }
+
+  Future<void> _startWebRtcCall() async {
+    await _signaling.openAudioStream();
+
+    if (widget.isIncoming && widget.callId != null) {
+      await _signaling.answerCall(
+        callId: widget.callId!,
+        onRemoteStreamReceived: (stream) {
+          _startTimer();
+        },
+        onCallEnded: () {
+          if (mounted) Navigator.pop(context);
+        },
+      );
+      _startTimer();
+    } else {
+      final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+      final currentName = FirebaseAuth.instance.currentUser?.displayName ?? 'User';
+
+      await _signaling.createCall(
+        callerId: currentUid,
+        calleeId: widget.peerUid,
+        callerName: currentName,
+        callerAvatar: AvatarState.current.name,
+        onRemoteStreamReceived: (stream) {
+          _startTimer();
+        },
+        onCallEnded: () {
+          if (mounted) Navigator.pop(context);
+        },
+      );
+    }
+  }
+
+  void _startTimer() {
+    if (!isConnected && mounted) {
+      setState(() => isConnected = true);
+      callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted) setState(() => callSeconds++);
+      });
+    }
+  }
+
+  void _toggleMic() {
+    setState(() => isMuted = !isMuted);
+    _signaling.localStream?.getAudioTracks().forEach((track) {
+      track.enabled = !isMuted;
+    });
+  }
+
+  void _toggleSpeaker() {
+    setState(() => isSpeaker = !isSpeaker);
+    _signaling.remoteStream?.getAudioTracks().forEach((track) {
+      track.enableSpeakerphone(isSpeaker);
     });
   }
 
@@ -788,6 +1225,7 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void dispose() {
     callTimer?.cancel();
+    _signaling.hangUp();
     super.dispose();
   }
 
@@ -807,7 +1245,7 @@ class _CallScreenState extends State<CallScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              isConnected ? 'Connected • ${_formatTime(callSeconds)}' : 'Ringing...',
+              isConnected ? 'Connected • ${_formatTime(callSeconds)}' : 'Calling...',
               style: TextStyle(
                 fontSize: 16,
                 color: isConnected ? Colors.greenAccent : Colors.white60,
@@ -844,7 +1282,7 @@ class _CallScreenState extends State<CallScreen> {
                     backgroundColor: isMuted ? Colors.white : const Color(0xFF2A2A2A),
                     foregroundColor: isMuted ? Colors.black : Colors.white,
                   ),
-                  onPressed: () => setState(() => isMuted = !isMuted),
+                  onPressed: _toggleMic,
                   icon: Icon(isMuted ? Icons.mic_off : Icons.mic),
                 ),
                 IconButton.filled(
@@ -863,7 +1301,7 @@ class _CallScreenState extends State<CallScreen> {
                     backgroundColor: isSpeaker ? Colors.white : const Color(0xFF2A2A2A),
                     foregroundColor: isSpeaker ? Colors.black : Colors.white,
                   ),
-                  onPressed: () => setState(() => isSpeaker = !isSpeaker),
+                  onPressed: _toggleSpeaker,
                   icon: Icon(isSpeaker ? Icons.volume_up : Icons.volume_down),
                 ),
               ],
@@ -1808,7 +2246,7 @@ class AnimatedBubble extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN (SUPER-PACK INCLUDED)
+// CHAT CONVERSATION SCREEN
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1834,7 +2272,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final FlutterTts flutterTts = FlutterTts();
   final ImagePicker _picker = ImagePicker();
   final AudioRecorder _audioRecorder = AudioRecorder();
-  
+
   bool isLoading = false;
   bool isRecording = false;
   int recordingSeconds = 0;
@@ -1946,7 +2384,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  // 1-on-1 Gallery Image Pick & Send
   Future<void> _pickAndSendGalleryImage() async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
@@ -1987,7 +2424,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  // Voice Note Recording
   Future<void> _startRecording() async {
     try {
       if (await _audioRecorder.hasPermission()) {
@@ -2097,7 +2533,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Emoji reaction row
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
               child: Row(
@@ -2256,6 +2691,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         builder: (_) => CallScreen(
                           peerName: widget.userName,
                           peerAvatar: widget.peerAvatar ?? 'ORANGE',
+                          peerUid: widget.peerUid ?? '',
+                          isIncoming: false,
                         ),
                       ),
                     );
@@ -2275,7 +2712,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 child: isAvatarFriend ? _buildAiChat(currentAvatar) : _buildRealUserChat(),
               ),
 
-              // CHAT INPUT BAR
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
@@ -2501,7 +2937,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         final messages = snapshot.data!.docs;
         _scrollToBottom();
 
-        // Mark incoming messages as read
         for (var doc in messages) {
           final d = doc.data() as Map<String, dynamic>;
           if (d['receiverId'] == currentUid && d['isRead'] == false) {
@@ -2567,7 +3002,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             else
                               Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
 
-                            // Message Ticks System (Sent / Read)
                             if (isMe) ...[
                               const SizedBox(height: 3),
                               Row(
@@ -2584,8 +3018,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           ],
                         ),
                       ),
-
-                      // Emoji Reaction Badge
                       if (reaction.isNotEmpty)
                         Positioned(
                           bottom: 2,
