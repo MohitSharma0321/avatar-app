@@ -17,7 +17,7 @@ Future<void> main() async {
 }
 
 // ==================================================
-// TOP-LEVEL HELPERS
+// TOP-LEVEL HELPERS & AUTO-SYNC
 // ==================================================
 
 void _showMessage(BuildContext context, String message) {
@@ -33,7 +33,25 @@ String getChatRoomId(String a, String b) {
   return a.compareTo(b) < 0 ? '${a}_$b' : '${b}_$a';
 }
 
-// Free Cloud Image Upload (100% Free - No Card Required)
+// Ensure User Exists in Firestore Database
+Future<void> ensureUserDoc(User user) async {
+  try {
+    final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final doc = await docRef.get();
+    if (!doc.exists) {
+      await docRef.set({
+        'uid': user.uid,
+        'name': (user.displayName?.isNotEmpty == true) ? user.displayName : 'User',
+        'bio': 'Hey there! I am using Avatar.',
+        'avatar': AvatarState.current.name,
+        'bonds': [],
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+  } catch (_) {}
+}
+
+// Free Cloud Image Upload
 Future<String?> uploadImageFreeHost(File imageFile) async {
   try {
     final uri = Uri.parse('https://api.imgbb.com/1/upload?key=6d207e02198a847aa5af3acf343fe4ef');
@@ -166,7 +184,8 @@ class AuthGate extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasData) {
+        if (snapshot.hasData && snapshot.data != null) {
+          ensureUserDoc(snapshot.data!);
           return const HomeScreen();
         }
 
@@ -302,7 +321,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'avatar': AvatarState.current.name,
           'bonds': [],
           'createdAt': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
       }
 
       if (!mounted) return;
@@ -403,7 +422,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 }
 
 // ==================================================
-// LOGIN (AUTO-REDIRECTS)
+// LOGIN (WITH AUTO-DATABASE SYNC)
 // ==================================================
 
 class LoginScreen extends StatefulWidget {
@@ -432,10 +451,14 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      if (credential.user != null) {
+        await ensureUserDoc(credential.user!);
+      }
 
       if (!mounted) return;
       Navigator.pop(context);
@@ -526,7 +549,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (INDEXED STACK)
+// HOME SCREEN
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -544,6 +567,15 @@ class _HomeScreenState extends State<HomeScreen> {
     ChatScreen(),
     ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      ensureUserDoc(user);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -682,7 +714,7 @@ class _HomeTabState extends State<HomeTab> {
 }
 
 // ==================================================
-// CHAT SCREEN
+// CHAT SCREEN (100% RELIABLE BOND SYSTEM)
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -709,12 +741,20 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
 
-    if (isBonded) {
-      await userRef.update({'bonds': FieldValue.arrayRemove([peerUid])});
-      if (mounted) _showMessage(context, 'Bond removed.');
-    } else {
-      await userRef.update({'bonds': FieldValue.arrayUnion([peerUid])});
-      if (mounted) _showMessage(context, 'Bond created!');
+    try {
+      if (isBonded) {
+        await userRef.set({
+          'bonds': FieldValue.arrayRemove([peerUid])
+        }, SetOptions(merge: true));
+        if (mounted) _showMessage(context, 'Bond removed.');
+      } else {
+        await userRef.set({
+          'bonds': FieldValue.arrayUnion([peerUid])
+        }, SetOptions(merge: true));
+        if (mounted) _showMessage(context, 'Bond created!');
+      }
+    } catch (e) {
+      if (mounted) _showMessage(context, 'Bond update failed: $e');
     }
   }
 
@@ -924,7 +964,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                     ),
-                    ...suggestedUsers.take(10).map((doc) {
+                    ...suggestedUsers.take(15).map((doc) {
                       final data = doc.data() as Map<String, dynamic>;
                       final peerUid = data['uid'] ?? doc.id;
                       final name = data['name'] ?? 'User';
@@ -1023,12 +1063,20 @@ class _NewChatScreenState extends State<NewChatScreen> {
 
     final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
 
-    if (isBonded) {
-      await userRef.update({'bonds': FieldValue.arrayRemove([peerUid])});
-      if (mounted) _showMessage(context, 'Bond removed.');
-    } else {
-      await userRef.update({'bonds': FieldValue.arrayUnion([peerUid])});
-      if (mounted) _showMessage(context, 'Bond created! You can now message.');
+    try {
+      if (isBonded) {
+        await userRef.set({
+          'bonds': FieldValue.arrayRemove([peerUid])
+        }, SetOptions(merge: true));
+        if (mounted) _showMessage(context, 'Bond removed.');
+      } else {
+        await userRef.set({
+          'bonds': FieldValue.arrayUnion([peerUid])
+        }, SetOptions(merge: true));
+        if (mounted) _showMessage(context, 'Bond created! You can now message.');
+      }
+    } catch (e) {
+      if (mounted) _showMessage(context, 'Error updating bond: $e');
     }
   }
 
@@ -1301,9 +1349,13 @@ class UserProfileViewScreen extends StatelessWidget {
                                   .collection('users')
                                   .doc(currentUid);
                               if (isBonded) {
-                                await userRef.update({'bonds': FieldValue.arrayRemove([peerUid])});
+                                await userRef.set({
+                                  'bonds': FieldValue.arrayRemove([peerUid])
+                                }, SetOptions(merge: true));
                               } else {
-                                await userRef.update({'bonds': FieldValue.arrayUnion([peerUid])});
+                                await userRef.set({
+                                  'bonds': FieldValue.arrayUnion([peerUid])
+                                }, SetOptions(merge: true));
                               }
                             },
                             child: Text(
@@ -1387,7 +1439,7 @@ class FullImageViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN (FREE IMAGE SHARING + AUTO SCROLL)
+// CHAT CONVERSATION SCREEN
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1486,7 +1538,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  // Pick and Send Image using 100% Free Cloud Upload API
   Future<void> _pickAndSendImage(ImageSource source) async {
     if (isAvatarFriend) {
       _showMessage(context, 'AI Image analysis will be connected next!');
@@ -2101,7 +2152,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                         await FirebaseFirestore.instance
                             .collection('users')
                             .doc(user.uid)
-                            .update({'avatar': AvatarState.current.name});
+                            .set({'avatar': AvatarState.current.name}, SetOptions(merge: true));
                       }
 
                       if (!mounted) return;
@@ -2212,10 +2263,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     if (user != null) {
                       await user.updateDisplayName(newName);
-                      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
                         'name': newName,
                         'bio': newBio,
-                      });
+                      }, SetOptions(merge: true));
                     }
 
                     if (mounted) {
