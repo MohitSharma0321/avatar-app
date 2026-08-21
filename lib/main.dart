@@ -76,35 +76,22 @@ Future<void> ensureUserDoc(User user) async {
 }
 
 // ==================================================
-// AVATAR FRIEND MULTI-KEY VISION AI SERVICE
+// AVATAR FRIEND AI SERVICE
 // ==================================================
 
-Future<String> askAvatarFriend(String userMessage, {String? imageBase64}) async {
+Future<String> askAvatarFriend(String userMessage) async {
   final url = Uri.parse('https://avatar-friend-ai.projectkhurafat.workers.dev/');
 
   try {
-    final Map<String, dynamic> bodyData = {
-      'message': userMessage,
-      'prompt': userMessage,
-    };
-
-    if (imageBase64 != null && imageBase64.isNotEmpty) {
-      final cleanBase64 = imageBase64.replaceFirst(RegExp(r'^data:image\/[a-zA-Z]+;base64,'), '');
-      bodyData['image'] = cleanBase64;
-      bodyData['imageBase64'] = cleanBase64;
-      bodyData['imageData'] = cleanBase64;
-      bodyData['image_url'] = 'data:image/jpeg;base64,$cleanBase64';
-    }
-
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(bodyData),
+      body: jsonEncode({'message': userMessage}),
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['reply'] ?? data['response'] ?? data['message'] ?? 'Photo receive hui!';
+      return data['reply'] ?? data['response'] ?? 'Koi response nahi mila.';
     } else {
       return 'Server error: ${response.statusCode}';
     }
@@ -1689,7 +1676,7 @@ class AnimatedBubble extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN (LIVE 3D AVATAR HEADER)
+// CHAT CONVERSATION SCREEN
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1731,19 +1718,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   void initState() {
     super.initState();
     _initTts();
-    _checkLostImageData();
     if (isAvatarFriend) {
       _loadChatHistory();
     }
-  }
-
-  // Camera Crash / Activity Killed Recovery
-  Future<void> _checkLostImageData() async {
-    try {
-      final LostDataResponse response = await _picker.retrieveLostData();
-      if (response.isEmpty || response.file == null) return;
-      _handleImageFile(response.file!);
-    } catch (_) {}
   }
 
   void _scrollToBottom() {
@@ -1802,77 +1779,46 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  // Safe Image Handler (Zero Crash & Multi-Key Vision AI)
-  Future<void> _handleImageFile(XFile pickedFile) async {
+  // 1-on-1 Gallery Image Pick & Send
+  Future<void> _pickAndSendGalleryImage() async {
     try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 700,
+        maxHeight: 700,
+        imageQuality: 60,
+      );
+
+      if (pickedFile == null) return;
+
       setState(() => isUploadingMedia = true);
 
       final Uint8List bytes = await pickedFile.readAsBytes();
       final String base64String = base64Encode(bytes);
 
-      if (isAvatarFriend) {
-        setState(() {
-          localMessages.add({'sender': 'user', 'type': 'image', 'imageData': base64String});
-          isLoading = true;
-        });
-        _saveChatHistory();
-        _scrollToBottom();
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatRoomId)
+          .collection('messages')
+          .add({
+        'senderId': currentUid,
+        'receiverId': widget.peerUid,
+        'type': 'image',
+        'imageData': base64String,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
 
-        final reply = await askAvatarFriend(
-          'Photo dekhiye aur friendly Hindi/Hinglish mein batayein isme kya dikh raha hai!',
-          imageBase64: base64String,
-        );
-
-        if (!mounted) return;
-
-        setState(() {
-          localMessages.add({'sender': 'bot', 'type': 'text', 'text': reply});
-          isLoading = false;
-        });
-        _saveChatHistory();
-        _scrollToBottom();
-        _speak(reply);
-      } else {
-        await FirebaseFirestore.instance
-            .collection('chats')
-            .doc(chatRoomId)
-            .collection('messages')
-            .add({
-          'senderId': currentUid,
-          'receiverId': widget.peerUid,
-          'type': 'image',
-          'imageData': base64String,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-        _scrollToBottom();
-      }
-
+      _scrollToBottom();
       if (mounted) setState(() => isUploadingMedia = false);
     } catch (e) {
       if (mounted) {
         setState(() => isUploadingMedia = false);
-        _showMessage(context, 'Error sending image: $e');
+        _showMessage(context, 'Gallery error: $e');
       }
     }
   }
 
-  Future<void> _pickAndSendImage(ImageSource source) async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: source,
-        maxWidth: 500,
-        maxHeight: 500,
-        imageQuality: 40,
-      );
-
-      if (pickedFile == null) return;
-      await _handleImageFile(pickedFile);
-    } catch (e) {
-      _showMessage(context, 'Camera error: $e');
-    }
-  }
-
-  // Voice Note Recording
+  // Voice Note Recording (For 1-on-1)
   Future<void> _startRecording() async {
     try {
       if (await _audioRecorder.hasPermission()) {
@@ -1927,62 +1873,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     } catch (e) {
       setState(() => isRecording = false);
     }
-  }
-
-  void _showMediaPickerSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              GestureDetector(
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickAndSendImage(ImageSource.camera);
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Color(0xFF2A2A2A),
-                      child: Icon(Icons.camera_alt, color: Colors.white, size: 28),
-                    ),
-                    SizedBox(height: 8),
-                    Text('Camera', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickAndSendImage(ImageSource.gallery);
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Color(0xFF2A2A2A),
-                      child: Icon(Icons.photo_library, color: Colors.white, size: 28),
-                    ),
-                    SizedBox(height: 8),
-                    Text('Gallery', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   void sendMessage() async {
@@ -2052,7 +1942,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             titleSpacing: 0,
             title: Row(
               children: [
-                // 3D Avatar Display in AppBar Header
+                // 3D Avatar Display in Header
                 Container(
                   width: 38,
                   height: 38,
@@ -2132,7 +2022,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 child: isAvatarFriend ? _buildAiChat(currentAvatar) : _buildRealUserChat(),
               ),
 
-              // RECORDING OR MESSAGE BAR
+              // CHAT INPUT BAR
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
@@ -2161,10 +2051,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         )
                       : Row(
                           children: [
-                            IconButton(
-                              onPressed: _showMediaPickerSheet,
-                              icon: const Icon(Icons.add_circle_outline),
-                            ),
+                            // Gallery button for 1-on-1 chats only
+                            if (!isAvatarFriend)
+                              IconButton(
+                                onPressed: _pickAndSendGalleryImage,
+                                icon: const Icon(Icons.photo_library_outlined),
+                                tooltip: 'Send Image from Gallery',
+                              ),
                             Expanded(
                               child: TextField(
                                 controller: messageController,
@@ -2174,7 +2067,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                 },
                                 onSubmitted: (_) => sendMessage(),
                                 decoration: InputDecoration(
-                                  hintText: 'Message...',
+                                  hintText: isAvatarFriend ? 'Ask anything to Avatar...' : 'Message...',
                                   filled: true,
                                   fillColor: const Color(0xFF1E1E1E),
                                   border: OutlineInputBorder(
@@ -2184,11 +2077,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              onPressed: _startRecording,
-                              icon: const Icon(Icons.mic, color: Colors.white70),
-                            ),
+                            if (!isAvatarFriend) ...[
+                              const SizedBox(width: 4),
+                              IconButton(
+                                onPressed: _startRecording,
+                                icon: const Icon(Icons.mic, color: Colors.white70),
+                              ),
+                            ],
                             const SizedBox(width: 2),
                             CircleAvatar(
                               radius: 24,
@@ -2246,7 +2141,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Your personalized 3D AI companion with voice & vision',
+                'Your personalized 3D AI companion with voice',
                 style: TextStyle(fontSize: 14, color: Colors.white60),
               ),
             ],
@@ -2281,16 +2176,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
         final msg = localMessages[index];
         final isUser = msg['sender'] == 'user';
-        final isImage = msg['type'] == 'image';
 
         return AnimatedBubble(
           child: Align(
             alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
-              padding: isImage
-                  ? const EdgeInsets.all(4)
-                  : const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
               decoration: BoxDecoration(
                 color: isUser ? Colors.deepPurple : const Color(0xFF1E1E1E),
                 borderRadius: BorderRadius.circular(18),
@@ -2298,35 +2190,25 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     ? Border.all(color: currentAvatar.themeColor.withOpacity(0.3), width: 1)
                     : null,
               ),
-              child: isImage
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.memory(
-                        base64Decode(msg['imageData'] ?? ''),
-                        width: 220,
-                        height: 220,
-                        fit: BoxFit.cover,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 15)),
+                  ),
+                  if (!isUser) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => _speak(msg['text'] ?? ''),
+                      child: Icon(
+                        Icons.volume_up,
+                        size: 16,
+                        color: currentAvatar.themeColor.withOpacity(0.8),
                       ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 15)),
-                        ),
-                        if (!isUser) ...[
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => _speak(msg['text'] ?? ''),
-                            child: Icon(
-                              Icons.volume_up,
-                              size: 16,
-                              color: currentAvatar.themeColor.withOpacity(0.8),
-                            ),
-                          ),
-                        ],
-                      ],
                     ),
+                  ],
+                ],
+              ),
             ),
           ),
         );
