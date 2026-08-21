@@ -76,16 +76,24 @@ Future<void> ensureUserDoc(User user) async {
 }
 
 // ==================================================
-// AVATAR FRIEND AI SERVICE
+// AVATAR FRIEND MULTI-KEY VISION AI SERVICE
 // ==================================================
 
 Future<String> askAvatarFriend(String userMessage, {String? imageBase64}) async {
   final url = Uri.parse('https://avatar-friend-ai.projectkhurafat.workers.dev/');
 
   try {
-    final bodyData = <String, dynamic>{'message': userMessage};
-    if (imageBase64 != null) {
-      bodyData['image'] = 'data:image/jpeg;base64,$imageBase64';
+    final Map<String, dynamic> bodyData = {
+      'message': userMessage,
+      'prompt': userMessage,
+    };
+
+    if (imageBase64 != null && imageBase64.isNotEmpty) {
+      final cleanBase64 = imageBase64.replaceFirst(RegExp(r'^data:image\/[a-zA-Z]+;base64,'), '');
+      bodyData['image'] = cleanBase64;
+      bodyData['imageBase64'] = cleanBase64;
+      bodyData['imageData'] = cleanBase64;
+      bodyData['image_url'] = 'data:image/jpeg;base64,$cleanBase64';
     }
 
     final response = await http.post(
@@ -96,7 +104,7 @@ Future<String> askAvatarFriend(String userMessage, {String? imageBase64}) async 
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['reply'] ?? 'Koi response nahi mila.';
+      return data['reply'] ?? data['response'] ?? data['message'] ?? 'Photo receive hui!';
     } else {
       return 'Server error: ${response.statusCode}';
     }
@@ -750,7 +758,7 @@ class HomeTab extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT SCREEN (CUSTOM AVATAR BADGE)
+// CHAT SCREEN (3D MODEL BADGE)
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -872,28 +880,27 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
 
-                      // 1. Avatar Friend AI Tile (Selected Avatar Character Badge)
+                      // 1. Avatar Friend AI Tile (Actual 3D Model Sphere)
                       ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                         leading: Stack(
                           children: [
-                            CircleAvatar(
-                              radius: 25,
-                              backgroundColor: currentAvatar.themeColor.withOpacity(0.3),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: currentAvatar.themeColor, width: 2),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    currentAvatar.name[0],
-                                    style: TextStyle(
-                                      color: currentAvatar.themeColor,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 22,
-                                    ),
-                                  ),
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF1E1E1E),
+                                border: Border.all(color: currentAvatar.themeColor, width: 2),
+                              ),
+                              child: ClipOval(
+                                child: ModelViewer(
+                                  key: ValueKey('tile_${currentAvatar.modelPath}'),
+                                  src: currentAvatar.modelPath,
+                                  alt: 'Avatar',
+                                  autoRotate: true,
+                                  cameraControls: false,
+                                  backgroundColor: const Color(0xFF1E1E1E),
                                 ),
                               ),
                             ),
@@ -946,7 +953,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       const Divider(height: 1, color: Colors.white10),
 
-                      // 2. Bonded Users List
+                      // 2. Bonded Users List (3D Avatar Visuals)
                       if (bondedUsers.isNotEmpty) ...[
                         ...bondedUsers.map((doc) {
                           final data = doc.data() as Map<String, dynamic>;
@@ -968,15 +975,22 @@ class _ChatScreenState extends State<ChatScreen> {
                               },
                               child: Stack(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 25,
-                                    backgroundColor: peerAvatar.themeColor.withOpacity(0.25),
-                                    child: Text(
-                                      name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                      style: TextStyle(
-                                        color: peerAvatar.themeColor,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
+                                  Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: const Color(0xFF1E1E1E),
+                                      border: Border.all(color: peerAvatar.themeColor, width: 2),
+                                    ),
+                                    child: ClipOval(
+                                      child: ModelViewer(
+                                        key: ValueKey('peer_${peerUid}_${peerAvatar.modelPath}'),
+                                        src: peerAvatar.modelPath,
+                                        alt: 'Peer Avatar',
+                                        autoRotate: false,
+                                        cameraControls: false,
+                                        backgroundColor: const Color(0xFF1E1E1E),
                                       ),
                                     ),
                                   ),
@@ -1070,14 +1084,22 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ),
                                 );
                               },
-                              child: CircleAvatar(
-                                radius: 23,
-                                backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
-                                child: Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                  style: TextStyle(
-                                    color: peerAvatar.themeColor,
-                                    fontWeight: FontWeight.bold,
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFF1E1E1E),
+                                  border: Border.all(color: peerAvatar.themeColor, width: 1.5),
+                                ),
+                                child: ClipOval(
+                                  child: ModelViewer(
+                                    key: ValueKey('suggest_${peerUid}_${peerAvatar.modelPath}'),
+                                    src: peerAvatar.modelPath,
+                                    alt: 'Avatar',
+                                    autoRotate: false,
+                                    cameraControls: false,
+                                    backgroundColor: const Color(0xFF1E1E1E),
                                   ),
                                 ),
                               ),
@@ -1250,15 +1272,22 @@ class _NewChatScreenState extends State<NewChatScreen> {
                                 ),
                               );
                             },
-                            child: CircleAvatar(
-                              radius: 25,
-                              backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
-                              child: Text(
-                                userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                                style: TextStyle(
-                                  color: peerAvatar.themeColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
+                            child: Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF1E1E1E),
+                                border: Border.all(color: peerAvatar.themeColor, width: 2),
+                              ),
+                              child: ClipOval(
+                                child: ModelViewer(
+                                  key: ValueKey('newchat_${peerUid}_${peerAvatar.modelPath}'),
+                                  src: peerAvatar.modelPath,
+                                  alt: 'Avatar',
+                                  autoRotate: false,
+                                  cameraControls: false,
+                                  backgroundColor: const Color(0xFF1E1E1E),
                                 ),
                               ),
                             ),
@@ -1660,7 +1689,7 @@ class AnimatedBubble extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN
+// CHAT CONVERSATION SCREEN (LIVE 3D AVATAR HEADER)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1773,7 +1802,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  // Safe Image Handler (Zero Crash & Vision AI Attached)
+  // Safe Image Handler (Zero Crash & Multi-Key Vision AI)
   Future<void> _handleImageFile(XFile pickedFile) async {
     try {
       setState(() => isUploadingMedia = true);
@@ -1831,9 +1860,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
-        maxWidth: 600,
-        maxHeight: 600,
-        imageQuality: 50,
+        maxWidth: 500,
+        maxHeight: 500,
+        imageQuality: 40,
       );
 
       if (pickedFile == null) return;
@@ -2023,23 +2052,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             titleSpacing: 0,
             title: Row(
               children: [
-                CircleAvatar(
-                  radius: 19,
-                  backgroundColor: headerAvatar.themeColor.withOpacity(0.25),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: headerAvatar.themeColor, width: 1.5),
-                    ),
-                    child: Center(
-                      child: Text(
-                        isAvatarFriend ? headerAvatar.name[0] : (widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U'),
-                        style: TextStyle(
-                          color: headerAvatar.themeColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+                // 3D Avatar Display in AppBar Header
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF1E1E1E),
+                    border: Border.all(color: headerAvatar.themeColor, width: 2),
+                  ),
+                  child: ClipOval(
+                    child: ModelViewer(
+                      key: ValueKey('header_${headerAvatar.modelPath}'),
+                      src: headerAvatar.modelPath,
+                      alt: 'Avatar',
+                      autoRotate: true,
+                      cameraControls: false,
+                      backgroundColor: const Color(0xFF1E1E1E),
                     ),
                   ),
                 ),
