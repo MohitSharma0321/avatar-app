@@ -10,6 +10,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
@@ -20,13 +22,49 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 // ==================================================
-// FCM BACKGROUND HANDLER
+// FCM BACKGROUND HANDLER & CALLKIT TRIGGER
 // ==================================================
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+
+  if (message.data['type'] == 'call') {
+    final callId = message.data['callId'] ?? '';
+    final callerName = message.data['callerName'] ?? 'Incoming Call';
+    final callerAvatar = message.data['callerAvatar'] ?? 'ORANGE';
+    final callerId = message.data['callerId'] ?? '';
+
+    final params = CallKitParams(
+      id: callId,
+      nameCaller: callerName,
+      appName: 'Avatar',
+      avatar: 'https://via.placeholder.com/100',
+      handle: '$callerAvatar Avatar Voice Call',
+      type: 0,
+      textAccept: 'Accept',
+      textDecline: 'Decline',
+      duration: 30000,
+      extra: <String, dynamic>{
+        'callId': callId,
+        'callerName': callerName,
+        'callerAvatar': callerAvatar,
+        'callerId': callerId,
+      },
+      android: const AndroidParams(
+        isCustomNotification: true,
+        isShowLogo: false,
+        ringtonePath: 'system_ringtone_default',
+        backgroundColor: '#101014',
+        actionColor: '#4CAF50',
+      ),
+    );
+
+    await FlutterCallkitIncoming.showCallkitIncoming(params);
+  }
 }
 
 Future<void> main() async {
@@ -491,6 +529,7 @@ class _AvatarAppState extends State<AvatarApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Avatar',
       theme: ThemeData(
@@ -879,7 +918,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (WITH INCOMING CALL LISTENER)
+// HOME SCREEN (WITH CALLKIT & CALL LISTENERS)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -906,7 +945,47 @@ class _HomeScreenState extends State<HomeScreen> {
     if (user != null) {
       ensureUserDoc(user);
       _listenForIncomingCalls(user.uid);
+      _listenToCallKitEvents();
     }
+  }
+
+  void _listenToCallKitEvents() {
+    FlutterCallkitIncoming.onEvent.listen((CallEvent? event) {
+      if (event == null) return;
+
+      switch (event.event) {
+        case Event.actionCallAccept:
+          final extra = event.body['extra'] ?? {};
+          final callId = extra['callId'] ?? event.body['id'];
+          final callerName = extra['callerName'] ?? event.body['nameCaller'] ?? 'User';
+          final callerAvatar = extra['callerAvatar'] ?? 'ORANGE';
+          final callerId = extra['callerId'] ?? '';
+
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (_) => CallScreen(
+                peerName: callerName,
+                peerAvatar: callerAvatar,
+                peerUid: callerId,
+                callId: callId,
+                isIncoming: true,
+              ),
+            ),
+          );
+          break;
+        case Event.actionCallDecline:
+          final callId = event.body['id'];
+          if (callId != null) {
+            FirebaseFirestore.instance
+                .collection('calls')
+                .doc(callId)
+                .update({'status': 'ended'});
+          }
+          break;
+        default:
+          break;
+      }
+    });
   }
 
   void _listenForIncomingCalls(String myUid) {
@@ -1170,6 +1249,7 @@ class _CallScreenState extends State<CallScreen> {
           _startTimer();
         },
         onCallEnded: () {
+          FlutterCallkitIncoming.endAllCalls();
           if (mounted) Navigator.pop(context);
         },
       );
@@ -1187,6 +1267,7 @@ class _CallScreenState extends State<CallScreen> {
           _startTimer();
         },
         onCallEnded: () {
+          FlutterCallkitIncoming.endAllCalls();
           if (mounted) Navigator.pop(context);
         },
       );
@@ -1226,6 +1307,7 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     callTimer?.cancel();
     _signaling.hangUp();
+    FlutterCallkitIncoming.endAllCalls();
     super.dispose();
   }
 
@@ -2531,7 +2613,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: dynamic,
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
