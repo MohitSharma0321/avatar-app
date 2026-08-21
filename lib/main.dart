@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -138,7 +139,6 @@ class AvatarState {
   static final ValueNotifier<int> selectedIndexNotifier = ValueNotifier<int>(0);
 
   static int get selectedIndex => selectedIndexNotifier.value;
-
   static AvatarCharacter get current => characters[selectedIndexNotifier.value];
 
   static Future<void> equip(int index) async {
@@ -745,7 +745,139 @@ class HomeTab extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT SCREEN (3D MODEL BADGE)
+// 1-ON-1 ACTIVE CALLING SCREEN
+// ==================================================
+
+class CallScreen extends StatefulWidget {
+  final String peerName;
+  final String peerAvatar;
+
+  const CallScreen({Key? key, required this.peerName, required this.peerAvatar}) : super(key: key);
+
+  @override
+  State<CallScreen> createState() => _CallScreenState();
+}
+
+class _CallScreenState extends State<CallScreen> {
+  bool isMuted = false;
+  bool isSpeaker = false;
+  bool isConnected = false;
+  int callSeconds = 0;
+  Timer? callTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Simulate connection after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() => isConnected = true);
+        callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (mounted) setState(() => callSeconds++);
+        });
+      }
+    });
+  }
+
+  String _formatTime(int sec) {
+    final m = (sec ~/ 60).toString().padLeft(2, '0');
+    final s = (sec % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  void dispose() {
+    callTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarObj = AvatarState.getByName(widget.peerAvatar);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF101014),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 40),
+            Text(
+              widget.peerName,
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isConnected ? 'Connected • ${_formatTime(callSeconds)}' : 'Ringing...',
+              style: TextStyle(
+                fontSize: 16,
+                color: isConnected ? Colors.greenAccent : Colors.white60,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF1E1E1E),
+                border: Border.all(color: avatarObj.themeColor, width: 3),
+              ),
+              child: ClipOval(
+                child: ModelViewer(
+                  key: ValueKey('call_${avatarObj.modelPath}'),
+                  src: avatarObj.modelPath,
+                  alt: 'Caller Avatar',
+                  autoRotate: true,
+                  cameraControls: false,
+                  backgroundColor: const Color(0xFF1E1E1E),
+                ),
+              ),
+            ),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                IconButton.filledTonal(
+                  iconSize: 30,
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    backgroundColor: isMuted ? Colors.white : const Color(0xFF2A2A2A),
+                    foregroundColor: isMuted ? Colors.black : Colors.white,
+                  ),
+                  onPressed: () => setState(() => isMuted = !isMuted),
+                  icon: Icon(isMuted ? Icons.mic_off : Icons.mic),
+                ),
+                IconButton.filled(
+                  iconSize: 34,
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(18),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.call_end, color: Colors.white),
+                ),
+                IconButton.filledTonal(
+                  iconSize: 30,
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    backgroundColor: isSpeaker ? Colors.white : const Color(0xFF2A2A2A),
+                    foregroundColor: isSpeaker ? Colors.black : Colors.white,
+                  ),
+                  onPressed: () => setState(() => isSpeaker = !isSpeaker),
+                  icon: Icon(isSpeaker ? Icons.volume_up : Icons.volume_down),
+                ),
+              ],
+            ),
+            const SizedBox(height: 50),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// CHAT SCREEN (CHATS LIST)
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -867,7 +999,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
 
-                      // 1. Avatar Friend AI Tile (Actual 3D Model Sphere)
+                      // 1. Avatar Friend AI Tile
                       ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                         leading: Stack(
@@ -940,7 +1072,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       const Divider(height: 1, color: Colors.white10),
 
-                      // 2. Bonded Users List (3D Avatar Visuals)
+                      // 2. Bonded Users List
                       if (bondedUsers.isNotEmpty) ...[
                         ...bondedUsers.map((doc) {
                           final data = doc.data() as Map<String, dynamic>;
@@ -1676,7 +1808,7 @@ class AnimatedBubble extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN
+// CHAT CONVERSATION SCREEN (SUPER-PACK INCLUDED)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1709,6 +1841,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Timer? recordingTimer;
   bool isUploadingMedia = false;
   bool isVoiceEnabled = true;
+  Timer? typingDebounceTimer;
 
   bool get isAvatarFriend => widget.userName == 'Avatar Friend';
   String get currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -1720,7 +1853,41 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     _initTts();
     if (isAvatarFriend) {
       _loadChatHistory();
+    } else {
+      _markMessagesAsRead();
     }
+  }
+
+  void _markMessagesAsRead() async {
+    try {
+      final unreadDocs = await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatRoomId)
+          .collection('messages')
+          .where('receiverId', isEqualTo: currentUid)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      for (var doc in unreadDocs.docs) {
+        doc.reference.update({'isRead': true});
+      }
+    } catch (_) {}
+  }
+
+  void _updateTypingStatus(bool isTyping) {
+    if (isAvatarFriend || widget.peerUid == null) return;
+    FirebaseFirestore.instance.collection('chats').doc(chatRoomId).set({
+      'typing_$currentUid': isTyping,
+    }, SetOptions(merge: true));
+  }
+
+  void _onTextChanged(String text) {
+    if (isAvatarFriend) return;
+    _updateTypingStatus(true);
+    typingDebounceTimer?.cancel();
+    typingDebounceTimer = Timer(const Duration(seconds: 2), () {
+      _updateTypingStatus(false);
+    });
   }
 
   void _scrollToBottom() {
@@ -1805,6 +1972,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         'receiverId': widget.peerUid,
         'type': 'image',
         'imageData': base64String,
+        'isRead': false,
+        'reaction': '',
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -1818,7 +1987,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  // Voice Note Recording (For 1-on-1)
+  // Voice Note Recording
   Future<void> _startRecording() async {
     try {
       if (await _audioRecorder.hasPermission()) {
@@ -1863,11 +2032,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             'receiverId': widget.peerUid,
             'type': 'audio',
             'audioData': base64Audio,
+            'isRead': false,
+            'reaction': '',
             'timestamp': FieldValue.serverTimestamp(),
           });
           _scrollToBottom();
-        } else {
-          _showMessage(context, 'Voice Notes are for 1-on-1 chats.');
         }
       }
     } catch (e) {
@@ -1880,6 +2049,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     if (text.isEmpty) return;
 
     messageController.clear();
+    _updateTypingStatus(false);
 
     if (isAvatarFriend) {
       setState(() {
@@ -1910,14 +2080,70 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         'receiverId': widget.peerUid,
         'type': 'text',
         'text': text,
+        'isRead': false,
+        'reaction': '',
         'timestamp': FieldValue.serverTimestamp(),
       });
       _scrollToBottom();
     }
   }
 
+  void _showMessageOptions(DocumentSnapshot doc, Map<String, dynamic> data, bool isMe) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Emoji reaction row
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: ['❤️', '😂', '👍', '🔥', '😮', '😢'].map((emoji) {
+                  return GestureDetector(
+                    onTap: () {
+                      doc.reference.update({'reaction': emoji});
+                      Navigator.pop(ctx);
+                    },
+                    child: Text(emoji, style: const TextStyle(fontSize: 28)),
+                  );
+                }).toList(),
+              ),
+            ),
+            const Divider(height: 1, color: Colors.white10),
+            if (data['type'] == 'text')
+              ListTile(
+                leading: const Icon(Icons.copy),
+                title: const Text('Copy Text'),
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: data['text'] ?? ''));
+                  Navigator.pop(ctx);
+                  _showMessage(context, 'Text copied to clipboard!');
+                },
+              ),
+            if (isMe)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                title: const Text('Delete Message', style: TextStyle(color: Colors.redAccent)),
+                onTap: () {
+                  doc.reference.delete();
+                  Navigator.pop(ctx);
+                  _showMessage(context, 'Message deleted.');
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    _updateTypingStatus(false);
+    typingDebounceTimer?.cancel();
     recordingTimer?.cancel();
     _audioRecorder.dispose();
     scrollController.dispose();
@@ -1942,7 +2168,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             titleSpacing: 0,
             title: Row(
               children: [
-                // 3D Avatar Display in Header
                 Container(
                   width: 38,
                   height: 38,
@@ -1963,7 +2188,25 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(widget.userName),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.userName, style: const TextStyle(fontSize: 16)),
+                    if (!isAvatarFriend)
+                      StreamBuilder<DocumentSnapshot>(
+                        stream: FirebaseFirestore.instance.collection('chats').doc(chatRoomId).snapshots(),
+                        builder: (context, snap) {
+                          final data = snap.data?.data() as Map<String, dynamic>?;
+                          final isPeerTyping = data?['typing_${widget.peerUid}'] == true;
+
+                          if (isPeerTyping) {
+                            return const Text('typing...', style: TextStyle(color: Colors.greenAccent, fontSize: 12));
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                  ],
+                ),
               ],
             ),
             actions: [
@@ -1981,7 +2224,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     isVoiceEnabled ? Icons.volume_up : Icons.volume_off,
                     color: isVoiceEnabled ? currentAvatar.themeColor : Colors.white54,
                   ),
-                  tooltip: 'Toggle Voice',
                 ),
                 IconButton(
                   onPressed: () {
@@ -2004,13 +2246,24 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     );
                   },
                   icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Clear Chat',
+                ),
+              ] else ...[
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CallScreen(
+                          peerName: widget.userName,
+                          peerAvatar: widget.peerAvatar ?? 'ORANGE',
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.call, color: Colors.greenAccent),
+                  tooltip: '1-on-1 Voice Call',
                 ),
               ],
-              IconButton(
-                onPressed: () => _showMessage(context, 'Voice call will be connected next.'),
-                icon: const Icon(Icons.call),
-              ),
             ],
           ),
           body: Column(
@@ -2051,7 +2304,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         )
                       : Row(
                           children: [
-                            // Gallery button for 1-on-1 chats only
                             if (!isAvatarFriend)
                               IconButton(
                                 onPressed: _pickAndSendGalleryImage,
@@ -2062,6 +2314,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               child: TextField(
                                 controller: messageController,
                                 textInputAction: TextInputAction.send,
+                                onChanged: _onTextChanged,
                                 onTap: () {
                                   Future.delayed(const Duration(milliseconds: 300), _scrollToBottom);
                                 },
@@ -2248,51 +2501,108 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         final messages = snapshot.data!.docs;
         _scrollToBottom();
 
+        // Mark incoming messages as read
+        for (var doc in messages) {
+          final d = doc.data() as Map<String, dynamic>;
+          if (d['receiverId'] == currentUid && d['isRead'] == false) {
+            doc.reference.update({'isRead': true});
+          }
+        }
+
         return ListView.builder(
           controller: scrollController,
           padding: const EdgeInsets.all(16),
           itemCount: messages.length,
           itemBuilder: (context, index) {
-            final data = messages[index].data() as Map<String, dynamic>;
+            final doc = messages[index];
+            final data = doc.data() as Map<String, dynamic>;
             final isMe = data['senderId'] == currentUid;
             final type = data['type'] ?? 'text';
             final imgPayload = data['imageData'] ?? data['imageUrl'] ?? '';
             final audioPayload = data['audioData'] ?? '';
+            final isRead = data['isRead'] == true;
+            final reaction = data['reaction'] ?? '';
 
-            return AnimatedBubble(
-              child: Align(
-                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: type == 'image'
-                      ? const EdgeInsets.all(4)
-                      : (type == 'audio'
-                          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
-                          : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
-                  decoration: BoxDecoration(
-                    color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: type == 'image'
-                      ? GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => FullImageViewScreen(imageData: imgPayload),
+            return GestureDetector(
+              onLongPress: () => _showMessageOptions(doc, data, isMe),
+              child: AnimatedBubble(
+                child: Align(
+                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: type == 'image'
+                            ? const EdgeInsets.all(4)
+                            : (type == 'audio'
+                                ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+                                : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
+                        decoration: BoxDecoration(
+                          color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          children: [
+                            if (type == 'image')
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => FullImageViewScreen(imageData: imgPayload),
+                                    ),
+                                  );
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: imgPayload.startsWith('http')
+                                      ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
+                                      : Image.memory(base64Decode(imgPayload), width: 220, height: 220, fit: BoxFit.cover),
+                                ),
+                              )
+                            else if (type == 'audio')
+                              VoiceNoteBubble(audioBase64: audioPayload, isMe: isMe)
+                            else
+                              Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
+
+                            // Message Ticks System (Sent / Read)
+                            if (isMe) ...[
+                              const SizedBox(height: 3),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isRead ? Icons.done_all : Icons.done,
+                                    size: 15,
+                                    color: isRead ? Colors.lightBlueAccent : Colors.white54,
+                                  ),
+                                ],
                               ),
-                            );
-                          },
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: imgPayload.startsWith('http')
-                                ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
-                                : Image.memory(base64Decode(imgPayload), width: 220, height: 220, fit: BoxFit.cover),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      // Emoji Reaction Badge
+                      if (reaction.isNotEmpty)
+                        Positioned(
+                          bottom: 2,
+                          right: isMe ? 4 : null,
+                          left: !isMe ? 4 : null,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2A2A2A),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white24, width: 1),
+                            ),
+                            child: Text(reaction, style: const TextStyle(fontSize: 13)),
                           ),
-                        )
-                      : (type == 'audio'
-                          ? VoiceNoteBubble(audioBase64: audioPayload, isMe: isMe)
-                          : Text(data['text'] ?? '', style: const TextStyle(fontSize: 15))),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             );
