@@ -143,9 +143,7 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
@@ -160,7 +158,7 @@ class AuthGate extends StatelessWidget {
 }
 
 // ==================================================
-// WELCOME
+// WELCOME SCREEN
 // ==================================================
 
 class WelcomeScreen extends StatelessWidget {
@@ -179,11 +177,7 @@ class WelcomeScreen extends StatelessWidget {
                 const CircleAvatar(
                   radius: 70,
                   backgroundColor: Color(0xFF1E1E1E),
-                  child: Icon(
-                    Icons.person,
-                    size: 80,
-                    color: Colors.white70,
-                  ),
+                  child: Icon(Icons.person, size: 80, color: Colors.white70),
                 ),
                 const SizedBox(height: 28),
                 const Text(
@@ -198,10 +192,7 @@ class WelcomeScreen extends StatelessWidget {
                 const Text(
                   'Choose your original character and make bonds.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.white70),
                 ),
                 const SizedBox(height: 40),
                 SizedBox(
@@ -211,15 +202,10 @@ class WelcomeScreen extends StatelessWidget {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const CreateAccountScreen(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const CreateAccountScreen()),
                       );
                     },
-                    child: const Text(
-                      'Create Account',
-                      style: TextStyle(fontSize: 16),
-                    ),
+                    child: const Text('Create Account', style: TextStyle(fontSize: 16)),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -230,15 +216,10 @@ class WelcomeScreen extends StatelessWidget {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const LoginScreen(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
                       );
                     },
-                    child: const Text(
-                      'Login',
-                      style: TextStyle(fontSize: 16),
-                    ),
+                    child: const Text('Login', style: TextStyle(fontSize: 16)),
                   ),
                 ),
               ],
@@ -284,9 +265,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       return;
     }
 
-    setState(() {
-      loading = true;
-    });
+    setState(() => loading = true);
 
     try {
       final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
@@ -295,10 +274,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       );
 
       final user = credential.user;
-
       if (user != null) {
         await user.updateDisplayName(name);
-
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'name': name,
@@ -326,11 +303,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       _showMessage(context, 'Something went wrong.');
     }
 
-    if (mounted) {
-      setState(() {
-        loading = false;
-      });
-    }
+    if (mounted) setState(() => loading = false);
   }
 
   @override
@@ -344,9 +317,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Account'),
-      ),
+      appBar: AppBar(title: const Text('Create Account')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -355,10 +326,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             children: [
               const Text(
                 'Create your account',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 24),
               TextField(
@@ -388,14 +356,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
-                    onPressed: () {
-                      setState(() {
-                        hidePassword = !hidePassword;
-                      });
-                    },
-                    icon: Icon(
-                      hidePassword ? Icons.visibility : Icons.visibility_off,
-                    ),
+                    onPressed: () => setState(() => hidePassword = !hidePassword),
+                    icon: Icon(hidePassword ? Icons.visibility : Icons.visibility_off),
                   ),
                 ),
               ),
@@ -422,7 +384,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 }
 
 // ==================================================
-// LOGIN (AUTO-REDIRECTS ON SUCCESS)
+// LOGIN (AUTO-REDIRECTS)
 // ==================================================
 
 class LoginScreen extends StatefulWidget {
@@ -448,9 +410,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    setState(() {
-      loading = true;
-    });
+    setState(() => loading = true);
 
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -459,7 +419,6 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (!mounted) return;
-      // Auto close login screen and jump to Home
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       String message = 'Login failed.';
@@ -473,11 +432,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _showMessage(context, 'Other error: $e');
     }
 
-    if (mounted) {
-      setState(() {
-        loading = false;
-      });
-    }
+    if (mounted) setState(() => loading = false);
   }
 
   @override
@@ -490,9 +445,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Login'),
-      ),
+      appBar: AppBar(title: const Text('Login')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -500,18 +453,12 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 30),
-              const Icon(
-                Icons.account_circle,
-                size: 100,
-              ),
+              const Icon(Icons.account_circle, size: 100),
               const SizedBox(height: 20),
               const Text(
                 'Welcome Back',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 30),
               TextField(
@@ -532,14 +479,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
-                    onPressed: () {
-                      setState(() {
-                        hidePassword = !hidePassword;
-                      });
-                    },
-                    icon: Icon(
-                      hidePassword ? Icons.visibility : Icons.visibility_off,
-                    ),
+                    onPressed: () => setState(() => hidePassword = !hidePassword),
+                    icon: Icon(hidePassword ? Icons.visibility : Icons.visibility_off),
                   ),
                 ),
               ),
@@ -566,7 +507,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (CLEAN 3-TAB NAVIGATION)
+// HOME SCREEN (INDEXED STACK - ZERO TAB RELOAD LAG)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -588,7 +529,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: pages[currentIndex],
+      body: IndexedStack(
+        index: currentIndex,
+        children: pages,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         onDestinationSelected: (index) {
@@ -671,7 +615,7 @@ class _HomeTabState extends State<HomeTab> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
                 child: ModelViewer(
-                  key: ValueKey(character.modelPath),
+                  key: ValueKey('main_${character.modelPath}'),
                   src: character.modelPath,
                   alt: 'My 3D Avatar',
                   autoRotate: true,
@@ -701,10 +645,7 @@ class _HomeTabState extends State<HomeTab> {
                   );
                   setState(() {});
                 },
-                icon: const Icon(
-                  Icons.swap_horiz,
-                  size: 26,
-                ),
+                icon: const Icon(Icons.swap_horiz, size: 26),
                 label: Text(
                   'Change Character (${character.name})',
                   style: const TextStyle(
@@ -739,9 +680,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void openNewChat() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const NewChatScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const NewChatScreen()),
     );
   }
 
@@ -752,14 +691,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
 
     if (isBonded) {
-      await userRef.update({
-        'bonds': FieldValue.arrayRemove([peerUid])
-      });
+      await userRef.update({'bonds': FieldValue.arrayRemove([peerUid])});
       if (mounted) _showMessage(context, 'Bond removed.');
     } else {
-      await userRef.update({
-        'bonds': FieldValue.arrayUnion([peerUid])
-      });
+      await userRef.update({'bonds': FieldValue.arrayUnion([peerUid])});
       if (mounted) _showMessage(context, 'Bond created!');
     }
   }
@@ -777,10 +712,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Chats',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             onPressed: openNewChat,
@@ -841,28 +773,16 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
 
-                  // 1. Avatar Friend AI Tile
+                  // 1. Avatar Friend AI Tile (Lightweight & Instant)
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                    leading: Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: currentAvatar.themeColor,
-                          width: 2,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: ModelViewer(
-                          key: ValueKey('list_${currentAvatar.modelPath}'),
-                          src: currentAvatar.modelPath,
-                          alt: 'Avatar Thumbnail',
-                          autoRotate: true,
-                          cameraControls: false,
-                          backgroundColor: const Color(0xFF1E1E1E),
-                        ),
+                    leading: CircleAvatar(
+                      radius: 25,
+                      backgroundColor: currentAvatar.themeColor.withOpacity(0.2),
+                      child: Icon(
+                        Icons.smart_toy_rounded,
+                        color: currentAvatar.themeColor,
+                        size: 28,
                       ),
                     ),
                     title: const Text(
@@ -893,9 +813,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const ChatConversationScreen(
-                            userName: 'Avatar Friend',
-                          ),
+                          builder: (_) => const ChatConversationScreen(userName: 'Avatar Friend'),
                         ),
                       );
                     },
@@ -1087,14 +1005,10 @@ class _NewChatScreenState extends State<NewChatScreen> {
     final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
 
     if (isBonded) {
-      await userRef.update({
-        'bonds': FieldValue.arrayRemove([peerUid])
-      });
+      await userRef.update({'bonds': FieldValue.arrayRemove([peerUid])});
       if (mounted) _showMessage(context, 'Bond removed.');
     } else {
-      await userRef.update({
-        'bonds': FieldValue.arrayUnion([peerUid])
-      });
+      await userRef.update({'bonds': FieldValue.arrayUnion([peerUid])});
       if (mounted) _showMessage(context, 'Bond created! You can now message.');
     }
   }
@@ -1110,9 +1024,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Discover & Bond'),
-      ),
+      appBar: AppBar(title: const Text('Discover & Bond')),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
         builder: (context, userSnap) {
@@ -1125,11 +1037,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                 padding: const EdgeInsets.all(16),
                 child: TextField(
                   controller: searchController,
-                  onChanged: (val) {
-                    setState(() {
-                      searchQuery = val.trim().toLowerCase();
-                    });
-                  },
+                  onChanged: (val) => setState(() => searchQuery = val.trim().toLowerCase()),
                   decoration: InputDecoration(
                     hintText: 'Search by account name...',
                     prefixIcon: const Icon(Icons.search),
@@ -1162,10 +1070,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
 
                     if (users.isEmpty) {
                       return const Center(
-                        child: Text(
-                          'No users found.',
-                          style: TextStyle(color: Colors.white60),
-                        ),
+                        child: Text('No users found.', style: TextStyle(color: Colors.white60)),
                       );
                     }
 
@@ -1223,7 +1128,8 @@ class _NewChatScreenState extends State<NewChatScreen> {
                               OutlinedButton(
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(color: peerAvatar.themeColor),
-                                  foregroundColor: isBonded ? Colors.white70 : peerAvatar.themeColor,
+                                  foregroundColor:
+                                      isBonded ? Colors.white70 : peerAvatar.themeColor,
                                   backgroundColor: isBonded
                                       ? Colors.white12
                                       : peerAvatar.themeColor.withOpacity(0.15),
@@ -1281,10 +1187,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
 class UserProfileViewScreen extends StatelessWidget {
   final Map<String, dynamic> userData;
 
-  const UserProfileViewScreen({
-    Key? key,
-    required this.userData,
-  }) : super(key: key);
+  const UserProfileViewScreen({Key? key, required this.userData}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -1296,9 +1199,7 @@ class UserProfileViewScreen extends StatelessWidget {
     final peerAvatar = AvatarState.getByName(avatarName);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(name),
-      ),
+      appBar: AppBar(title: Text(name)),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
         builder: (context, snapshot) {
@@ -1337,19 +1238,13 @@ class UserProfileViewScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   Text(
                     name,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     bio,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: Colors.white70,
-                    ),
+                    style: const TextStyle(fontSize: 15, color: Colors.white70),
                   ),
                   const SizedBox(height: 10),
                   Container(
@@ -1387,21 +1282,14 @@ class UserProfileViewScreen extends StatelessWidget {
                                   .collection('users')
                                   .doc(currentUid);
                               if (isBonded) {
-                                await userRef.update({
-                                  'bonds': FieldValue.arrayRemove([peerUid])
-                                });
+                                await userRef.update({'bonds': FieldValue.arrayRemove([peerUid])});
                               } else {
-                                await userRef.update({
-                                  'bonds': FieldValue.arrayUnion([peerUid])
-                                });
+                                await userRef.update({'bonds': FieldValue.arrayUnion([peerUid])});
                               }
                             },
                             child: Text(
                               isBonded ? 'Break Bond' : '+ Make Bond',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ),
@@ -1447,7 +1335,7 @@ class UserProfileViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN (AUTO-SCROLL ON KEYBOARD)
+// CHAT CONVERSATION SCREEN
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1603,40 +1491,19 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            if (isAvatarFriend)
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: currentAvatar.themeColor,
-                    width: 1.5,
-                  ),
-                ),
-                child: ClipOval(
-                  child: ModelViewer(
-                    key: ValueKey('appbar_${currentAvatar.modelPath}'),
-                    src: currentAvatar.modelPath,
-                    alt: 'Avatar Thumbnail',
-                    autoRotate: true,
-                    cameraControls: false,
-                    backgroundColor: const Color(0xFF1E1E1E),
-                  ),
-                ),
-              )
-            else
-              CircleAvatar(
-                radius: 19,
-                backgroundColor: peerAvatarObj.themeColor.withOpacity(0.3),
-                child: Text(
-                  widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
-                  style: TextStyle(
-                    color: peerAvatarObj.themeColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+            CircleAvatar(
+              radius: 19,
+              backgroundColor: (isAvatarFriend ? currentAvatar.themeColor : peerAvatarObj.themeColor).withOpacity(0.25),
+              child: isAvatarFriend
+                  ? Icon(Icons.smart_toy_rounded, color: currentAvatar.themeColor, size: 22)
+                  : Text(
+                      widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U',
+                      style: TextStyle(
+                        color: peerAvatarObj.themeColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
             const SizedBox(width: 12),
             Text(widget.userName),
           ],
@@ -1645,12 +1512,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           if (isAvatarFriend) ...[
             IconButton(
               onPressed: () {
-                setState(() {
-                  isVoiceEnabled = !isVoiceEnabled;
-                });
-                if (!isVoiceEnabled) {
-                  flutterTts.stop();
-                }
+                setState(() => isVoiceEnabled = !isVoiceEnabled);
+                if (!isVoiceEnabled) flutterTts.stop();
                 _showMessage(
                   context,
                   isVoiceEnabled ? 'Avatar Voice Enabled 🔊' : 'Avatar Voice Muted 🔇',
@@ -1670,10 +1533,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     title: const Text('Clear Chat?'),
                     content: const Text('Are you sure you want to delete all messages?'),
                     actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancel'),
-                      ),
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
                       TextButton(
                         onPressed: () {
                           Navigator.pop(ctx);
@@ -1690,9 +1550,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             ),
           ],
           IconButton(
-            onPressed: () {
-              _showMessage(context, 'Voice call will be connected next.');
-            },
+            onPressed: () => _showMessage(context, 'Voice call will be connected next.'),
             icon: const Icon(Icons.call),
           ),
         ],
@@ -1710,9 +1568,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () {
-                      _showMessage(context, 'Media sharing will be connected next.');
-                    },
+                    onPressed: () => _showMessage(context, 'Media sharing will be connected next.'),
                     icon: const Icon(Icons.add_circle_outline),
                   ),
                   Expanded(
@@ -1720,7 +1576,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       controller: messageController,
                       textInputAction: TextInputAction.send,
                       onTap: () {
-                        // Auto scroll up when keyboard opens
                         Future.delayed(const Duration(milliseconds: 300), _scrollToBottom);
                       },
                       onSubmitted: (_) => sendMessage(),
@@ -1738,9 +1593,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   const SizedBox(width: 6),
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: isAvatarFriend
-                        ? currentAvatar.themeColor
-                        : Colors.deepPurple,
+                    backgroundColor: isAvatarFriend ? currentAvatar.themeColor : Colors.deepPurple,
                     child: IconButton(
                       onPressed: sendMessage,
                       icon: const Icon(Icons.send, size: 20),
@@ -1769,10 +1622,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: const Color(0xFF1E1E1E),
-                  border: Border.all(
-                    color: currentAvatar.themeColor,
-                    width: 3,
-                  ),
+                  border: Border.all(color: currentAvatar.themeColor, width: 3),
                 ),
                 child: ClipOval(
                   child: ModelViewer(
@@ -1851,10 +1701,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Flexible(
-                  child: Text(
-                    msg['text'] ?? '',
-                    style: const TextStyle(fontSize: 15),
-                  ),
+                  child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 15)),
                 ),
                 if (!isUser) ...[
                   const SizedBox(width: 8),
@@ -1894,18 +1741,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.chat_bubble_outline,
-                  size: 70,
-                  color: Colors.white24,
-                ),
+                const Icon(Icons.chat_bubble_outline, size: 70, color: Colors.white24),
                 const SizedBox(height: 15),
                 Text(
                   'Say hello to ${widget.userName}!',
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -1932,10 +1772,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: Text(
-                  data['text'] ?? '',
-                  style: const TextStyle(fontSize: 15),
-                ),
+                child: Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
               ),
             );
           },
@@ -1964,9 +1801,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
     final activeChar = AvatarState.characters[tempIndex];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Choose Character'),
-      ),
+      appBar: AppBar(title: const Text('Choose Character')),
       body: Column(
         children: [
           Expanded(
@@ -1983,7 +1818,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
                 child: ModelViewer(
-                  key: ValueKey(activeChar.modelPath),
+                  key: ValueKey('selector_${activeChar.modelPath}'),
                   src: activeChar.modelPath,
                   alt: 'Character Preview',
                   autoRotate: true,
@@ -1994,15 +1829,10 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 18,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
             decoration: const BoxDecoration(
               color: Color(0xFF181818),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(30),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2029,11 +1859,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                tempIndex = index;
-                              });
-                            },
+                            onTap: () => setState(() => tempIndex = index),
                             child: Container(
                               height: 52,
                               decoration: BoxDecoration(
@@ -2085,12 +1911,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                       }
 
                       if (!mounted) return;
-
-                      _showMessage(
-                        context,
-                        '${AvatarState.current.name} Avatar equipped!',
-                      );
-
+                      _showMessage(context, '${AvatarState.current.name} Avatar equipped!');
                       Navigator.pop(context);
                     },
                     child: Text(
@@ -2114,7 +1935,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
 }
 
 // ==================================================
-// PROFILE SCREEN (INSTANT REAL-TIME SYNC & AUTO-CLOSE)
+// PROFILE SCREEN (ZERO FLICKER & INSTANT STATE SYNC)
 // ==================================================
 
 class ProfileScreen extends StatefulWidget {
@@ -2125,9 +1946,19 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  void _openEditProfileSheet(String currentName, String currentBio) {
-    final nameCtrl = TextEditingController(text: currentName);
-    final bioCtrl = TextEditingController(text: currentBio);
+  String displayName = '';
+  String displayBio = 'Hey there! I am using Avatar.';
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    displayName = user?.displayName ?? 'User';
+  }
+
+  void _openEditProfileSheet() {
+    final nameCtrl = TextEditingController(text: displayName);
+    final bioCtrl = TextEditingController(text: displayBio);
 
     showModalBottomSheet(
       context: context,
@@ -2177,17 +2008,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   final newBio = bioCtrl.text.trim();
                   final user = FirebaseAuth.instance.currentUser;
 
-                  if (user != null && newName.isNotEmpty) {
-                    Navigator.pop(ctx); // Close sheet instantly
-
-                    await user.updateDisplayName(newName);
-                    await FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(user.uid)
-                        .update({
-                      'name': newName,
-                      'bio': newBio,
+                  if (newName.isNotEmpty) {
+                    // Update state locally first (instant UI update)
+                    setState(() {
+                      displayName = newName;
+                      displayBio = newBio;
                     });
+
+                    Navigator.pop(ctx);
+
+                    if (user != null) {
+                      await user.updateDisplayName(newName);
+                      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                        'name': newName,
+                        'bio': newBio,
+                      });
+                    }
 
                     if (mounted) {
                       _showMessage(context, 'Profile updated successfully!');
@@ -2223,57 +2059,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
-        builder: (context, snapshot) {
-          final data = snapshot.data?.data() as Map<String, dynamic>?;
-          final name = data?['name'] ?? user?.displayName ?? 'User';
-          final bio = data?['bio'] ?? 'Hey there! I am using Avatar.';
-          final List<dynamic> bonds = data?['bonds'] ?? [];
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              // 3D Avatar (Standalone, Zero Flicker)
+              Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF1E1E1E),
+                  border: Border.all(color: currentAvatar.themeColor, width: 3),
+                ),
+                child: ClipOval(
+                  child: ModelViewer(
+                    key: ValueKey('profile_static_${currentAvatar.modelPath}'),
+                    src: currentAvatar.modelPath,
+                    alt: 'Avatar Profile',
+                    autoRotate: true,
+                    cameraControls: false,
+                    backgroundColor: const Color(0xFF1E1E1E),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                displayName.isNotEmpty ? displayName : (user?.displayName ?? 'User'),
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                displayBio,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 20),
 
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  // 3D Avatar Display
-                  Container(
-                    width: 140,
-                    height: 140,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF1E1E1E),
-                      border: Border.all(
-                        color: currentAvatar.themeColor,
-                        width: 3,
-                      ),
-                    ),
-                    child: ClipOval(
-                      child: ModelViewer(
-                        key: ValueKey('profile_${currentAvatar.modelPath}'),
-                        src: currentAvatar.modelPath,
-                        alt: 'Avatar Profile',
-                        autoRotate: true,
-                        cameraControls: false,
-                        backgroundColor: const Color(0xFF1E1E1E),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    name,
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    bio,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  const SizedBox(height: 20),
+              // Dynamic Bonds Stats
+              StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
+                builder: (context, snapshot) {
+                  final data = snapshot.data?.data() as Map<String, dynamic>?;
+                  final List<dynamic> bonds = data?['bonds'] ?? [];
 
-                  // Stats Row
-                  Row(
+                  // Sync bio from remote on initial fetch
+                  if (data != null && data['bio'] != null && displayBio == 'Hey there! I am using Avatar.') {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() => displayBio = data['bio']);
+                    });
+                  }
+
+                  return Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
@@ -2294,10 +2132,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                             const SizedBox(height: 2),
-                            const Text(
-                              'Bonds',
-                              style: TextStyle(color: Colors.white60, fontSize: 13),
-                            ),
+                            const Text('Bonds', style: TextStyle(color: Colors.white60, fontSize: 13)),
                           ],
                         ),
                       ),
@@ -2320,42 +2155,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                             const SizedBox(height: 2),
-                            const Text(
-                              'Equipped',
-                              style: TextStyle(color: Colors.white60, fontSize: 13),
-                            ),
+                            const Text('Equipped', style: TextStyle(color: Colors.white60, fontSize: 13)),
                           ],
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 24),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
 
-                  // Edit Profile Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: currentAvatar.themeColor),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      onPressed: () => _openEditProfileSheet(name, bio),
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: const Text(
-                        'Edit Profile',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
+              // Edit Profile Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: currentAvatar.themeColor),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                ],
+                  onPressed: _openEditProfileSheet,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text(
+                    'Edit Profile',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
-            ),
-          );
-        },
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2371,9 +2203,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
           const ListTile(
