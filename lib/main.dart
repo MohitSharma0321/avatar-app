@@ -1,10 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,7 +22,7 @@ Future<void> main() async {
 }
 
 // ==================================================
-// TOP-LEVEL HELPERS & AUTO-SYNC
+// TOP-LEVEL HELPERS & PRESENCE
 // ==================================================
 
 void _showMessage(BuildContext context, String message) {
@@ -25,6 +30,7 @@ void _showMessage(BuildContext context, String message) {
     SnackBar(
       content: Text(message),
       behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
     ),
   );
 }
@@ -33,7 +39,16 @@ String getChatRoomId(String a, String b) {
   return a.compareTo(b) < 0 ? '${a}_$b' : '${b}_$a';
 }
 
-// Ensure User Exists in Firestore Database
+void updateUserPresence(bool isOnline) {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'isOnline': isOnline,
+      'lastSeen': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+}
+
 Future<void> ensureUserDoc(User user) async {
   try {
     final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
@@ -45,6 +60,8 @@ Future<void> ensureUserDoc(User user) async {
         'bio': 'Hey there! I am using Avatar.',
         'avatar': AvatarState.current.name,
         'bonds': [],
+        'isOnline': true,
+        'lastSeen': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } else {
@@ -52,22 +69,28 @@ Future<void> ensureUserDoc(User user) async {
       if (data != null && data['avatar'] != null) {
         AvatarState.setByName(data['avatar']);
       }
+      updateUserPresence(true);
     }
   } catch (_) {}
 }
 
 // ==================================================
-// AVATAR FRIEND AI SERVICE
+// AVATAR FRIEND AI SERVICE (TEXT + VISION SUPPORT)
 // ==================================================
 
-Future<String> askAvatarFriend(String userMessage) async {
+Future<String> askAvatarFriend(String userMessage, {String? imageBase64}) async {
   final url = Uri.parse('https://avatar-friend-ai.projectkhurafat.workers.dev/');
 
   try {
+    final bodyData = <String, dynamic>{'message': userMessage};
+    if (imageBase64 != null) {
+      bodyData['image'] = imageBase64;
+    }
+
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'message': userMessage}),
+      body: jsonEncode(bodyData),
     );
 
     if (response.statusCode == 200) {
@@ -82,7 +105,7 @@ Future<String> askAvatarFriend(String userMessage) async {
 }
 
 // ==================================================
-// GLOBAL AVATAR STATE (REACTIVE NOTIFIER)
+// GLOBAL AVATAR STATE
 // ==================================================
 
 class AvatarCharacter {
@@ -144,11 +167,39 @@ class AvatarState {
 }
 
 // ==================================================
-// APP
+// APP & LIFECYCLE OBSERVER
 // ==================================================
 
-class AvatarApp extends StatelessWidget {
+class AvatarApp extends StatefulWidget {
   const AvatarApp({Key? key}) : super(key: key);
+
+  @override
+  State<AvatarApp> createState() => _AvatarAppState();
+}
+
+class _AvatarAppState extends State<AvatarApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    updateUserPresence(true);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      updateUserPresence(true);
+    } else {
+      updateUserPresence(false);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    updateUserPresence(false);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -323,6 +374,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'bio': 'Hey there! I am using Avatar.',
           'avatar': AvatarState.current.name,
           'bonds': [],
+          'isOnline': true,
+          'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
@@ -717,7 +770,7 @@ class HomeTab extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT SCREEN (DYNAMIC AVATAR COLOR & REALTIME BONNDS)
+// CHAT SCREEN (WITH ONLINE GREEN DOT)
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -839,27 +892,42 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
 
-                      // 1. Avatar Friend AI Tile (Instantly reflects Blue/Green/Orange)
+                      // 1. Avatar Friend AI Tile
                       ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                        leading: CircleAvatar(
-                          radius: 25,
-                          backgroundColor: currentAvatar.themeColor.withOpacity(0.25),
-                          child: Icon(
-                            Icons.smart_toy_rounded,
-                            color: currentAvatar.themeColor,
-                            size: 28,
-                          ),
+                        leading: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 25,
+                              backgroundColor: currentAvatar.themeColor.withOpacity(0.25),
+                              child: Icon(
+                                Icons.smart_toy_rounded,
+                                color: currentAvatar.themeColor,
+                                size: 28,
+                              ),
+                            ),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                width: 14,
+                                height: 14,
+                                decoration: BoxDecoration(
+                                  color: Colors.greenAccent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: const Color(0xFF121212), width: 2),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         title: const Text(
                           'Avatar Friend',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
-                        subtitle: Text(
-                          '${currentAvatar.name} AI Companion',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white60),
+                        subtitle: const Text(
+                          'Online • AI Companion',
+                          style: TextStyle(color: Colors.greenAccent, fontSize: 13),
                         ),
                         trailing: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -894,6 +962,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           final peerUid = data['uid'] ?? doc.id;
                           final name = data['name'] ?? 'User';
                           final peerAvatar = AvatarState.getByName(data['avatar']);
+                          final isOnline = data['isOnline'] == true;
 
                           return ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
@@ -906,26 +975,47 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ),
                                 );
                               },
-                              child: CircleAvatar(
-                                radius: 25,
-                                backgroundColor: peerAvatar.themeColor.withOpacity(0.25),
-                                child: Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                  style: TextStyle(
-                                    color: peerAvatar.themeColor,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                              child: Stack(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 25,
+                                    backgroundColor: peerAvatar.themeColor.withOpacity(0.25),
+                                    child: Text(
+                                      name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                      style: TextStyle(
+                                        color: peerAvatar.themeColor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  if (isOnline)
+                                    Positioned(
+                                      right: 0,
+                                      bottom: 0,
+                                      child: Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: BoxDecoration(
+                                          color: Colors.greenAccent,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: const Color(0xFF121212), width: 2),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             title: Text(
                               name,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
-                            subtitle: const Text(
-                              'Bonded with you',
-                              style: TextStyle(color: Colors.white60, fontSize: 13),
+                            subtitle: Text(
+                              isOnline ? 'Online' : 'Offline',
+                              style: TextStyle(
+                                color: isOnline ? Colors.greenAccent : Colors.white54,
+                                fontSize: 13,
+                              ),
                             ),
                             trailing: Icon(
                               Icons.chat_bubble_outline,
@@ -1416,7 +1506,7 @@ class UserProfileViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// FULL SCREEN IMAGE VIEWER (BASE64 & NETWORK SUPPORT)
+// FULL SCREEN IMAGE VIEWER
 // ==================================================
 
 class FullImageViewScreen extends StatelessWidget {
@@ -1452,7 +1542,139 @@ class FullImageViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN (SAFE BASE64 & NO CRASH CAMERA)
+// AUDIO VOICE NOTE PLAYER WIDGET
+// ==================================================
+
+class VoiceNoteBubble extends StatefulWidget {
+  final String audioBase64;
+  final bool isMe;
+
+  const VoiceNoteBubble({Key? key, required this.audioBase64, required this.isMe}) : super(key: key);
+
+  @override
+  State<VoiceNoteBubble> createState() => _VoiceNoteBubbleState();
+}
+
+class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool isPlaying = false;
+  Duration duration = Duration.zero;
+  Duration position = Duration.zero;
+  String? tempAudioPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _prepareAudio();
+
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() => isPlaying = state == PlayerState.playing);
+      }
+    });
+
+    _audioPlayer.onDurationChanged.listen((d) {
+      if (mounted) setState(() => duration = d);
+    });
+
+    _audioPlayer.onPositionChanged.listen((p) {
+      if (mounted) setState(() => position = p);
+    });
+  }
+
+  Future<void> _prepareAudio() async {
+    try {
+      final bytes = base64Decode(widget.audioBase64);
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/${DateTime.now().microsecondsSinceEpoch}.m4a');
+      await file.writeAsBytes(bytes);
+      tempAudioPath = file.path;
+    } catch (_) {}
+  }
+
+  Future<void> _togglePlay() async {
+    if (isPlaying) {
+      await _audioPlayer.pause();
+    } else {
+      if (tempAudioPath != null) {
+        await _audioPlayer.play(DeviceFileSource(tempAudioPath!));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          onPressed: _togglePlay,
+          icon: Icon(
+            isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+            size: 36,
+            color: Colors.white,
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 130,
+              child: LinearProgressIndicator(
+                value: duration.inMilliseconds > 0
+                    ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+                    : 0.0,
+                backgroundColor: Colors.white24,
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${position.inSeconds}s / ${duration.inSeconds}s',
+              style: const TextStyle(fontSize: 11, color: Colors.white70),
+            ),
+          ],
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+}
+
+// ==================================================
+// ANIMATED MESSAGE BUBBLE (POP-IN BOUNCE)
+// ==================================================
+
+class AnimatedBubble extends StatelessWidget {
+  final Widget child;
+
+  const AnimatedBubble({Key? key, required this.child}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.8, end: 1.0),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, animChild) {
+        return Transform.scale(
+          scale: scale,
+          child: animChild,
+        );
+      },
+      child: child,
+    );
+  }
+}
+
+// ==================================================
+// CHAT CONVERSATION SCREEN
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1477,9 +1699,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final List<Map<String, String>> localMessages = [];
   final FlutterTts flutterTts = FlutterTts();
   final ImagePicker _picker = ImagePicker();
+  final AudioRecorder _audioRecorder = AudioRecorder();
   
   bool isLoading = false;
-  bool isUploadingImage = false;
+  bool isRecording = false;
+  int recordingSeconds = 0;
+  Timer? recordingTimer;
+  bool isUploadingMedia = false;
   bool isVoiceEnabled = true;
 
   bool get isAvatarFriend => widget.userName == 'Avatar Friend';
@@ -1551,13 +1777,65 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  // 100% Reliable Image Pick & Direct Cloud Save (Zero Crash, Zero API Failure)
-  Future<void> _pickAndSendImage(ImageSource source) async {
-    if (isAvatarFriend) {
-      _showMessage(context, 'AI Image analysis will be connected next!');
-      return;
-    }
+  // Voice Note Recording
+  Future<void> _startRecording() async {
+    try {
+      if (await _audioRecorder.hasPermission()) {
+        final tempDir = await getTemporaryDirectory();
+        final path = '${tempDir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
+        await _audioRecorder.start(const RecordConfig(), path: path);
+        setState(() {
+          isRecording = true;
+          recordingSeconds = 0;
+        });
+
+        recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (mounted) setState(() => recordingSeconds++);
+        });
+      } else {
+        _showMessage(context, 'Microphone permission required.');
+      }
+    } catch (e) {
+      _showMessage(context, 'Recording error: $e');
+    }
+  }
+
+  Future<void> _stopAndSendRecording() async {
+    recordingTimer?.cancel();
+    try {
+      final path = await _audioRecorder.stop();
+      setState(() => isRecording = false);
+
+      if (path != null && recordingSeconds >= 1) {
+        final file = File(path);
+        final bytes = await file.readAsBytes();
+        final base64Audio = base64Encode(bytes);
+
+        if (!isAvatarFriend) {
+          await FirebaseFirestore.instance
+              .collection('chats')
+              .doc(chatRoomId)
+              .collection('messages')
+              .add({
+            'senderId': currentUid,
+            'receiverId': widget.peerUid,
+            'type': 'audio',
+            'audioData': base64Audio,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+          _scrollToBottom();
+        } else {
+          _showMessage(context, 'Voice Notes are for 1-on-1 chats.');
+        }
+      }
+    } catch (e) {
+      setState(() => isRecording = false);
+    }
+  }
+
+  // Pick Image (Safe Base64 + Vision AI Analysis)
+  Future<void> _pickAndSendImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
@@ -1568,29 +1846,53 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
       if (pickedFile == null) return;
 
-      setState(() => isUploadingImage = true);
+      setState(() => isUploadingMedia = true);
 
       final Uint8List bytes = await pickedFile.readAsBytes();
       final String base64String = base64Encode(bytes);
 
-      await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(chatRoomId)
-          .collection('messages')
-          .add({
-        'senderId': currentUid,
-        'receiverId': widget.peerUid,
-        'type': 'image',
-        'imageData': base64String,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+      if (isAvatarFriend) {
+        setState(() {
+          localMessages.add({'sender': 'user', 'type': 'image', 'imageData': base64String});
+          isLoading = true;
+        });
+        _saveChatHistory();
+        _scrollToBottom();
 
-      if (mounted) setState(() => isUploadingImage = false);
-      _scrollToBottom();
+        final reply = await askAvatarFriend(
+          'Photo dekhiye aur friendly Hindi/Hinglish mein batayein isme kya dikh raha hai!',
+          imageBase64: base64String,
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          localMessages.add({'sender': 'bot', 'type': 'text', 'text': reply});
+          isLoading = false;
+        });
+        _saveChatHistory();
+        _scrollToBottom();
+        _speak(reply);
+      } else {
+        await FirebaseFirestore.instance
+            .collection('chats')
+            .doc(chatRoomId)
+            .collection('messages')
+            .add({
+          'senderId': currentUid,
+          'receiverId': widget.peerUid,
+          'type': 'image',
+          'imageData': base64String,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+        _scrollToBottom();
+      }
+
+      if (mounted) setState(() => isUploadingMedia = false);
     } catch (e) {
       if (mounted) {
-        setState(() => isUploadingImage = false);
-        _showMessage(context, 'Error sending photo: $e');
+        setState(() => isUploadingMedia = false);
+        _showMessage(context, 'Error sending image: $e');
       }
     }
   }
@@ -1659,7 +1961,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
     if (isAvatarFriend) {
       setState(() {
-        localMessages.add({'sender': 'user', 'text': text});
+        localMessages.add({'sender': 'user', 'type': 'text', 'text': text});
         isLoading = true;
       });
       _saveChatHistory();
@@ -1670,7 +1972,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       if (!mounted) return;
 
       setState(() {
-        localMessages.add({'sender': 'bot', 'text': reply});
+        localMessages.add({'sender': 'bot', 'type': 'text', 'text': reply});
         isLoading = false;
       });
       _saveChatHistory();
@@ -1694,6 +1996,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   void dispose() {
+    recordingTimer?.cancel();
+    _audioRecorder.dispose();
     scrollController.dispose();
     flutterTts.stop();
     messageController.dispose();
@@ -1777,53 +2081,81 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       ),
       body: Column(
         children: [
-          if (isUploadingImage)
+          if (isUploadingMedia)
             const LinearProgressIndicator(minHeight: 2),
 
           Expanded(
             child: isAvatarFriend ? _buildAiChat(currentAvatar) : _buildRealUserChat(),
           ),
 
-          // MESSAGE BAR
+          // RECORDING OR MESSAGE BAR
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: _showMediaPickerSheet,
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: messageController,
-                      textInputAction: TextInputAction.send,
-                      onTap: () {
-                        Future.delayed(const Duration(milliseconds: 300), _scrollToBottom);
-                      },
-                      onSubmitted: (_) => sendMessage(),
-                      decoration: InputDecoration(
-                        hintText: 'Message...',
-                        filled: true,
-                        fillColor: const Color(0xFF1E1E1E),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
-                        ),
+              child: isRecording
+                  ? Container(
+                      height: 52,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(color: Colors.redAccent),
                       ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 20),
+                          const SizedBox(width: 8),
+                          Text('Recording... ${recordingSeconds}s',
+                              style: const TextStyle(fontWeight: FontWeight.bold)),
+                          const Spacer(),
+                          IconButton(
+                            onPressed: _stopAndSendRecording,
+                            icon: const Icon(Icons.send, color: Colors.greenAccent),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        IconButton(
+                          onPressed: _showMediaPickerSheet,
+                          icon: const Icon(Icons.add_circle_outline),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: messageController,
+                            textInputAction: TextInputAction.send,
+                            onTap: () {
+                              Future.delayed(const Duration(milliseconds: 300), _scrollToBottom);
+                            },
+                            onSubmitted: (_) => sendMessage(),
+                            decoration: InputDecoration(
+                              hintText: 'Message...',
+                              filled: true,
+                              fillColor: const Color(0xFF1E1E1E),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(24),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          onPressed: _startRecording,
+                          icon: const Icon(Icons.mic, color: Colors.white70),
+                        ),
+                        const SizedBox(width: 2),
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor: isAvatarFriend ? currentAvatar.themeColor : Colors.deepPurple,
+                          child: IconButton(
+                            onPressed: sendMessage,
+                            icon: const Icon(Icons.send, size: 20),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: isAvatarFriend ? currentAvatar.themeColor : Colors.deepPurple,
-                    child: IconButton(
-                      onPressed: sendMessage,
-                      icon: const Icon(Icons.send, size: 20),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ],
@@ -1831,7 +2163,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
-  // AI Chat Layout
   Widget _buildAiChat(AvatarCharacter currentAvatar) {
     if (localMessages.isEmpty) {
       return Center(
@@ -1869,7 +2200,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Your personalized 3D AI companion with voice',
+                'Your personalized 3D AI companion with voice & vision',
                 style: TextStyle(fontSize: 14, color: Colors.white60),
               ),
             ],
@@ -1904,40 +2235,52 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
         final msg = localMessages[index];
         final isUser = msg['sender'] == 'user';
+        final isImage = msg['type'] == 'image';
 
-        return Align(
-          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-            decoration: BoxDecoration(
-              color: isUser ? Colors.deepPurple : const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(18),
-              border: (!isUser)
-                  ? Border.all(
-                      color: currentAvatar.themeColor.withOpacity(0.3),
-                      width: 1,
+        return AnimatedBubble(
+          child: Align(
+            alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: isImage
+                  ? const EdgeInsets.all(4)
+                  : const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              decoration: BoxDecoration(
+                color: isUser ? Colors.deepPurple : const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(18),
+                border: (!isUser)
+                    ? Border.all(color: currentAvatar.themeColor.withOpacity(0.3), width: 1)
+                    : null,
+              ),
+              child: isImage
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.memory(
+                        base64Decode(msg['imageData'] ?? ''),
+                        width: 220,
+                        height: 220,
+                        fit: BoxFit.cover,
+                      ),
                     )
-                  : null,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 15)),
-                ),
-                if (!isUser) ...[
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => _speak(msg['text'] ?? ''),
-                    child: Icon(
-                      Icons.volume_up,
-                      size: 16,
-                      color: currentAvatar.themeColor.withOpacity(0.8),
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 15)),
+                        ),
+                        if (!isUser) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => _speak(msg['text'] ?? ''),
+                            child: Icon(
+                              Icons.volume_up,
+                              size: 16,
+                              color: currentAvatar.themeColor.withOpacity(0.8),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ),
-                ],
-              ],
             ),
           ),
         );
@@ -1945,7 +2288,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
-  // 1-on-1 Firestore Live Chat Layout (Instant Base64 & Network Image Render)
   Widget _buildRealUserChat() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -1985,53 +2327,45 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           itemBuilder: (context, index) {
             final data = messages[index].data() as Map<String, dynamic>;
             final isMe = data['senderId'] == currentUid;
-            final isImage = data['type'] == 'image';
+            final type = data['type'] ?? 'text';
             final imgPayload = data['imageData'] ?? data['imageUrl'] ?? '';
+            final audioPayload = data['audioData'] ?? '';
 
-            return Align(
-              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: isImage
-                    ? const EdgeInsets.all(4)
-                    : const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-                decoration: BoxDecoration(
-                  color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: isImage
-                    ? GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => FullImageViewScreen(
-                                imageData: imgPayload,
+            return AnimatedBubble(
+              child: Align(
+                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: type == 'image'
+                      ? const EdgeInsets.all(4)
+                      : (type == 'audio'
+                          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+                          : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
+                  decoration: BoxDecoration(
+                    color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: type == 'image'
+                      ? GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => FullImageViewScreen(imageData: imgPayload),
                               ),
-                            ),
-                          );
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: imgPayload.startsWith('http')
-                              ? Image.network(
-                                  imgPayload,
-                                  width: 220,
-                                  height: 220,
-                                  fit: BoxFit.cover,
-                                )
-                              : Image.memory(
-                                  base64Decode(imgPayload),
-                                  width: 220,
-                                  height: 220,
-                                  fit: BoxFit.cover,
-                                ),
-                        ),
-                      )
-                    : Text(
-                        data['text'] ?? '',
-                        style: const TextStyle(fontSize: 15),
-                      ),
+                            );
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: imgPayload.startsWith('http')
+                                ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
+                                : Image.memory(base64Decode(imgPayload), width: 220, height: 220, fit: BoxFit.cover),
+                          ),
+                        )
+                      : (type == 'audio'
+                          ? VoiceNoteBubble(audioBase64: audioPayload, isMe: isMe)
+                          : Text(data['text'] ?? '', style: const TextStyle(fontSize: 15))),
+                ),
               ),
             );
           },
@@ -2042,7 +2376,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 }
 
 // ==================================================
-// CHARACTER SELECTOR (INSTANT COLOR BROADCAST)
+// CHARACTER SELECTOR
 // ==================================================
 
 class SelectCharacterScreen extends StatefulWidget {
@@ -2069,10 +2403,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(28),
                 color: const Color(0xFF1E1E1E),
-                border: Border.all(
-                  color: activeChar.themeColor.withOpacity(0.4),
-                  width: 2,
-                ),
+                border: Border.all(color: activeChar.themeColor.withOpacity(0.4), width: 2),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
@@ -2122,9 +2453,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                             child: Container(
                               height: 52,
                               decoration: BoxDecoration(
-                                color: isSelected
-                                    ? char.themeColor
-                                    : char.themeColor.withOpacity(0.18),
+                                color: isSelected ? char.themeColor : char.themeColor.withOpacity(0.18),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: isSelected ? Colors.white : char.themeColor,
@@ -2154,9 +2483,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: activeChar.themeColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
                     onPressed: () async {
                       AvatarState.equip(tempIndex);
@@ -2175,11 +2502,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                     },
                     child: Text(
                       'Equip ${activeChar.name}',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                   ),
                 ),
@@ -2237,26 +2560,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Edit Profile',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
+            const Text('Edit Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 18),
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Username',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(labelText: 'Username', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 14),
             TextField(
               controller: bioCtrl,
               maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Bio / Status',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(labelText: 'Bio / Status', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -2283,9 +2597,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       }, SetOptions(merge: true));
                     }
 
-                    if (mounted) {
-                      _showMessage(context, 'Profile updated successfully!');
-                    }
+                    if (mounted) _showMessage(context, 'Profile updated successfully!');
                   }
                 },
                 child: const Text('Save Changes'),
@@ -2429,16 +2741,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: currentAvatar.themeColor),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       onPressed: _openEditProfileSheet,
                       icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: const Text(
-                        'Edit Profile',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
+                      label: const Text('Edit Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
@@ -2464,26 +2771,15 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
-          const ListTile(
-            leading: Icon(Icons.person),
-            title: Text('Account'),
-          ),
-          const ListTile(
-            leading: Icon(Icons.notifications),
-            title: Text('Notifications'),
-          ),
-          const ListTile(
-            leading: Icon(Icons.lock),
-            title: Text('Privacy'),
-          ),
-          const ListTile(
-            leading: Icon(Icons.info),
-            title: Text('About Avatar'),
-          ),
+          const ListTile(leading: Icon(Icons.person), title: Text('Account')),
+          const ListTile(leading: Icon(Icons.notifications), title: Text('Notifications')),
+          const ListTile(leading: Icon(Icons.lock), title: Text('Privacy')),
+          const ListTile(leading: Icon(Icons.info), title: Text('About Avatar')),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
             title: const Text('Logout', style: TextStyle(color: Colors.redAccent)),
             onTap: () async {
+              updateUserPresence(false);
               await FirebaseAuth.instance.signOut();
               if (context.mounted) {
                 Navigator.popUntil(context, (route) => route.isFirst);
