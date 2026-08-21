@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -773,7 +776,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
 
-                  // 1. Avatar Friend AI Tile (Lightweight & Instant)
+                  // 1. Avatar Friend AI Tile
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                     leading: CircleAvatar(
@@ -1335,7 +1338,40 @@ class UserProfileViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN
+// FULL SCREEN IMAGE VIEWER
+// ==================================================
+
+class FullImageViewScreen extends StatelessWidget {
+  final String imageUrl;
+
+  const FullImageViewScreen({Key? key, required this.imageUrl}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            loadingBuilder: (ctx, child, progress) {
+              if (progress == null) return child;
+              return const CircularProgressIndicator();
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// CHAT CONVERSATION SCREEN (IMAGE SHARING + AUTO SCROLL)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1359,8 +1395,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final ScrollController scrollController = ScrollController();
   final List<Map<String, String>> localMessages = [];
   final FlutterTts flutterTts = FlutterTts();
+  final ImagePicker _picker = ImagePicker();
   
   bool isLoading = false;
+  bool isUploadingImage = false;
   bool isVoiceEnabled = true;
 
   bool get isAvatarFriend => widget.userName == 'Avatar Friend';
@@ -1432,6 +1470,110 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
+  // Pick and Send Image
+  Future<void> _pickAndSendImage(ImageSource source) async {
+    if (isAvatarFriend) {
+      _showMessage(context, 'AI Image analysis will be connected next!');
+      return;
+    }
+
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 70,
+      );
+
+      if (pickedFile == null) return;
+
+      setState(() => isUploadingImage = true);
+
+      final file = File(pickedFile.path);
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('chat_images')
+          .child(chatRoomId)
+          .child(fileName);
+
+      final uploadTask = await ref.putFile(file);
+      final imageUrl = await uploadTask.ref.getDownloadURL();
+
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatRoomId)
+          .collection('messages')
+          .add({
+        'senderId': currentUid,
+        'receiverId': widget.peerUid,
+        'type': 'image',
+        'imageUrl': imageUrl,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      setState(() => isUploadingImage = false);
+      _scrollToBottom();
+    } catch (e) {
+      setState(() => isUploadingImage = false);
+      _showMessage(context, 'Image upload failed: $e');
+    }
+  }
+
+  void _showMediaPickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndSendImage(ImageSource.camera);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Color(0xFF2A2A2A),
+                      child: Icon(Icons.camera_alt, color: Colors.white, size: 28),
+                    ),
+                    SizedBox(height: 8),
+                    Text('Camera', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndSendImage(ImageSource.gallery);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Color(0xFF2A2A2A),
+                      child: Icon(Icons.photo_library, color: Colors.white, size: 28),
+                    ),
+                    SizedBox(height: 8),
+                    Text('Gallery', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void sendMessage() async {
     final text = messageController.text.trim();
     if (text.isEmpty) return;
@@ -1465,6 +1607,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           .add({
         'senderId': currentUid,
         'receiverId': widget.peerUid,
+        'type': 'text',
         'text': text,
         'timestamp': FieldValue.serverTimestamp(),
       });
@@ -1557,6 +1700,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       ),
       body: Column(
         children: [
+          if (isUploadingImage)
+            const LinearProgressIndicator(minHeight: 2),
+
           Expanded(
             child: isAvatarFriend ? _buildAiChat(currentAvatar) : _buildRealUserChat(),
           ),
@@ -1568,7 +1714,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () => _showMessage(context, 'Media sharing will be connected next.'),
+                    onPressed: _showMediaPickerSheet,
                     icon: const Icon(Icons.add_circle_outline),
                   ),
                   Expanded(
@@ -1762,17 +1908,53 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           itemBuilder: (context, index) {
             final data = messages[index].data() as Map<String, dynamic>;
             final isMe = data['senderId'] == currentUid;
+            final isImage = data['type'] == 'image';
 
             return Align(
               alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
               child: Container(
                 margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                padding: isImage
+                    ? const EdgeInsets.all(4)
+                    : const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                 decoration: BoxDecoration(
                   color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
+                child: isImage
+                    ? GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FullImageViewScreen(
+                                imageUrl: data['imageUrl'] ?? '',
+                              ),
+                            ),
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.network(
+                            data['imageUrl'] ?? '',
+                            width: 220,
+                            height: 220,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (ctx, child, progress) {
+                              if (progress == null) return child;
+                              return const SizedBox(
+                                width: 220,
+                                height: 220,
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            },
+                          ),
+                        ),
+                      )
+                    : Text(
+                        data['text'] ?? '',
+                        style: const TextStyle(fontSize: 15),
+                      ),
               ),
             );
           },
@@ -1935,7 +2117,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
 }
 
 // ==================================================
-// PROFILE SCREEN (ZERO FLICKER & INSTANT STATE SYNC)
+// PROFILE SCREEN
 // ==================================================
 
 class ProfileScreen extends StatefulWidget {
@@ -2009,7 +2191,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   final user = FirebaseAuth.instance.currentUser;
 
                   if (newName.isNotEmpty) {
-                    // Update state locally first (instant UI update)
                     setState(() {
                       displayName = newName;
                       displayBio = newBio;
@@ -2064,7 +2245,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              // 3D Avatar (Standalone, Zero Flicker)
               Container(
                 width: 140,
                 height: 140,
@@ -2096,15 +2276,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: const TextStyle(color: Colors.white70, fontSize: 14),
               ),
               const SizedBox(height: 20),
-
-              // Dynamic Bonds Stats
               StreamBuilder<DocumentSnapshot>(
                 stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
                 builder: (context, snapshot) {
                   final data = snapshot.data?.data() as Map<String, dynamic>?;
                   final List<dynamic> bonds = data?['bonds'] ?? [];
 
-                  // Sync bio from remote on initial fetch
                   if (data != null && data['bio'] != null && displayBio == 'Hey there! I am using Avatar.') {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted) setState(() => displayBio = data['bio']);
@@ -2164,8 +2341,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
               const SizedBox(height: 24),
-
-              // Edit Profile Button
               SizedBox(
                 width: double.infinity,
                 height: 50,
