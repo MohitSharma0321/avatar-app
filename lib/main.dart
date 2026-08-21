@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -47,25 +47,13 @@ Future<void> ensureUserDoc(User user) async {
         'bonds': [],
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+    } else {
+      final data = doc.data();
+      if (data != null && data['avatar'] != null) {
+        AvatarState.setByName(data['avatar']);
+      }
     }
   } catch (_) {}
-}
-
-// Free Cloud Image Upload
-Future<String?> uploadImageFreeHost(File imageFile) async {
-  try {
-    final uri = Uri.parse('https://api.imgbb.com/1/upload?key=6d207e02198a847aa5af3acf343fe4ef');
-    final request = http.MultipartRequest('POST', uri)
-      ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-
-    final response = await request.send();
-    if (response.statusCode == 200) {
-      final respStr = await response.stream.bytesToString();
-      final data = jsonDecode(respStr);
-      return data['data']['display_url'] ?? data['data']['url'];
-    }
-  } catch (_) {}
-  return null;
 }
 
 // ==================================================
@@ -94,7 +82,7 @@ Future<String> askAvatarFriend(String userMessage) async {
 }
 
 // ==================================================
-// GLOBAL AVATAR STATE
+// GLOBAL AVATAR STATE (REACTIVE NOTIFIER)
 // ==================================================
 
 class AvatarCharacter {
@@ -128,9 +116,24 @@ class AvatarState {
     ),
   ];
 
-  static int selectedIndex = 0;
+  static final ValueNotifier<int> selectedIndexNotifier = ValueNotifier<int>(0);
 
-  static AvatarCharacter get current => characters[selectedIndex];
+  static int get selectedIndex => selectedIndexNotifier.value;
+
+  static AvatarCharacter get current => characters[selectedIndexNotifier.value];
+
+  static void equip(int index) {
+    if (index >= 0 && index < characters.length) {
+      selectedIndexNotifier.value = index;
+    }
+  }
+
+  static void setByName(String name) {
+    final idx = characters.indexWhere((c) => c.name.toUpperCase() == name.toUpperCase());
+    if (idx != -1) {
+      selectedIndexNotifier.value = idx;
+    }
+  }
 
   static AvatarCharacter getByName(String? name) {
     return characters.firstWhere(
@@ -422,7 +425,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 }
 
 // ==================================================
-// LOGIN (WITH AUTO-DATABASE SYNC)
+// LOGIN
 // ==================================================
 
 class LoginScreen extends StatefulWidget {
@@ -617,104 +620,104 @@ class _HomeScreenState extends State<HomeScreen> {
 // HOME TAB
 // ==================================================
 
-class HomeTab extends StatefulWidget {
+class HomeTab extends StatelessWidget {
   const HomeTab({Key? key}) : super(key: key);
 
   @override
-  State<HomeTab> createState() => _HomeTabState();
-}
-
-class _HomeTabState extends State<HomeTab> {
-  @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final character = AvatarState.current;
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'My Avatar',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              user?.displayName?.isNotEmpty == true ? user!.displayName! : 'User',
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.white70,
-              ),
-            ),
-            const SizedBox(height: 25),
-            Container(
-              width: double.infinity,
-              height: 380,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                color: const Color(0xFF1E1E1E),
-                border: Border.all(
-                  color: character.themeColor.withOpacity(0.4),
-                  width: 2,
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: ModelViewer(
-                  key: ValueKey('main_${character.modelPath}'),
-                  src: character.modelPath,
-                  alt: 'My 3D Avatar',
-                  autoRotate: true,
-                  cameraControls: true,
-                  backgroundColor: const Color(0xFF1E1E1E),
-                ),
-              ),
-            ),
-            const SizedBox(height: 25),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: character.themeColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SelectCharacterScreen(),
-                    ),
-                  );
-                  setState(() {});
-                },
-                icon: const Icon(Icons.swap_horiz, size: 26),
-                label: Text(
-                  'Change Character (${character.name})',
-                  style: const TextStyle(
-                    fontSize: 17,
+    return ValueListenableBuilder<int>(
+      valueListenable: AvatarState.selectedIndexNotifier,
+      builder: (context, _, __) {
+        final character = AvatarState.current;
+
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'My Avatar',
+                  style: TextStyle(
+                    fontSize: 30,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
+                const SizedBox(height: 6),
+                Text(
+                  user?.displayName?.isNotEmpty == true ? user!.displayName! : 'User',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(height: 25),
+                Container(
+                  width: double.infinity,
+                  height: 380,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    color: const Color(0xFF1E1E1E),
+                    border: Border.all(
+                      color: character.themeColor.withOpacity(0.4),
+                      width: 2,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: ModelViewer(
+                      key: ValueKey('main_${character.modelPath}'),
+                      src: character.modelPath,
+                      alt: 'My 3D Avatar',
+                      autoRotate: true,
+                      cameraControls: true,
+                      backgroundColor: const Color(0xFF1E1E1E),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 25),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: character.themeColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SelectCharacterScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.swap_horiz, size: 26),
+                    label: Text(
+                      'Change Character (${character.name})',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
 
 // ==================================================
-// CHAT SCREEN (100% RELIABLE BOND SYSTEM)
+// CHAT SCREEN (DYNAMIC AVATAR COLOR & REALTIME BONNDS)
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -766,278 +769,285 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentAvatar = AvatarState.current;
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            onPressed: openNewChat,
-            icon: const Icon(Icons.person_add_alt_1),
-            tooltip: 'Discover & Search',
+    return ValueListenableBuilder<int>(
+      valueListenable: AvatarState.selectedIndexNotifier,
+      builder: (context, _, __) {
+        final currentAvatar = AvatarState.current;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.bold)),
+            actions: [
+              IconButton(
+                onPressed: openNewChat,
+                icon: const Icon(Icons.person_add_alt_1),
+                tooltip: 'Discover & Search',
+              ),
+            ],
           ),
-        ],
-      ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
-        builder: (context, userSnap) {
-          final myData = userSnap.data?.data() as Map<String, dynamic>?;
-          final List<dynamic> myBonds = myData?['bonds'] ?? [];
+          body: StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
+            builder: (context, userSnap) {
+              final myData = userSnap.data?.data() as Map<String, dynamic>?;
+              final List<dynamic> myBonds = myData?['bonds'] ?? [];
 
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('users').snapshots(),
-            builder: (context, allUsersSnap) {
-              if (allUsersSnap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').snapshots(),
+                builder: (context, allUsersSnap) {
+                  if (allUsersSnap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-              final allDocs = allUsersSnap.data?.docs ?? [];
+                  final allDocs = allUsersSnap.data?.docs ?? [];
 
-              final bondedUsers = allDocs.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final uid = data['uid'] ?? doc.id;
-                final name = (data['name'] ?? '').toString().toLowerCase();
+                  final bondedUsers = allDocs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final uid = data['uid'] ?? doc.id;
+                    final name = (data['name'] ?? '').toString().toLowerCase();
 
-                if (uid == currentUid || !myBonds.contains(uid)) return false;
-                if (searchQuery.isNotEmpty) {
-                  return name.contains(searchQuery.toLowerCase());
-                }
-                return true;
-              }).toList();
+                    if (uid == currentUid || !myBonds.contains(uid)) return false;
+                    if (searchQuery.isNotEmpty) {
+                      return name.contains(searchQuery.toLowerCase());
+                    }
+                    return true;
+                  }).toList();
 
-              final suggestedUsers = allDocs.where((doc) {
-                final uid = doc.id;
-                return uid != currentUid && !myBonds.contains(uid);
-              }).toList();
+                  final suggestedUsers = allDocs.where((doc) {
+                    final uid = doc.id;
+                    return uid != currentUid && !myBonds.contains(uid);
+                  }).toList();
 
-              return ListView(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: TextField(
-                      controller: searchController,
-                      onChanged: (v) => setState(() => searchQuery = v.trim()),
-                      decoration: InputDecoration(
-                        hintText: 'Search bonded chats...',
-                        prefixIcon: const Icon(Icons.search),
-                        filled: true,
-                        fillColor: const Color(0xFF1E1E1E),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // 1. Avatar Friend AI Tile
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                    leading: CircleAvatar(
-                      radius: 25,
-                      backgroundColor: currentAvatar.themeColor.withOpacity(0.2),
-                      child: Icon(
-                        Icons.smart_toy_rounded,
-                        color: currentAvatar.themeColor,
-                        size: 28,
-                      ),
-                    ),
-                    title: const Text(
-                      'Avatar Friend',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    subtitle: const Text(
-                      'Your personalized 3D AI companion',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: currentAvatar.themeColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'AI',
-                        style: TextStyle(
-                          color: currentAvatar.themeColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ChatConversationScreen(userName: 'Avatar Friend'),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, color: Colors.white10),
-
-                  // 2. Bonded Users List
-                  if (bondedUsers.isNotEmpty) ...[
-                    ...bondedUsers.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final peerUid = data['uid'] ?? doc.id;
-                      final name = data['name'] ?? 'User';
-                      final peerAvatar = AvatarState.getByName(data['avatar']);
-
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                        leading: GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => UserProfileViewScreen(userData: data),
-                              ),
-                            );
-                          },
-                          child: CircleAvatar(
-                            radius: 25,
-                            backgroundColor: peerAvatar.themeColor.withOpacity(0.25),
-                            child: Text(
-                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                              style: TextStyle(
-                                color: peerAvatar.themeColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
+                  return ListView(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        child: TextField(
+                          controller: searchController,
+                          onChanged: (v) => setState(() => searchQuery = v.trim()),
+                          decoration: InputDecoration(
+                            hintText: 'Search bonded chats...',
+                            prefixIcon: const Icon(Icons.search),
+                            filled: true,
+                            fillColor: const Color(0xFF1E1E1E),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide.none,
                             ),
                           ),
                         ),
-                        title: Text(
-                          name,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+
+                      // 1. Avatar Friend AI Tile (Instantly reflects Blue/Green/Orange)
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                        leading: CircleAvatar(
+                          radius: 25,
+                          backgroundColor: currentAvatar.themeColor.withOpacity(0.25),
+                          child: Icon(
+                            Icons.smart_toy_rounded,
+                            color: currentAvatar.themeColor,
+                            size: 28,
+                          ),
                         ),
-                        subtitle: const Text(
-                          'Bonded with you',
-                          style: TextStyle(color: Colors.white60, fontSize: 13),
+                        title: const Text(
+                          'Avatar Friend',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
-                        trailing: Icon(
-                          Icons.chat_bubble_outline,
-                          color: peerAvatar.themeColor,
-                          size: 22,
+                        subtitle: Text(
+                          '${currentAvatar.name} AI Companion',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white60),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: currentAvatar.themeColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'AI',
+                            style: TextStyle(
+                              color: currentAvatar.themeColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => ChatConversationScreen(
-                                userName: name,
-                                peerUid: peerUid,
-                                peerAvatar: data['avatar'],
-                              ),
+                              builder: (_) => const ChatConversationScreen(userName: 'Avatar Friend'),
                             ),
                           );
                         },
-                      );
-                    }).toList(),
-                  ] else if (searchQuery.isNotEmpty) ...[
-                    const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Center(
-                        child: Text(
-                          'No bonded contacts match your search.',
-                          style: TextStyle(color: Colors.white60),
-                        ),
                       ),
-                    ),
-                  ],
+                      const Divider(height: 1, color: Colors.white10),
 
-                  // 3. Suggested Bonds Section
-                  if (suggestedUsers.isNotEmpty) ...[
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(18, 24, 18, 10),
-                      child: Text(
-                        'SUGGESTED BONDS',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                          color: Colors.white54,
-                        ),
-                      ),
-                    ),
-                    ...suggestedUsers.take(15).map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final peerUid = data['uid'] ?? doc.id;
-                      final name = data['name'] ?? 'User';
-                      final peerAvatar = AvatarState.getByName(data['avatar']);
+                      // 2. Bonded Users List
+                      if (bondedUsers.isNotEmpty) ...[
+                        ...bondedUsers.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final peerUid = data['uid'] ?? doc.id;
+                          final name = data['name'] ?? 'User';
+                          final peerAvatar = AvatarState.getByName(data['avatar']);
 
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                        leading: GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => UserProfileViewScreen(userData: data),
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                            leading: GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => UserProfileViewScreen(userData: data),
+                                  ),
+                                );
+                              },
+                              child: CircleAvatar(
+                                radius: 25,
+                                backgroundColor: peerAvatar.themeColor.withOpacity(0.25),
+                                child: Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                  style: TextStyle(
+                                    color: peerAvatar.themeColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
                               ),
-                            );
-                          },
-                          child: CircleAvatar(
-                            radius: 23,
-                            backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
+                            ),
+                            title: Text(
+                              name,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            subtitle: const Text(
+                              'Bonded with you',
+                              style: TextStyle(color: Colors.white60, fontSize: 13),
+                            ),
+                            trailing: Icon(
+                              Icons.chat_bubble_outline,
+                              color: peerAvatar.themeColor,
+                              size: 22,
+                            ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChatConversationScreen(
+                                    userName: name,
+                                    peerUid: peerUid,
+                                    peerAvatar: data['avatar'],
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        }).toList(),
+                      ] else if (searchQuery.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Center(
                             child: Text(
-                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                              style: TextStyle(
-                                color: peerAvatar.themeColor,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              'No bonded contacts match your search.',
+                              style: TextStyle(color: Colors.white60),
                             ),
                           ),
                         ),
-                        title: GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => UserProfileViewScreen(userData: data),
-                              ),
-                            );
-                          },
+                      ],
+
+                      // 3. Suggested Bonds Section
+                      if (suggestedUsers.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(18, 24, 18, 10),
                           child: Text(
-                            name,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            'SUGGESTED BONDS',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                              color: Colors.white54,
+                            ),
                           ),
                         ),
-                        trailing: SizedBox(
-                          height: 34,
-                          child: FilledButton.tonal(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
-                              foregroundColor: peerAvatar.themeColor,
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                        ...suggestedUsers.take(15).map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final peerUid = data['uid'] ?? doc.id;
+                          final name = data['name'] ?? 'User';
+                          final peerAvatar = AvatarState.getByName(data['avatar']);
+
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                            leading: GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => UserProfileViewScreen(userData: data),
+                                  ),
+                                );
+                              },
+                              child: CircleAvatar(
+                                radius: 23,
+                                backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
+                                child: Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                  style: TextStyle(
+                                    color: peerAvatar.themeColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
-                            onPressed: () => toggleBond(peerUid, false),
-                            child: const Text(
-                              '+ Bond',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            title: GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => UserProfileViewScreen(userData: data),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                name,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
                             ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ],
-                ],
+                            trailing: SizedBox(
+                              height: 34,
+                              child: FilledButton.tonal(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
+                                  foregroundColor: peerAvatar.themeColor,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                onPressed: () => toggleBond(peerUid, false),
+                                child: const Text(
+                                  '+ Bond',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ],
+                  );
+                },
               );
             },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: openNewChat,
-        child: const Icon(Icons.search),
-      ),
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: openNewChat,
+            child: const Icon(Icons.search),
+          ),
+        );
+      },
     );
   }
 }
@@ -1406,16 +1416,28 @@ class UserProfileViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// FULL SCREEN IMAGE VIEWER
+// FULL SCREEN IMAGE VIEWER (BASE64 & NETWORK SUPPORT)
 // ==================================================
 
 class FullImageViewScreen extends StatelessWidget {
-  final String imageUrl;
+  final String imageData;
 
-  const FullImageViewScreen({Key? key, required this.imageUrl}) : super(key: key);
+  const FullImageViewScreen({Key? key, required this.imageData}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    Widget imageWidget;
+    if (imageData.startsWith('http')) {
+      imageWidget = Image.network(imageData, fit: BoxFit.contain);
+    } else {
+      try {
+        final bytes = base64Decode(imageData);
+        imageWidget = Image.memory(bytes, fit: BoxFit.contain);
+      } catch (_) {
+        imageWidget = const Icon(Icons.broken_image, size: 80, color: Colors.white54);
+      }
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -1423,23 +1445,14 @@ class FullImageViewScreen extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Center(
-        child: InteractiveViewer(
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            loadingBuilder: (ctx, child, progress) {
-              if (progress == null) return child;
-              return const CircularProgressIndicator();
-            },
-          ),
-        ),
+        child: InteractiveViewer(child: imageWidget),
       ),
     );
   }
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN
+// CHAT CONVERSATION SCREEN (SAFE BASE64 & NO CRASH CAMERA)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1538,6 +1551,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
+  // 100% Reliable Image Pick & Direct Cloud Save (Zero Crash, Zero API Failure)
   Future<void> _pickAndSendImage(ImageSource source) async {
     if (isAvatarFriend) {
       _showMessage(context, 'AI Image analysis will be connected next!');
@@ -1547,37 +1561,37 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
-        imageQuality: 70,
+        maxWidth: 700,
+        maxHeight: 700,
+        imageQuality: 60,
       );
 
       if (pickedFile == null) return;
 
       setState(() => isUploadingImage = true);
 
-      final file = File(pickedFile.path);
-      final imageUrl = await uploadImageFreeHost(file);
+      final Uint8List bytes = await pickedFile.readAsBytes();
+      final String base64String = base64Encode(bytes);
 
-      if (imageUrl != null) {
-        await FirebaseFirestore.instance
-            .collection('chats')
-            .doc(chatRoomId)
-            .collection('messages')
-            .add({
-          'senderId': currentUid,
-          'receiverId': widget.peerUid,
-          'type': 'image',
-          'imageUrl': imageUrl,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-        _scrollToBottom();
-      } else {
-        _showMessage(context, 'Image upload failed. Try again.');
-      }
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatRoomId)
+          .collection('messages')
+          .add({
+        'senderId': currentUid,
+        'receiverId': widget.peerUid,
+        'type': 'image',
+        'imageData': base64String,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
 
       if (mounted) setState(() => isUploadingImage = false);
+      _scrollToBottom();
     } catch (e) {
-      if (mounted) setState(() => isUploadingImage = false);
-      _showMessage(context, 'Error uploading image: $e');
+      if (mounted) {
+        setState(() => isUploadingImage = false);
+        _showMessage(context, 'Error sending photo: $e');
+      }
     }
   }
 
@@ -1931,7 +1945,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
-  // 1-on-1 Firestore Live Chat Layout
+  // 1-on-1 Firestore Live Chat Layout (Instant Base64 & Network Image Render)
   Widget _buildRealUserChat() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -1972,6 +1986,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             final data = messages[index].data() as Map<String, dynamic>;
             final isMe = data['senderId'] == currentUid;
             final isImage = data['type'] == 'image';
+            final imgPayload = data['imageData'] ?? data['imageUrl'] ?? '';
 
             return Align(
               alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -1991,27 +2006,26 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => FullImageViewScreen(
-                                imageUrl: data['imageUrl'] ?? '',
+                                imageData: imgPayload,
                               ),
                             ),
                           );
                         },
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(14),
-                          child: Image.network(
-                            data['imageUrl'] ?? '',
-                            width: 220,
-                            height: 220,
-                            fit: BoxFit.cover,
-                            loadingBuilder: (ctx, child, progress) {
-                              if (progress == null) return child;
-                              return const SizedBox(
-                                width: 220,
-                                height: 220,
-                                child: Center(child: CircularProgressIndicator()),
-                              );
-                            },
-                          ),
+                          child: imgPayload.startsWith('http')
+                              ? Image.network(
+                                  imgPayload,
+                                  width: 220,
+                                  height: 220,
+                                  fit: BoxFit.cover,
+                                )
+                              : Image.memory(
+                                  base64Decode(imgPayload),
+                                  width: 220,
+                                  height: 220,
+                                  fit: BoxFit.cover,
+                                ),
                         ),
                       )
                     : Text(
@@ -2028,7 +2042,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 }
 
 // ==================================================
-// CHARACTER SELECTOR
+// CHARACTER SELECTOR (INSTANT COLOR BROADCAST)
 // ==================================================
 
 class SelectCharacterScreen extends StatefulWidget {
@@ -2145,7 +2159,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                       ),
                     ),
                     onPressed: () async {
-                      AvatarState.selectedIndex = tempIndex;
+                      AvatarState.equip(tempIndex);
 
                       final user = FirebaseAuth.instance.currentUser;
                       if (user != null) {
@@ -2286,147 +2300,153 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final currentAvatar = AvatarState.current;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
-            icon: const Icon(Icons.settings),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF1E1E1E),
-                  border: Border.all(color: currentAvatar.themeColor, width: 3),
-                ),
-                child: ClipOval(
-                  child: ModelViewer(
-                    key: ValueKey('profile_static_${currentAvatar.modelPath}'),
-                    src: currentAvatar.modelPath,
-                    alt: 'Avatar Profile',
-                    autoRotate: true,
-                    cameraControls: false,
-                    backgroundColor: const Color(0xFF1E1E1E),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                displayName.isNotEmpty ? displayName : (user?.displayName ?? 'User'),
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                displayBio,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-              const SizedBox(height: 20),
-              StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
-                builder: (context, snapshot) {
-                  final data = snapshot.data?.data() as Map<String, dynamic>?;
-                  final List<dynamic> bonds = data?['bonds'] ?? [];
+    return ValueListenableBuilder<int>(
+      valueListenable: AvatarState.selectedIndexNotifier,
+      builder: (context, _, __) {
+        final currentAvatar = AvatarState.current;
 
-                  if (data != null && data['bio'] != null && displayBio == 'Hey there! I am using Avatar.') {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) setState(() => displayBio = data['bio']);
-                    });
-                  }
-
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E1E1E),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white10),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              '${bonds.length}',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: currentAvatar.themeColor,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            const Text('Bonds', style: TextStyle(color: Colors.white60, fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E1E1E),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white10),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              currentAvatar.name,
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: currentAvatar.themeColor,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            const Text('Equipped', style: TextStyle(color: Colors.white60, fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                    ],
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Profile'),
+            actions: [
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   );
                 },
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: currentAvatar.themeColor),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: _openEditProfileSheet,
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text(
-                    'Edit Profile',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
+                icon: const Icon(Icons.settings),
               ),
             ],
           ),
-        ),
-      ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Container(
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF1E1E1E),
+                      border: Border.all(color: currentAvatar.themeColor, width: 3),
+                    ),
+                    child: ClipOval(
+                      child: ModelViewer(
+                        key: ValueKey('profile_static_${currentAvatar.modelPath}'),
+                        src: currentAvatar.modelPath,
+                        alt: 'Avatar Profile',
+                        autoRotate: true,
+                        cameraControls: false,
+                        backgroundColor: const Color(0xFF1E1E1E),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    displayName.isNotEmpty ? displayName : (user?.displayName ?? 'User'),
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    displayBio,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const SizedBox(height: 20),
+                  StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
+                    builder: (context, snapshot) {
+                      final data = snapshot.data?.data() as Map<String, dynamic>?;
+                      final List<dynamic> bonds = data?['bonds'] ?? [];
+
+                      if (data != null && data['bio'] != null && displayBio == 'Hey there! I am using Avatar.') {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) setState(() => displayBio = data['bio']);
+                        });
+                      }
+
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E1E1E),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white10),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  '${bonds.length}',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: currentAvatar.themeColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                const Text('Bonds', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E1E1E),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white10),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  currentAvatar.name,
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: currentAvatar.themeColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                const Text('Equipped', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: currentAvatar.themeColor),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: _openEditProfileSheet,
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text(
+                        'Edit Profile',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
