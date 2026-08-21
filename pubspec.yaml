@@ -39,7 +39,7 @@ dependencies:
 
   # Notifications & Real-Time Calling
   flutter_local_notifications: ^17.2.3
-  flutter_webrtc: ^0.11.7
+  flutter_webrtc: ^0.12.5
   flutter_callkit_incoming: ^2.0.4+2
   permission_handler: ^11.3.1
 
