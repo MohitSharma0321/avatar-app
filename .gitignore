@@ -65,6 +65,8 @@ secrets/
 *.jks
 key.properties
 
+# Firebase Android config
+android/app/google-services.json
 # Cloud & Firebase Private Admin Keys
 firebase-service-account.json
 service-account.json
