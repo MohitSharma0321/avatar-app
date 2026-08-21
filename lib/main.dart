@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:http/http.dart' as http;
@@ -32,6 +31,23 @@ void _showMessage(BuildContext context, String message) {
 
 String getChatRoomId(String a, String b) {
   return a.compareTo(b) < 0 ? '${a}_$b' : '${b}_$a';
+}
+
+// Free Cloud Image Upload (100% Free - No Card Required)
+Future<String?> uploadImageFreeHost(File imageFile) async {
+  try {
+    final uri = Uri.parse('https://api.imgbb.com/1/upload?key=6d207e02198a847aa5af3acf343fe4ef');
+    final request = http.MultipartRequest('POST', uri)
+      ..files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+
+    final response = await request.send();
+    if (response.statusCode == 200) {
+      final respStr = await response.stream.bytesToString();
+      final data = jsonDecode(respStr);
+      return data['data']['display_url'] ?? data['data']['url'];
+    }
+  } catch (_) {}
+  return null;
 }
 
 // ==================================================
@@ -510,7 +526,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (INDEXED STACK - ZERO TAB RELOAD LAG)
+// HOME SCREEN (INDEXED STACK)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1371,7 +1387,7 @@ class FullImageViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN (IMAGE SHARING + AUTO SCROLL)
+// CHAT CONVERSATION SCREEN (FREE IMAGE SHARING + AUTO SCROLL)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -1470,7 +1486,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  // Pick and Send Image
+  // Pick and Send Image using 100% Free Cloud Upload API
   Future<void> _pickAndSendImage(ImageSource source) async {
     if (isAvatarFriend) {
       _showMessage(context, 'AI Image analysis will be connected next!');
@@ -1488,33 +1504,29 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       setState(() => isUploadingImage = true);
 
       final file = File(pickedFile.path);
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('chat_images')
-          .child(chatRoomId)
-          .child(fileName);
+      final imageUrl = await uploadImageFreeHost(file);
 
-      final uploadTask = await ref.putFile(file);
-      final imageUrl = await uploadTask.ref.getDownloadURL();
+      if (imageUrl != null) {
+        await FirebaseFirestore.instance
+            .collection('chats')
+            .doc(chatRoomId)
+            .collection('messages')
+            .add({
+          'senderId': currentUid,
+          'receiverId': widget.peerUid,
+          'type': 'image',
+          'imageUrl': imageUrl,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+        _scrollToBottom();
+      } else {
+        _showMessage(context, 'Image upload failed. Try again.');
+      }
 
-      await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(chatRoomId)
-          .collection('messages')
-          .add({
-        'senderId': currentUid,
-        'receiverId': widget.peerUid,
-        'type': 'image',
-        'imageUrl': imageUrl,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      setState(() => isUploadingImage = false);
-      _scrollToBottom();
+      if (mounted) setState(() => isUploadingImage = false);
     } catch (e) {
-      setState(() => isUploadingImage = false);
-      _showMessage(context, 'Image upload failed: $e');
+      if (mounted) setState(() => isUploadingImage = false);
+      _showMessage(context, 'Error uploading image: $e');
     }
   }
 
