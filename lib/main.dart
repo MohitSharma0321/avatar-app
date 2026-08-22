@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1209,7 +1210,7 @@ class HomeTab extends StatelessWidget {
 }
 
 // ==================================================
-// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN (ANIMATED)
+// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN (FLUTTER UI ANIMATIONS)
 // ==================================================
 
 class CallScreen extends StatefulWidget {
@@ -1232,20 +1233,85 @@ class CallScreen extends StatefulWidget {
   State<CallScreen> createState() => _CallScreenState();
 }
 
-class _CallScreenState extends State<CallScreen> {
+class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
   final WebRtcSignalingService _signaling = WebRtcSignalingService();
   bool isMuted = false;
   bool isSpeaker = false;
   bool isConnected = false;
   int callSeconds = 0;
   Timer? callTimer;
-  Timer? animationSequenceTimer;
-  String connectedAnimation = 'Wave';
+
+  // Animation Controllers for UI Simulation
+  late AnimationController _walkingBounceController;
+  late AnimationController _walkingHorizontalController;
+  late AnimationController _thoughtBubbleController;
+  late AnimationController _connectedEntryController;
+  late AnimationController _talkingPulseController;
+
+  late Animation<double> _walkVerticalAnimation;
+  late Animation<double> _walkHorizontalAnimation;
+  late Animation<double> _thoughtScaleAnimation;
+  late Animation<Offset> _leftAvatarSlideAnimation;
+  late Animation<Offset> _rightAvatarSlideAnimation;
 
   @override
   void initState() {
     super.initState();
+    _initUiAnimations();
     _startWebRtcCall();
+  }
+
+  void _initUiAnimations() {
+    // 1. Walking Animation: Continuous vertical bounce + gentle horizontal pacing
+    _walkingBounceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    )..repeat(reverse: true);
+
+    _walkVerticalAnimation = Tween<double>(begin: 0.0, end: -18.0).animate(
+      CurvedAnimation(parent: _walkingBounceController, curve: Curves.easeInOut),
+    );
+
+    _walkingHorizontalController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat(reverse: true);
+
+    _walkHorizontalAnimation = Tween<double>(begin: -45.0, end: 45.0).animate(
+      CurvedAnimation(parent: _walkingHorizontalController, curve: Curves.easeInOut),
+    );
+
+    // 2. Thought Bubble Floating/Pulsing Animation
+    _thoughtBubbleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    _thoughtScaleAnimation = Tween<double>(begin: 0.94, end: 1.06).animate(
+      CurvedAnimation(parent: _thoughtBubbleController, curve: Curves.easeInOutSine),
+    );
+
+    // 3. Connected Entry Animation: Slide together & meet
+    _connectedEntryController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+
+    _leftAvatarSlideAnimation = Tween<Offset>(
+      begin: const Offset(-1.5, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _connectedEntryController, curve: Curves.easeOutBack));
+
+    _rightAvatarSlideAnimation = Tween<Offset>(
+      begin: const Offset(1.5, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _connectedEntryController, curve: Curves.easeOutBack));
+
+    // 4. Talking Pulse Glow
+    _talkingPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
   }
 
   Future<void> _startWebRtcCall() async {
@@ -1256,7 +1322,7 @@ class _CallScreenState extends State<CallScreen> {
         callId: widget.callId!,
         onRemoteStreamReceived: (stream) {
           unawaited(FlutterCallkitIncoming.setCallConnected(widget.callId!));
-          _startConnectedState();
+          _triggerConnectedState();
         },
         onCallEnded: () {
           unawaited(FlutterCallkitIncoming.endAllCalls());
@@ -1279,7 +1345,7 @@ class _CallScreenState extends State<CallScreen> {
         if (realCallId != null) {
           unawaited(FlutterCallkitIncoming.setCallConnected(realCallId!));
         }
-        _startConnectedState();
+        _triggerConnectedState();
       },
       onCallEnded: () {
         unawaited(FlutterCallkitIncoming.endAllCalls());
@@ -1316,25 +1382,13 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {}
   }
 
-  void _startConnectedState() {
+  void _triggerConnectedState() {
     if (!isConnected && mounted) {
-      setState(() {
-        isConnected = true;
-        connectedAnimation = 'Wave';
-      });
+      setState(() => isConnected = true);
+      _connectedEntryController.forward();
 
       callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (mounted) setState(() => callSeconds++);
-      });
-
-      // 3.5 seconds handshake / wave -> both avatars sit down and talk
-      animationSequenceTimer?.cancel();
-      animationSequenceTimer = Timer(const Duration(milliseconds: 3500), () {
-        if (mounted) {
-          setState(() {
-            connectedAnimation = 'Sit_Talk';
-          });
-        }
       });
     }
   }
@@ -1362,153 +1416,313 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void dispose() {
     callTimer?.cancel();
-    animationSequenceTimer?.cancel();
+    _walkingBounceController.dispose();
+    _walkingHorizontalController.dispose();
+    _thoughtBubbleController.dispose();
+    _connectedEntryController.dispose();
+    _talkingPulseController.dispose();
+
     unawaited(_signaling.hangUp());
     unawaited(FlutterCallkitIncoming.endAllCalls());
     super.dispose();
   }
 
-  Widget _buildAvatarScene(AvatarCharacter myAvatar, AvatarCharacter peerAvatar) {
-    if (!isConnected) {
-      if (!widget.isIncoming) {
-        // CALLER SCREEN: Walk continuously until receiver picks up
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: ModelViewer(
-                key: ValueKey('walk_${myAvatar.modelPath}'),
-                src: myAvatar.modelPath,
-                alt: 'Walking Avatar',
-                autoPlay: true,
-                animationName: 'Walk',
-                cameraControls: false,
-                disableZoom: true,
-                backgroundColor: const Color(0xFF101014),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Walking to ${widget.peerName}...',
-              style: const TextStyle(color: Colors.white60, fontSize: 14),
-            ),
-          ],
-        );
-      } else {
-        // RECEIVER SCREEN: Stands straight with Thought Bubble of caller
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            ModelViewer(
-              key: ValueKey('idle_${myAvatar.modelPath}'),
-              src: myAvatar.modelPath,
-              alt: 'Standing Avatar',
-              autoPlay: true,
-              animationName: 'Idle',
-              cameraControls: false,
-              disableZoom: true,
-              backgroundColor: const Color(0xFF101014),
-            ),
-            Positioned(
-              top: 25,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+  Widget _buildCallerWalkingScene(AvatarCharacter myAvatar) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_walkingBounceController, _walkingHorizontalController]),
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(_walkHorizontalAnimation.value, _walkVerticalAnimation.value),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 220,
+                height: 320,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.92),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                      color: myAvatar.themeColor.withOpacity(0.25),
+                      blurRadius: 20,
+                      spreadRadius: 2,
                     ),
                   ],
+                ),
+                child: ModelViewer(
+                  key: ValueKey('walking_${myAvatar.modelPath}'),
+                  src: myAvatar.modelPath,
+                  alt: 'Walking Avatar',
+                  autoRotate: false,
+                  cameraControls: false,
+                  disableZoom: true,
+                  backgroundColor: Colors.transparent,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: myAvatar.themeColor.withOpacity(0.4)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cloud, color: myAvatar.themeColor, size: 22),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.directions_walk, color: Colors.orangeAccent, size: 18),
+                    const SizedBox(width: 6),
                     Text(
-                      'Thinking of ${widget.peerName}... 💭',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        );
-      }
-    }
-
-    // CONNECTED SCREEN: Both avatars together (Wave/Handshake -> Sit & Talk)
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: ModelViewer(
-                        key: ValueKey('left_${myAvatar.modelPath}_$connectedAnimation'),
-                        src: myAvatar.modelPath,
-                        alt: 'My Avatar',
-                        autoPlay: true,
-                        animationName: connectedAnimation,
-                        cameraControls: false,
-                        disableZoom: true,
-                        backgroundColor: const Color(0xFF101014),
-                      ),
-                    ),
-                    Text(
-                      'You (${myAvatar.name})',
-                      style: TextStyle(color: myAvatar.themeColor, fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: ModelViewer(
-                        key: ValueKey('right_${peerAvatar.modelPath}_$connectedAnimation'),
-                        src: peerAvatar.modelPath,
-                        alt: 'Peer Avatar',
-                        autoPlay: true,
-                        animationName: connectedAnimation,
-                        cameraControls: false,
-                        disableZoom: true,
-                        backgroundColor: const Color(0xFF101014),
-                      ),
-                    ),
-                    Text(
-                      '${widget.peerName} (${peerAvatar.name})',
-                      style: TextStyle(color: peerAvatar.themeColor, fontWeight: FontWeight.bold, fontSize: 13),
+                      'Walking towards ${widget.peerName}...',
+                      style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Text(
-            connectedAnimation == 'Wave'
-                ? '🤝 Greeting each other...'
-                : '💬 Sitting & Talking together',
-            style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+        );
+      },
+    );
+  }
+
+  Widget _buildReceiverThinkingScene(AvatarCharacter myAvatar) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Static avatar standing straight
+        Container(
+          width: 240,
+          height: 340,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: myAvatar.themeColor.withOpacity(0.2),
+                blurRadius: 24,
+              ),
+            ],
+          ),
+          child: ModelViewer(
+            key: ValueKey('receiver_idle_${myAvatar.modelPath}'),
+            src: myAvatar.modelPath,
+            alt: 'Standing Avatar',
+            autoRotate: false,
+            cameraControls: false,
+            disableZoom: true,
+            backgroundColor: Colors.transparent,
           ),
         ),
+
+        // Animated Thought Bubble over the avatar's head
+        Positioned(
+          top: 15,
+          child: ScaleTransition(
+            scale: _thoughtScaleAnimation,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.cloud, color: myAvatar.themeColor, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Thinking of ${widget.peerName}... 💭',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConnectedMeetScene(AvatarCharacter myAvatar, AvatarCharacter peerAvatar) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Both avatars side by side
+        Expanded(
+          child: Row(
+            children: [
+              // Left Avatar (Slide from left)
+              Expanded(
+                child: SlideTransition(
+                  position: _leftAvatarSlideAnimation,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _talkingPulseController,
+                        builder: (context, child) {
+                          return Container(
+                            width: 150,
+                            height: 220,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: myAvatar.themeColor.withOpacity(
+                                  isMuted ? 0.2 : 0.3 + (_talkingPulseController.value * 0.5),
+                                ),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: myAvatar.themeColor.withOpacity(
+                                    isMuted ? 0.0 : 0.15 * _talkingPulseController.value,
+                                  ),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: ModelViewer(
+                                key: ValueKey('left_connected_${myAvatar.modelPath}'),
+                                src: myAvatar.modelPath,
+                                alt: 'My Avatar',
+                                autoRotate: false,
+                                cameraControls: false,
+                                disableZoom: true,
+                                backgroundColor: const Color(0xFF16161C),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'You (${myAvatar.name})',
+                        style: TextStyle(
+                          color: myAvatar.themeColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Meeting Interaction Heart / Connection Center Icon
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF1E1E1E),
+                    ),
+                    child: const Icon(Icons.handshake, color: Colors.greenAccent, size: 24),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('Connected', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                ],
+              ),
+
+              // Right Avatar (Slide from right)
+              Expanded(
+                child: SlideTransition(
+                  position: _rightAvatarSlideAnimation,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _talkingPulseController,
+                        builder: (context, child) {
+                          return Container(
+                            width: 150,
+                            height: 220,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: peerAvatar.themeColor.withOpacity(
+                                  0.3 + (_talkingPulseController.value * 0.5),
+                                ),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: peerAvatar.themeColor.withOpacity(
+                                    0.15 * _talkingPulseController.value,
+                                  ),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: ModelViewer(
+                                key: ValueKey('right_connected_${peerAvatar.modelPath}'),
+                                src: peerAvatar.modelPath,
+                                alt: 'Peer Avatar',
+                                autoRotate: false,
+                                cameraControls: false,
+                                disableZoom: true,
+                                backgroundColor: const Color(0xFF16161C),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '${widget.peerName} (${peerAvatar.name})',
+                        style: TextStyle(
+                          color: peerAvatar.themeColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Sitting & Talking status pill
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.airline_seat_recline_normal, color: Colors.blueAccent, size: 18),
+              SizedBox(width: 6),
+              Text(
+                'Sitting together & speaking...',
+                style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
       ],
     );
   }
@@ -1541,7 +1755,11 @@ class _CallScreenState extends State<CallScreen> {
             const SizedBox(height: 10),
             Expanded(
               child: Center(
-                child: _buildAvatarScene(myAvatarObj, peerAvatarObj),
+                child: isConnected
+                    ? _buildConnectedMeetScene(myAvatarObj, peerAvatarObj)
+                    : (widget.isIncoming
+                        ? _buildReceiverThinkingScene(myAvatarObj)
+                        : _buildCallerWalkingScene(myAvatarObj)),
               ),
             ),
             const SizedBox(height: 10),
@@ -3194,7 +3412,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     : null,
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: dynamic ? MainAxisSize.min : MainAxisSize.min,
                 children: [
                   Flexible(
                     child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 15)),
