@@ -60,6 +60,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         ringtonePath: 'system_ringtone_default',
         backgroundColor: '#101014',
         actionColor: '#4CAF50',
+        incomingCallNotificationChannelName: 'Incoming Call',
       ),
     );
 
@@ -72,11 +73,9 @@ Future<void> main() async {
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // Do not block the first frame on FCM permission/token work.
   await AvatarState.loadSavedAvatar();
   runApp(const AvatarApp());
 
-  // Notifications are initialized after the UI is already visible.
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(NotificationService.initialize());
   });
@@ -164,7 +163,7 @@ class NotificationService {
 }
 
 // ==================================================
-// WEBRTC SIGNALING SERVICE
+// WEBRTC SIGNALING SERVICE (WITH TURN & QUEUEING)
 // ==================================================
 
 typedef StreamCallback = void Function(MediaStream stream);
@@ -174,6 +173,16 @@ class WebRtcSignalingService {
     'iceServers': [
       {'urls': 'stun:stun.l.google.com:19302'},
       {'urls': 'stun:stun1.l.google.com:19302'},
+      {
+        'urls': 'turn:openrelay.metered.ca:80',
+        'username': 'openrelayproject',
+        'credential': 'openrelayproject',
+      },
+      {
+        'urls': 'turn:openrelay.metered.ca:443',
+        'username': 'openrelayproject',
+        'credential': 'openrelayproject',
+      },
     ]
   };
 
@@ -184,10 +193,17 @@ class WebRtcSignalingService {
   StreamSubscription? callDocSubscription;
   StreamSubscription? candidateSubscription;
 
+  final List<RTCIceCandidate> _iceCandidateQueue = [];
+  bool _isRemoteDescriptionSet = false;
+
   Future<MediaStream> openAudioStream() async {
     await Permission.microphone.request();
     localStream = await navigator.mediaDevices.getUserMedia({
-      'audio': true,
+      'audio': {
+        'echoCancellation': true,
+        'noiseSuppression': true,
+        'autoGainControl': true,
+      },
       'video': false,
     });
     return localStream!;
@@ -204,6 +220,8 @@ class WebRtcSignalingService {
     final firestore = FirebaseFirestore.instance;
     final callDoc = firestore.collection('calls').doc();
     currentCallId = callDoc.id;
+    _isRemoteDescriptionSet = false;
+    _iceCandidateQueue.clear();
 
     peerConnection = await createPeerConnection(configuration);
 
@@ -241,13 +259,14 @@ class WebRtcSignalingService {
       if (data != null) {
         if (data['status'] == 'ended') {
           onCallEnded();
-        } else if (data['answer'] != null &&
-            peerConnection?.getRemoteDescription() == null) {
+        } else if (data['answer'] != null && !_isRemoteDescriptionSet) {
           var answer = RTCSessionDescription(
             data['answer']['sdp'],
             data['answer']['type'],
           );
           await peerConnection?.setRemoteDescription(answer);
+          _isRemoteDescriptionSet = true;
+          _processIceCandidateQueue();
         }
       }
     });
@@ -259,13 +278,18 @@ class WebRtcSignalingService {
       for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
           var data = change.doc.data();
-          peerConnection?.addCandidate(
-            RTCIceCandidate(
-              data?['candidate'],
-              data?['sdpMid'],
-              data?['sdpMLineIndex'],
-            ),
-          );
+          if (data != null) {
+            final candidate = RTCIceCandidate(
+              data['candidate'],
+              data['sdpMid'],
+              data['sdpMLineIndex'],
+            );
+            if (_isRemoteDescriptionSet) {
+              peerConnection?.addCandidate(candidate);
+            } else {
+              _iceCandidateQueue.add(candidate);
+            }
+          }
         }
       }
     });
@@ -279,6 +303,9 @@ class WebRtcSignalingService {
     required VoidCallback onCallEnded,
   }) async {
     currentCallId = callId;
+    _isRemoteDescriptionSet = false;
+    _iceCandidateQueue.clear();
+
     final callDoc = FirebaseFirestore.instance.collection('calls').doc(callId);
 
     peerConnection = await createPeerConnection(configuration);
@@ -305,6 +332,8 @@ class WebRtcSignalingService {
         callData['offer']['type'],
       );
       await peerConnection?.setRemoteDescription(offer);
+      _isRemoteDescriptionSet = true;
+      _processIceCandidateQueue();
 
       var answer = await peerConnection!.createAnswer();
       await peerConnection!.setLocalDescription(answer);
@@ -329,16 +358,28 @@ class WebRtcSignalingService {
       for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
           var data = change.doc.data();
-          peerConnection?.addCandidate(
-            RTCIceCandidate(
-              data?['candidate'],
-              data?['sdpMid'],
-              data?['sdpMLineIndex'],
-            ),
-          );
+          if (data != null) {
+            final candidate = RTCIceCandidate(
+              data['candidate'],
+              data['sdpMid'],
+              data['sdpMLineIndex'],
+            );
+            if (_isRemoteDescriptionSet) {
+              peerConnection?.addCandidate(candidate);
+            } else {
+              _iceCandidateQueue.add(candidate);
+            }
+          }
         }
       }
     });
+  }
+
+  void _processIceCandidateQueue() {
+    for (var candidate in _iceCandidateQueue) {
+      peerConnection?.addCandidate(candidate);
+    }
+    _iceCandidateQueue.clear();
   }
 
   Future<void> hangUp() async {
@@ -361,6 +402,8 @@ class WebRtcSignalingService {
     localStream = null;
     remoteStream = null;
     currentCallId = null;
+    _isRemoteDescriptionSet = false;
+    _iceCandidateQueue.clear();
   }
 }
 
@@ -942,7 +985,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (WITH CALLKIT & CALL LISTENERS)
+// HOME SCREEN (WITH CALLKIT & TERMINATED HANDLER)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -956,9 +999,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int currentIndex = 0;
   StreamSubscription? callSubscription;
 
-  // Build tabs lazily. The old IndexedStack created Home + Chat + Profile
-  // (including all 3D viewers and Firestore streams) immediately at startup.
-  // This keeps the same UI and state while making app launch lighter.
   final List<Widget?> pages = [null, null, null];
 
   Widget _pageAt(int index) {
@@ -980,7 +1020,38 @@ class _HomeScreenState extends State<HomeScreen> {
       ensureUserDoc(user);
       _listenForIncomingCalls(user.uid);
       _listenToCallKitEvents();
+      _checkInitialCall();
     }
+  }
+
+  // App band hone par CallKit Accept dabane par seedhe call screen open karna
+  Future<void> _checkInitialCall() async {
+    try {
+      final calls = await FlutterCallkitIncoming.activeCalls();
+      if (calls is List && calls.isNotEmpty) {
+        final call = calls.first;
+        final extra = call['extra'] ?? {};
+
+        final callId = extra['callId'] ?? call['id'];
+        final callerName = extra['callerName'] ?? call['nameCaller'] ?? 'User';
+        final callerAvatar = extra['callerAvatar'] ?? 'ORANGE';
+        final callerId = extra['callerId'] ?? '';
+
+        if (mounted) {
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (_) => CallScreen(
+                peerName: callerName,
+                peerAvatar: callerAvatar,
+                peerUid: callerId,
+                callId: callId,
+                isIncoming: true,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (_) {}
   }
 
   void _listenToCallKitEvents() {
@@ -1079,9 +1150,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       await FlutterCallkitIncoming.showCallkitIncoming(params);
-    } catch (_) {
-      // Keep Firestore call state alive even if CallKit is unavailable.
-    }
+    } catch (_) {}
   }
 
   @override
@@ -1293,8 +1362,6 @@ class _CallScreenState extends State<CallScreen> {
       },
     );
 
-    // Start the native outgoing-call UI after the real Firestore call id exists.
-    // Android uses the phone's default ringtone for the calling UI.
     try {
       final outgoingParams = CallKitParams(
         id: realCallId!,
@@ -1384,8 +1451,6 @@ class _CallScreenState extends State<CallScreen> {
               ),
             ),
             const Spacer(),
-            // Lightweight call avatar: 3D ModelViewer intentionally removed from calls.
-            // This prevents GLB loading during a call and keeps the call screen responsive.
             Container(
               width: 200,
               height: 200,
@@ -1410,10 +1475,6 @@ class _CallScreenState extends State<CallScreen> {
                 ),
               ),
             ),
-            /*
-              Old 3D call avatar removed intentionally.
-            
-            */
             const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -1580,7 +1641,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
 
-                      // 1. Avatar Friend AI Tile
+                      // Avatar Friend AI Tile
                       ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                         leading: Stack(
@@ -1653,7 +1714,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       const Divider(height: 1, color: Colors.white10),
 
-                      // 2. Bonded Users List
+                      // Bonded Users List
                       if (bondedUsers.isNotEmpty) ...[
                         ...bondedUsers.map((doc) {
                           final data = doc.data() as Map<String, dynamic>;
@@ -1753,7 +1814,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ],
 
-                      // 3. Suggested Bonds Section
+                      // Suggested Bonds Section
                       if (suggestedUsers.isNotEmpty) ...[
                         const Padding(
                           padding: EdgeInsets.fromLTRB(18, 24, 18, 10),
@@ -2389,7 +2450,7 @@ class AnimatedBubble extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN
+// CHAT CONVERSATION SCREEN (SMOOTH & NO-JUMP)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -2426,7 +2487,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   bool isVoiceEnabled = true;
   Timer? typingDebounceTimer;
   Timer? typingWriteTimer;
-  int _lastRenderedMessageCount = -1;
   final Map<String, Uint8List> _imageBytesCache = {};
 
   bool get isAvatarFriend => widget.userName == 'Avatar Friend';
@@ -2472,7 +2532,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   void _onTextChanged(String text) {
     if (isAvatarFriend) return;
 
-    // Debounce Firestore writes instead of writing on every key press.
     typingWriteTimer?.cancel();
     if (text.trim().isNotEmpty) {
       typingWriteTimer = Timer(const Duration(milliseconds: 600), () {
@@ -2491,15 +2550,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   void _scrollToBottom({bool animated = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !scrollController.hasClients) return;
-      final target = scrollController.position.maxScrollExtent;
       if (animated) {
         scrollController.animateTo(
-          target,
-          duration: const Duration(milliseconds: 220),
+          0.0,
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
       } else {
-        scrollController.jumpTo(target);
+        scrollController.jumpTo(0.0);
       }
     });
   }
@@ -2544,7 +2602,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           localMessages.add(Map<String, String>.from(item));
         }
       });
-      _scrollToBottom();
     }
   }
 
@@ -2676,7 +2733,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           isLoading = true;
         });
         await _saveChatHistory();
-        _scrollToBottom();
 
         final reply = await askAvatarFriend(text);
         if (!mounted) return;
@@ -2686,7 +2742,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           isLoading = false;
         });
         await _saveChatHistory();
-        _scrollToBottom();
         unawaited(_speak(reply));
       } else {
         await FirebaseFirestore.instance
@@ -2933,12 +2988,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                 minLines: 1,
                                 maxLines: 5,
                                 onChanged: _onTextChanged,
-                                onTap: () {
-                                  messageFocusNode.requestFocus();
-                                  Future.delayed(const Duration(milliseconds: 120), () {
-                                    if (mounted) _scrollToBottom();
-                                  });
-                                },
                                 onSubmitted: (_) => sendMessage(),
                                 decoration: InputDecoration(
                                   hintText: isAvatarFriend ? 'Ask anything to Avatar...' : 'Message...',
@@ -3096,7 +3145,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           .collection('chats')
           .doc(chatRoomId)
           .collection('messages')
-          .orderBy('timestamp', descending: false)
+          .orderBy('timestamp', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -3121,14 +3170,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
         final messages = snapshot.data!.docs;
 
-        // Scroll only when the message count changes. This prevents every
-        // Firestore rebuild (typing/read updates) from looking like a reload.
-        if (_lastRenderedMessageCount != messages.length) {
-          _lastRenderedMessageCount = messages.length;
-          _scrollToBottom();
-        }
-
         return ListView.builder(
+          reverse: true,
           controller: scrollController,
           padding: const EdgeInsets.all(16),
           itemCount: messages.length,
@@ -3147,82 +3190,81 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               child: Align(
                 alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                 child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: type == 'image'
-                            ? const EdgeInsets.all(4)
-                            : (type == 'audio'
-                                ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
-                                : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
-                        decoration: BoxDecoration(
-                          color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                          children: [
-                            if (type == 'image')
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => FullImageViewScreen(imageData: imgPayload),
-                                    ),
-                                  );
-                                },
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(14),
-                                  child: imgPayload.startsWith('http')
-                                      ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
-                                      : (() {
-                                          final bytes = _decodeImageCached(doc.id, imgPayload);
-                                          return bytes != null
-                                              ? Image.memory(bytes, width: 220, height: 220, fit: BoxFit.cover, gaplessPlayback: true)
-                                              : const SizedBox(width: 220, height: 220, child: Icon(Icons.broken_image));
-                                        })(),
-                                ),
-                              )
-                            else if (type == 'audio')
-                              VoiceNoteBubble(key: ValueKey(doc.id), audioBase64: audioPayload, isMe: isMe)
-                            else
-                              Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
-
-                            if (isMe) ...[
-                              const SizedBox(height: 3),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    isRead ? Icons.done_all : Icons.done,
-                                    size: 15,
-                                    color: isRead ? Colors.lightBlueAccent : Colors.white54,
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: type == 'image'
+                          ? const EdgeInsets.all(4)
+                          : (type == 'audio'
+                              ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+                              : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
+                      decoration: BoxDecoration(
+                        color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        children: [
+                          if (type == 'image')
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FullImageViewScreen(imageData: imgPayload),
                                   ),
-                                ],
+                                );
+                              },
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: imgPayload.startsWith('http')
+                                    ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
+                                    : (() {
+                                        final bytes = _decodeImageCached(doc.id, imgPayload);
+                                        return bytes != null
+                                            ? Image.memory(bytes, width: 220, height: 220, fit: BoxFit.cover, gaplessPlayback: true)
+                                            : const SizedBox(width: 220, height: 220, child: Icon(Icons.broken_image));
+                                      })(),
                               ),
-                            ],
+                            )
+                          else if (type == 'audio')
+                            VoiceNoteBubble(key: ValueKey(doc.id), audioBase64: audioPayload, isMe: isMe)
+                          else
+                            Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
+
+                          if (isMe) ...[
+                            const SizedBox(height: 3),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isRead ? Icons.done_all : Icons.done,
+                                  size: 15,
+                                  color: isRead ? Colors.lightBlueAccent : Colors.white54,
+                                ),
+                              ],
+                            ),
                           ],
+                        ],
+                      ),
+                    ),
+                    if (reaction.isNotEmpty)
+                      Positioned(
+                        bottom: 2,
+                        right: isMe ? 4 : null,
+                        left: !isMe ? 4 : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2A2A),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white24, width: 1),
+                          ),
+                          child: Text(reaction, style: const TextStyle(fontSize: 13)),
                         ),
                       ),
-                      if (reaction.isNotEmpty)
-                        Positioned(
-                          bottom: 2,
-                          right: isMe ? 4 : null,
-                          left: !isMe ? 4 : null,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2A2A2A),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.white24, width: 1),
-                            ),
-                            child: Text(reaction, style: const TextStyle(fontSize: 13)),
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
             );
