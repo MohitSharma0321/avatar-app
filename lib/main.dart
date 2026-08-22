@@ -932,11 +932,21 @@ class _HomeScreenState extends State<HomeScreen> {
   int currentIndex = 0;
   StreamSubscription? callSubscription;
 
-  final List<Widget> pages = const [
-    HomeTab(),
-    ChatScreen(),
-    ProfileScreen(),
-  ];
+  // Build tabs lazily. The old IndexedStack created Home + Chat + Profile
+  // (including all 3D viewers and Firestore streams) immediately at startup.
+  // This keeps the same UI and state while making app launch lighter.
+  final List<Widget?> pages = [null, null, null];
+
+  Widget _pageAt(int index) {
+    if (pages[index] == null) {
+      pages[index] = switch (index) {
+        0 => const HomeTab(),
+        1 => const ChatScreen(),
+        _ => const ProfileScreen(),
+      };
+    }
+    return pages[index]!;
+  }
 
   @override
   void initState() {
@@ -1086,7 +1096,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: IndexedStack(
         index: currentIndex,
-        children: pages,
+        children: [
+          currentIndex == 0 || pages[0] != null ? _pageAt(0) : const SizedBox.shrink(),
+          currentIndex == 1 || pages[1] != null ? _pageAt(1) : const SizedBox.shrink(),
+          currentIndex == 2 || pages[2] != null ? _pageAt(2) : const SizedBox.shrink(),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
@@ -2349,6 +2363,7 @@ class ChatConversationScreen extends StatefulWidget {
 
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final TextEditingController messageController = TextEditingController();
+  final FocusNode messageFocusNode = FocusNode();
   final ScrollController scrollController = ScrollController();
   final List<Map<String, String>> localMessages = [];
   final FlutterTts flutterTts = FlutterTts();
@@ -2362,6 +2377,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   bool isUploadingMedia = false;
   bool isVoiceEnabled = true;
   Timer? typingDebounceTimer;
+  Timer? typingWriteTimer;
+  int _lastRenderedMessageCount = -1;
+  final Map<String, Uint8List> _imageBytesCache = {};
 
   bool get isAvatarFriend => widget.userName == 'Avatar Friend';
   String get currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -2394,32 +2412,65 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     } catch (_) {}
   }
 
-  void _updateTypingStatus(bool isTyping) {
-    if (isAvatarFriend || widget.peerUid == null) return;
-    FirebaseFirestore.instance.collection('chats').doc(chatRoomId).set({
-      'typing_$currentUid': isTyping,
-    }, SetOptions(merge: true));
+  Future<void> _updateTypingStatus(bool isTyping) async {
+    if (isAvatarFriend || widget.peerUid == null || currentUid.isEmpty) return;
+    try {
+      await FirebaseFirestore.instance.collection('chats').doc(chatRoomId).set({
+        'typing_$currentUid': isTyping,
+      }, SetOptions(merge: true));
+    } catch (_) {}
   }
 
   void _onTextChanged(String text) {
     if (isAvatarFriend) return;
-    _updateTypingStatus(true);
+
+    // Debounce Firestore writes instead of writing on every key press.
+    typingWriteTimer?.cancel();
+    if (text.trim().isNotEmpty) {
+      typingWriteTimer = Timer(const Duration(milliseconds: 350), () {
+        _updateTypingStatus(true);
+      });
+    } else {
+      _updateTypingStatus(false);
+    }
+
     typingDebounceTimer?.cancel();
     typingDebounceTimer = Timer(const Duration(seconds: 2), () {
       _updateTypingStatus(false);
     });
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animated = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (scrollController.hasClients) {
+      if (!mounted || !scrollController.hasClients) return;
+      final target = scrollController.position.maxScrollExtent;
+      if (animated) {
         scrollController.animateTo(
-          scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          target,
+          duration: const Duration(milliseconds: 220),
           curve: Curves.easeOut,
         );
+      } else {
+        scrollController.jumpTo(target);
       }
     });
+  }
+
+  Uint8List? _decodeImageCached(String id, String payload) {
+    if (payload.isEmpty) return null;
+    final cached = _imageBytesCache[id];
+    if (cached != null) return cached;
+    try {
+      final clean = payload.replaceFirst(RegExp(r'data:image\/[a-zA-Z]+;base64,'), '');
+      final bytes = base64Decode(clean);
+      if (_imageBytesCache.length >= 40) {
+        _imageBytesCache.remove(_imageBytesCache.keys.first);
+      }
+      _imageBytesCache[id] = bytes;
+      return bytes;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _initTts() async {
@@ -2661,11 +2712,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   void dispose() {
     _updateTypingStatus(false);
     typingDebounceTimer?.cancel();
+    typingWriteTimer?.cancel();
     recordingTimer?.cancel();
     _audioRecorder.dispose();
     scrollController.dispose();
     flutterTts.stop();
     messageController.dispose();
+    messageFocusNode.dispose();
     super.dispose();
   }
 
@@ -2831,10 +2884,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             Expanded(
                               child: TextField(
                                 controller: messageController,
+                                focusNode: messageFocusNode,
+                                keyboardType: TextInputType.multiline,
                                 textInputAction: TextInputAction.send,
+                                minLines: 1,
+                                maxLines: 5,
                                 onChanged: _onTextChanged,
                                 onTap: () {
-                                  Future.delayed(const Duration(milliseconds: 300), _scrollToBottom);
+                                  messageFocusNode.requestFocus();
+                                  Future.delayed(const Duration(milliseconds: 120), () {
+                                    if (mounted) _scrollToBottom();
+                                  });
                                 },
                                 onSubmitted: (_) => sendMessage(),
                                 decoration: InputDecoration(
@@ -3017,12 +3077,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         }
 
         final messages = snapshot.data!.docs;
-        _scrollToBottom();
 
-        for (var doc in messages) {
-          final d = doc.data() as Map<String, dynamic>;
-          if (d['receiverId'] == currentUid && d['isRead'] == false) {
-            doc.reference.update({'isRead': true});
+        // Scroll only when the message count changes. This prevents every
+        // Firestore rebuild (typing/read updates) from looking like a reload.
+        if (_lastRenderedMessageCount != messages.length) {
+          _lastRenderedMessageCount = messages.length;
+          _scrollToBottom();
+
+          // Mark incoming messages as read only when the message list changes,
+          // instead of issuing writes during every StreamBuilder rebuild.
+          for (final doc in messages) {
+            final d = doc.data() as Map<String, dynamic>;
+            if (d['receiverId'] == currentUid && d['isRead'] == false) {
+              doc.reference.update({'isRead': true});
+            }
           }
         }
 
@@ -3076,11 +3144,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                                   borderRadius: BorderRadius.circular(14),
                                   child: imgPayload.startsWith('http')
                                       ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
-                                      : Image.memory(base64Decode(imgPayload), width: 220, height: 220, fit: BoxFit.cover),
+                                      : (() {
+                                          final bytes = _decodeImageCached(doc.id, imgPayload);
+                                          return bytes != null
+                                              ? Image.memory(bytes, width: 220, height: 220, fit: BoxFit.cover, gaplessPlayback: true)
+                                              : const SizedBox(width: 220, height: 220, child: Icon(Icons.broken_image));
+                                        })(),
                                 ),
                               )
                             else if (type == 'audio')
-                              VoiceNoteBubble(audioBase64: audioPayload, isMe: isMe)
+                              VoiceNoteBubble(key: ValueKey(doc.id), audioBase64: audioPayload, isMe: isMe)
                             else
                               Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
 
