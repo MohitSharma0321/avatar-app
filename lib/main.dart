@@ -1125,7 +1125,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ==================================================
-// HOME TAB
+// HOME TAB (FAST LOAD AVATAR)
 // ==================================================
 
 class HomeTab extends StatelessWidget {
@@ -1173,6 +1173,7 @@ class HomeTab extends StatelessWidget {
                       alt: 'My 3D Avatar',
                       autoRotate: true,
                       cameraControls: true,
+                      disableZoom: true,
                       backgroundColor: const Color(0xFF1E1E1E),
                     ),
                   ),
@@ -1210,7 +1211,7 @@ class HomeTab extends StatelessWidget {
 }
 
 // ==================================================
-// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN (FLUTTER UI ANIMATIONS)
+// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN (LAG-FREE + CALLER RINGING TONE)
 // ==================================================
 
 class CallScreen extends StatefulWidget {
@@ -1235,6 +1236,8 @@ class CallScreen extends StatefulWidget {
 
 class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
   final WebRtcSignalingService _signaling = WebRtcSignalingService();
+  final AudioPlayer _dialTonePlayer = AudioPlayer();
+
   bool isMuted = false;
   bool isSpeaker = false;
   bool isConnected = false;
@@ -1258,60 +1261,74 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _initUiAnimations();
+    _playOutgoingRingingTone();
     _startWebRtcCall();
   }
 
+  Future<void> _playOutgoingRingingTone() async {
+    if (!widget.isIncoming) {
+      try {
+        await _dialTonePlayer.setReleaseMode(ReleaseMode.loop);
+        await _dialTonePlayer.play(
+          UrlSource('https://actions.google.com/sounds/v1/telephones/phone_ring.ogg'),
+        );
+      } catch (_) {}
+    }
+  }
+
+  void _stopOutgoingRingingTone() {
+    try {
+      _dialTonePlayer.stop();
+    } catch (_) {}
+  }
+
   void _initUiAnimations() {
-    // 1. Walking Animation: Continuous vertical bounce + gentle horizontal pacing
     _walkingBounceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 500),
     )..repeat(reverse: true);
 
-    _walkVerticalAnimation = Tween<double>(begin: 0.0, end: -18.0).animate(
+    _walkVerticalAnimation = Tween<double>(begin: 0.0, end: -15.0).animate(
       CurvedAnimation(parent: _walkingBounceController, curve: Curves.easeInOut),
     );
 
     _walkingHorizontalController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2400),
+      duration: const Duration(milliseconds: 2800),
     )..repeat(reverse: true);
 
-    _walkHorizontalAnimation = Tween<double>(begin: -45.0, end: 45.0).animate(
+    _walkHorizontalAnimation = Tween<double>(begin: -35.0, end: 35.0).animate(
       CurvedAnimation(parent: _walkingHorizontalController, curve: Curves.easeInOut),
     );
 
-    // 2. Thought Bubble Floating/Pulsing Animation
     _thoughtBubbleController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
 
-    _thoughtScaleAnimation = Tween<double>(begin: 0.94, end: 1.06).animate(
+    _thoughtScaleAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _thoughtBubbleController, curve: Curves.easeInOutSine),
     );
 
-    // 3. Connected Entry Animation: Slide together & meet
     _connectedEntryController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 800),
     );
 
     _leftAvatarSlideAnimation = Tween<Offset>(
-      begin: const Offset(-1.5, 0),
+      begin: const Offset(-1.2, 0),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _connectedEntryController, curve: Curves.easeOutBack));
+    ).animate(CurvedAnimation(parent: _connectedEntryController, curve: Curves.easeOutCubic));
 
     _rightAvatarSlideAnimation = Tween<Offset>(
-      begin: const Offset(1.5, 0),
+      begin: const Offset(1.2, 0),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _connectedEntryController, curve: Curves.easeOutBack));
+    ).animate(CurvedAnimation(parent: _connectedEntryController, curve: Curves.easeOutCubic));
 
-    // 4. Talking Pulse Glow
     _talkingPulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
+    );
   }
 
   Future<void> _startWebRtcCall() async {
@@ -1384,8 +1401,16 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
 
   void _triggerConnectedState() {
     if (!isConnected && mounted) {
+      _stopOutgoingRingingTone();
+
+      // Free CPU & GPU cycles to eliminate call lag
+      _walkingBounceController.stop();
+      _walkingHorizontalController.stop();
+      _thoughtBubbleController.stop();
+
       setState(() => isConnected = true);
       _connectedEntryController.forward();
+      _talkingPulseController.repeat(reverse: true);
 
       callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (mounted) setState(() => callSeconds++);
@@ -1415,6 +1440,8 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _stopOutgoingRingingTone();
+    _dialTonePlayer.dispose();
     callTimer?.cancel();
     _walkingBounceController.dispose();
     _walkingHorizontalController.dispose();
@@ -1430,35 +1457,37 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
   Widget _buildCallerWalkingScene(AvatarCharacter myAvatar) {
     return AnimatedBuilder(
       animation: Listenable.merge([_walkingBounceController, _walkingHorizontalController]),
-      builder: (context, child) {
+      child: Container(
+        width: 220,
+        height: 320,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: myAvatar.themeColor.withOpacity(0.25),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: ModelViewer(
+          key: ValueKey('walking_${myAvatar.modelPath}'),
+          src: myAvatar.modelPath,
+          loading: Loading.eager,
+          alt: 'Walking Avatar',
+          autoRotate: false,
+          cameraControls: false,
+          disableZoom: true,
+          backgroundColor: Colors.transparent,
+        ),
+      ),
+      builder: (context, cachedModel) {
         return Transform.translate(
           offset: Offset(_walkHorizontalAnimation.value, _walkVerticalAnimation.value),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 220,
-                height: 320,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: myAvatar.themeColor.withOpacity(0.25),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: ModelViewer(
-                  key: ValueKey('walking_${myAvatar.modelPath}'),
-                  src: myAvatar.modelPath,
-                  alt: 'Walking Avatar',
-                  autoRotate: false,
-                  cameraControls: false,
-                  disableZoom: true,
-                  backgroundColor: Colors.transparent,
-                ),
-              ),
+              cachedModel!,
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -1470,10 +1499,10 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.directions_walk, color: Colors.orangeAccent, size: 18),
+                    const Icon(Icons.ring_volume, color: Colors.orangeAccent, size: 18),
                     const SizedBox(width: 6),
                     Text(
-                      'Walking towards ${widget.peerName}...',
+                      'Calling ${widget.peerName}...',
                       style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                   ],
@@ -1490,7 +1519,6 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Static avatar standing straight
         Container(
           width: 240,
           height: 340,
@@ -1506,6 +1534,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
           child: ModelViewer(
             key: ValueKey('receiver_idle_${myAvatar.modelPath}'),
             src: myAvatar.modelPath,
+            loading: Loading.eager,
             alt: 'Standing Avatar',
             autoRotate: false,
             cameraControls: false,
@@ -1513,8 +1542,6 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
             backgroundColor: Colors.transparent,
           ),
         ),
-
-        // Animated Thought Bubble over the avatar's head
         Positioned(
           top: 15,
           child: ScaleTransition(
@@ -1558,63 +1585,47 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Both avatars side by side
         Expanded(
           child: Row(
             children: [
-              // Left Avatar (Slide from left)
+              // Left Avatar
               Expanded(
                 child: SlideTransition(
                   position: _leftAvatarSlideAnimation,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      AnimatedBuilder(
-                        animation: _talkingPulseController,
-                        builder: (context, child) {
-                          return Container(
-                            width: 150,
-                            height: 220,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: myAvatar.themeColor.withOpacity(
-                                  isMuted ? 0.2 : 0.3 + (_talkingPulseController.value * 0.5),
-                                ),
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: myAvatar.themeColor.withOpacity(
-                                    isMuted ? 0.0 : 0.15 * _talkingPulseController.value,
-                                  ),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(18),
-                              child: ModelViewer(
-                                key: ValueKey('left_connected_${myAvatar.modelPath}'),
-                                src: myAvatar.modelPath,
-                                alt: 'My Avatar',
-                                autoRotate: false,
-                                cameraControls: false,
-                                disableZoom: true,
-                                backgroundColor: const Color(0xFF16161C),
-                              ),
-                            ),
-                          );
-                        },
+                      Container(
+                        width: 145,
+                        height: 210,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: myAvatar.themeColor.withOpacity(0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: ModelViewer(
+                            key: ValueKey('left_${myAvatar.modelPath}'),
+                            src: myAvatar.modelPath,
+                            loading: Loading.eager,
+                            alt: 'My Avatar',
+                            autoRotate: false,
+                            cameraControls: false,
+                            disableZoom: true,
+                            backgroundColor: const Color(0xFF16161C),
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       Text(
                         'You (${myAvatar.name})',
                         style: TextStyle(
                           color: myAvatar.themeColor,
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 13,
                         ),
                       ),
                     ],
@@ -1622,76 +1633,61 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                 ),
               ),
 
-              // Meeting Interaction Heart / Connection Center Icon
+              // Middle Connected Badge
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(8),
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       color: Color(0xFF1E1E1E),
                     ),
-                    child: const Icon(Icons.handshake, color: Colors.greenAccent, size: 24),
+                    child: const Icon(Icons.handshake, color: Colors.greenAccent, size: 22),
                   ),
-                  const SizedBox(height: 6),
-                  const Text('Connected', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  const Text('Talking', style: TextStyle(color: Colors.white54, fontSize: 11)),
                 ],
               ),
 
-              // Right Avatar (Slide from right)
+              // Right Avatar
               Expanded(
                 child: SlideTransition(
                   position: _rightAvatarSlideAnimation,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      AnimatedBuilder(
-                        animation: _talkingPulseController,
-                        builder: (context, child) {
-                          return Container(
-                            width: 150,
-                            height: 220,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: peerAvatar.themeColor.withOpacity(
-                                  0.3 + (_talkingPulseController.value * 0.5),
-                                ),
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: peerAvatar.themeColor.withOpacity(
-                                    0.15 * _talkingPulseController.value,
-                                  ),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(18),
-                              child: ModelViewer(
-                                key: ValueKey('right_connected_${peerAvatar.modelPath}'),
-                                src: peerAvatar.modelPath,
-                                alt: 'Peer Avatar',
-                                autoRotate: false,
-                                cameraControls: false,
-                                disableZoom: true,
-                                backgroundColor: const Color(0xFF16161C),
-                              ),
-                            ),
-                          );
-                        },
+                      Container(
+                        width: 145,
+                        height: 210,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: peerAvatar.themeColor.withOpacity(0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: ModelViewer(
+                            key: ValueKey('right_${peerAvatar.modelPath}'),
+                            src: peerAvatar.modelPath,
+                            loading: Loading.eager,
+                            alt: 'Peer Avatar',
+                            autoRotate: false,
+                            cameraControls: false,
+                            disableZoom: true,
+                            backgroundColor: const Color(0xFF16161C),
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       Text(
                         '${widget.peerName} (${peerAvatar.name})',
                         style: TextStyle(
                           color: peerAvatar.themeColor,
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 13,
                         ),
                       ),
                     ],
@@ -1704,20 +1700,20 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
 
         // Sitting & Talking status pill
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
             color: const Color(0xFF1E1E1E),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(color: Colors.white12),
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.airline_seat_recline_normal, color: Colors.blueAccent, size: 18),
+              Icon(Icons.airline_seat_recline_normal, color: Colors.blueAccent, size: 16),
               SizedBox(width: 6),
               Text(
                 'Sitting together & speaking...',
-                style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -1945,6 +1941,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 child: ModelViewer(
                                   key: ValueKey('tile_${currentAvatar.modelPath}'),
                                   src: currentAvatar.modelPath,
+                                  loading: Loading.eager,
                                   alt: 'Avatar',
                                   autoRotate: true,
                                   cameraControls: false,
@@ -2035,6 +2032,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       child: ModelViewer(
                                         key: ValueKey('peer_${peerUid}_${peerAvatar.modelPath}'),
                                         src: peerAvatar.modelPath,
+                                        loading: Loading.eager,
                                         alt: 'Peer Avatar',
                                         autoRotate: false,
                                         cameraControls: false,
@@ -2144,6 +2142,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   child: ModelViewer(
                                     key: ValueKey('suggest_${peerUid}_${peerAvatar.modelPath}'),
                                     src: peerAvatar.modelPath,
+                                    loading: Loading.eager,
                                     alt: 'Avatar',
                                     autoRotate: false,
                                     cameraControls: false,
@@ -2332,6 +2331,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                                 child: ModelViewer(
                                   key: ValueKey('newchat_${peerUid}_${peerAvatar.modelPath}'),
                                   src: peerAvatar.modelPath,
+                                  loading: Loading.eager,
                                   alt: 'Avatar',
                                   autoRotate: false,
                                   cameraControls: false,
@@ -2460,9 +2460,11 @@ class UserProfileViewScreen extends StatelessWidget {
                       child: ModelViewer(
                         key: ValueKey('preview_${peerAvatar.modelPath}'),
                         src: peerAvatar.modelPath,
+                        loading: Loading.eager,
                         alt: '$name Avatar',
                         autoRotate: true,
                         cameraControls: true,
+                        disableZoom: true,
                         backgroundColor: const Color(0xFF1E1E1E),
                       ),
                     ),
@@ -3008,7 +3010,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  Future<void> sendMessage() async {
+  Future<sendMessage() async {
     final text = messageController.text.trim();
     if (text.isEmpty || isSendingMessage) return;
 
@@ -3151,6 +3153,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     child: ModelViewer(
                       key: ValueKey('header_${headerAvatar.modelPath}'),
                       src: headerAvatar.modelPath,
+                      loading: Loading.eager,
                       alt: 'Avatar',
                       autoRotate: true,
                       cameraControls: false,
@@ -3344,6 +3347,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   child: ModelViewer(
                     key: ValueKey('chat_${currentAvatar.modelPath}'),
                     src: currentAvatar.modelPath,
+                    loading: Loading.eager,
                     alt: 'Avatar 3D Preview',
                     autoRotate: true,
                     cameraControls: false,
@@ -3616,6 +3620,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                   alt: 'Character Preview',
                   autoRotate: true,
                   cameraControls: true,
+                  disableZoom: true,
                   backgroundColor: const Color(0xFF1E1E1E),
                 ),
               ),
@@ -3859,9 +3864,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: ModelViewer(
                         key: ValueKey('profile_static_${currentAvatar.modelPath}'),
                         src: currentAvatar.modelPath,
+                        loading: Loading.eager,
                         alt: 'Avatar Profile',
                         autoRotate: true,
                         cameraControls: false,
+                        disableZoom: true,
                         backgroundColor: const Color(0xFF1E1E1E),
                       ),
                     ),
