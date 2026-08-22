@@ -72,11 +72,9 @@ Future<void> main() async {
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // Do not block the first frame on FCM permission/token work.
   await AvatarState.loadSavedAvatar();
   runApp(const AvatarApp());
 
-  // Notifications are initialized after the UI is already visible.
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(NotificationService.initialize());
   });
@@ -956,9 +954,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int currentIndex = 0;
   StreamSubscription? callSubscription;
 
-  // Build tabs lazily. The old IndexedStack created Home + Chat + Profile
-  // (including all 3D viewers and Firestore streams) immediately at startup.
-  // This keeps the same UI and state while making app launch lighter.
   final List<Widget?> pages = [null, null, null];
 
   Widget _pageAt(int index) {
@@ -1079,9 +1074,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       await FlutterCallkitIncoming.showCallkitIncoming(params);
-    } catch (_) {
-      // Keep Firestore call state alive even if CallKit is unavailable.
-    }
+    } catch (_) {}
   }
 
   @override
@@ -1216,7 +1209,7 @@ class HomeTab extends StatelessWidget {
 }
 
 // ==================================================
-// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN
+// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN (ANIMATED)
 // ==================================================
 
 class CallScreen extends StatefulWidget {
@@ -1246,6 +1239,8 @@ class _CallScreenState extends State<CallScreen> {
   bool isConnected = false;
   int callSeconds = 0;
   Timer? callTimer;
+  Timer? animationSequenceTimer;
+  String connectedAnimation = 'Wave';
 
   @override
   void initState() {
@@ -1261,14 +1256,13 @@ class _CallScreenState extends State<CallScreen> {
         callId: widget.callId!,
         onRemoteStreamReceived: (stream) {
           unawaited(FlutterCallkitIncoming.setCallConnected(widget.callId!));
-          _startTimer();
+          _startConnectedState();
         },
         onCallEnded: () {
           unawaited(FlutterCallkitIncoming.endAllCalls());
           if (mounted) Navigator.pop(context);
         },
       );
-      _startTimer();
       return;
     }
 
@@ -1285,7 +1279,7 @@ class _CallScreenState extends State<CallScreen> {
         if (realCallId != null) {
           unawaited(FlutterCallkitIncoming.setCallConnected(realCallId!));
         }
-        _startTimer();
+        _startConnectedState();
       },
       onCallEnded: () {
         unawaited(FlutterCallkitIncoming.endAllCalls());
@@ -1293,8 +1287,6 @@ class _CallScreenState extends State<CallScreen> {
       },
     );
 
-    // Start the native outgoing-call UI after the real Firestore call id exists.
-    // Android uses the phone's default ringtone for the calling UI.
     try {
       final outgoingParams = CallKitParams(
         id: realCallId!,
@@ -1324,11 +1316,25 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {}
   }
 
-  void _startTimer() {
+  void _startConnectedState() {
     if (!isConnected && mounted) {
-      setState(() => isConnected = true);
+      setState(() {
+        isConnected = true;
+        connectedAnimation = 'Wave';
+      });
+
       callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (mounted) setState(() => callSeconds++);
+      });
+
+      // 3.5 seconds handshake / wave -> both avatars sit down and talk
+      animationSequenceTimer?.cancel();
+      animationSequenceTimer = Timer(const Duration(milliseconds: 3500), () {
+        if (mounted) {
+          setState(() {
+            connectedAnimation = 'Sit_Talk';
+          });
+        }
       });
     }
   }
@@ -1356,54 +1362,189 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void dispose() {
     callTimer?.cancel();
+    animationSequenceTimer?.cancel();
     unawaited(_signaling.hangUp());
     unawaited(FlutterCallkitIncoming.endAllCalls());
     super.dispose();
   }
 
+  Widget _buildAvatarScene(AvatarCharacter myAvatar, AvatarCharacter peerAvatar) {
+    if (!isConnected) {
+      if (!widget.isIncoming) {
+        // CALLER SCREEN: Walk continuously until receiver picks up
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(
+              child: ModelViewer(
+                key: ValueKey('walk_${myAvatar.modelPath}'),
+                src: myAvatar.modelPath,
+                alt: 'Walking Avatar',
+                autoPlay: true,
+                animationName: 'Walk',
+                cameraControls: false,
+                disableZoom: true,
+                backgroundColor: const Color(0xFF101014),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Walking to ${widget.peerName}...',
+              style: const TextStyle(color: Colors.white60, fontSize: 14),
+            ),
+          ],
+        );
+      } else {
+        // RECEIVER SCREEN: Stands straight with Thought Bubble of caller
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            ModelViewer(
+              key: ValueKey('idle_${myAvatar.modelPath}'),
+              src: myAvatar.modelPath,
+              alt: 'Standing Avatar',
+              autoPlay: true,
+              animationName: 'Idle',
+              cameraControls: false,
+              disableZoom: true,
+              backgroundColor: const Color(0xFF101014),
+            ),
+            Positioned(
+              top: 25,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.92),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud, color: myAvatar.themeColor, size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Thinking of ${widget.peerName}... 💭',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+    }
+
+    // CONNECTED SCREEN: Both avatars together (Wave/Handshake -> Sit & Talk)
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ModelViewer(
+                        key: ValueKey('left_${myAvatar.modelPath}_$connectedAnimation'),
+                        src: myAvatar.modelPath,
+                        alt: 'My Avatar',
+                        autoPlay: true,
+                        animationName: connectedAnimation,
+                        cameraControls: false,
+                        disableZoom: true,
+                        backgroundColor: const Color(0xFF101014),
+                      ),
+                    ),
+                    Text(
+                      'You (${myAvatar.name})',
+                      style: TextStyle(color: myAvatar.themeColor, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ModelViewer(
+                        key: ValueKey('right_${peerAvatar.modelPath}_$connectedAnimation'),
+                        src: peerAvatar.modelPath,
+                        alt: 'Peer Avatar',
+                        autoPlay: true,
+                        animationName: connectedAnimation,
+                        cameraControls: false,
+                        disableZoom: true,
+                        backgroundColor: const Color(0xFF101014),
+                      ),
+                    ),
+                    Text(
+                      '${widget.peerName} (${peerAvatar.name})',
+                      style: TextStyle(color: peerAvatar.themeColor, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            connectedAnimation == 'Wave'
+                ? '🤝 Greeting each other...'
+                : '💬 Sitting & Talking together',
+            style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final avatarObj = AvatarState.getByName(widget.peerAvatar);
+    final myAvatarObj = AvatarState.current;
+    final peerAvatarObj = AvatarState.getByName(widget.peerAvatar);
 
     return Scaffold(
       backgroundColor: const Color(0xFF101014),
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 40),
+            const SizedBox(height: 20),
             Text(
               widget.peerName,
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
-              isConnected ? 'Connected • ${_formatTime(callSeconds)}' : 'Calling...',
+              isConnected
+                  ? 'Connected • ${_formatTime(callSeconds)}'
+                  : (widget.isIncoming ? 'Incoming Call...' : 'Calling...'),
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 15,
                 color: isConnected ? Colors.greenAccent : Colors.white60,
               ),
             ),
-            const Spacer(),
-            Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF1E1E1E),
-                border: Border.all(color: avatarObj.themeColor, width: 3),
-              ),
-              child: ClipOval(
-                child: ModelViewer(
-                  key: ValueKey('call_${avatarObj.modelPath}'),
-                  src: avatarObj.modelPath,
-                  alt: 'Caller Avatar',
-                  autoRotate: true,
-                  cameraControls: false,
-                  backgroundColor: const Color(0xFF1E1E1E),
-                ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: Center(
+                child: _buildAvatarScene(myAvatarObj, peerAvatarObj),
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -1438,7 +1579,7 @@ class _CallScreenState extends State<CallScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 50),
+            const SizedBox(height: 35),
           ],
         ),
       ),
@@ -2461,7 +2602,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   void _onTextChanged(String text) {
     if (isAvatarFriend) return;
 
-    // Debounce Firestore writes instead of writing on every key press.
     typingWriteTimer?.cancel();
     if (text.trim().isNotEmpty) {
       typingWriteTimer = Timer(const Duration(milliseconds: 600), () {
@@ -3110,8 +3250,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
         final messages = snapshot.data!.docs;
 
-        // Scroll only when the message count changes. This prevents every
-        // Firestore rebuild (typing/read updates) from looking like a reload.
         if (_lastRenderedMessageCount != messages.length) {
           _lastRenderedMessageCount = messages.length;
           _scrollToBottom();
@@ -3136,82 +3274,81 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               child: Align(
                 alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                 child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: type == 'image'
-                            ? const EdgeInsets.all(4)
-                            : (type == 'audio'
-                                ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
-                                : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
-                        decoration: BoxDecoration(
-                          color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                          children: [
-                            if (type == 'image')
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => FullImageViewScreen(imageData: imgPayload),
-                                    ),
-                                  );
-                                },
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(14),
-                                  child: imgPayload.startsWith('http')
-                                      ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
-                                      : (() {
-                                          final bytes = _decodeImageCached(doc.id, imgPayload);
-                                          return bytes != null
-                                              ? Image.memory(bytes, width: 220, height: 220, fit: BoxFit.cover, gaplessPlayback: true)
-                                              : const SizedBox(width: 220, height: 220, child: Icon(Icons.broken_image));
-                                        })(),
-                                ),
-                              )
-                            else if (type == 'audio')
-                              VoiceNoteBubble(key: ValueKey(doc.id), audioBase64: audioPayload, isMe: isMe)
-                            else
-                              Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
-
-                            if (isMe) ...[
-                              const SizedBox(height: 3),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    isRead ? Icons.done_all : Icons.done,
-                                    size: 15,
-                                    color: isRead ? Colors.lightBlueAccent : Colors.white54,
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: type == 'image'
+                          ? const EdgeInsets.all(4)
+                          : (type == 'audio'
+                              ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+                              : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
+                      decoration: BoxDecoration(
+                        color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        children: [
+                          if (type == 'image')
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FullImageViewScreen(imageData: imgPayload),
                                   ),
-                                ],
+                                );
+                              },
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: imgPayload.startsWith('http')
+                                    ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
+                                    : (() {
+                                        final bytes = _decodeImageCached(doc.id, imgPayload);
+                                        return bytes != null
+                                            ? Image.memory(bytes, width: 220, height: 220, fit: BoxFit.cover, gaplessPlayback: true)
+                                            : const SizedBox(width: 220, height: 220, child: Icon(Icons.broken_image));
+                                      })(),
                               ),
-                            ],
+                            )
+                          else if (type == 'audio')
+                            VoiceNoteBubble(key: ValueKey(doc.id), audioBase64: audioPayload, isMe: isMe)
+                          else
+                            Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
+
+                          if (isMe) ...[
+                            const SizedBox(height: 3),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isRead ? Icons.done_all : Icons.done,
+                                  size: 15,
+                                  color: isRead ? Colors.lightBlueAccent : Colors.white54,
+                                ),
+                              ],
+                            ),
                           ],
+                        ],
+                      ),
+                    ),
+                    if (reaction.isNotEmpty)
+                      Positioned(
+                        bottom: 2,
+                        right: isMe ? 4 : null,
+                        left: !isMe ? 4 : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2A2A),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white24, width: 1),
+                          ),
+                          child: Text(reaction, style: const TextStyle(fontSize: 13)),
                         ),
                       ),
-                      if (reaction.isNotEmpty)
-                        Positioned(
-                          bottom: 2,
-                          right: isMe ? 4 : null,
-                          left: !isMe ? 4 : null,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2A2A2A),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.white24, width: 1),
-                            ),
-                            child: Text(reaction, style: const TextStyle(fontSize: 13)),
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
             );
