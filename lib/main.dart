@@ -3010,7 +3010,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  Future<sendMessage() async {
+  Future<void> sendMessage() async {
     final text = messageController.text.trim();
     if (text.isEmpty || isSendingMessage) return;
 
@@ -3868,7 +3868,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         alt: 'Avatar Profile',
                         autoRotate: true,
                         cameraControls: false,
-                        disableZoom: true,
                         backgroundColor: const Color(0xFF1E1E1E),
                       ),
                     ),
