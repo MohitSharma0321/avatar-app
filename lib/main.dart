@@ -71,9 +71,15 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  await NotificationService.initialize();
+
+  // Do not block the first frame on FCM permission/token work.
   await AvatarState.loadSavedAvatar();
   runApp(const AvatarApp());
+
+  // Notifications are initialized after the UI is already visible.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(NotificationService.initialize());
+  });
 }
 
 // ==================================================
@@ -84,8 +90,17 @@ class NotificationService {
   static final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
+  static bool _initialized = false;
+  static StreamSubscription<String>? _tokenSubscription;
+  static StreamSubscription<RemoteMessage>? _messageSubscription;
 
   static Future<void> initialize() async {
+    if (_initialized) {
+      await saveCurrentToken();
+      return;
+    }
+    _initialized = true;
+
     await _fcm.requestPermission(
       alert: true,
       badge: true,
@@ -104,11 +119,11 @@ class NotificationService {
       await saveTokenToFirestore(token);
     }
 
-    _fcm.onTokenRefresh.listen((newToken) {
+    _tokenSubscription = _fcm.onTokenRefresh.listen((newToken) {
       saveTokenToFirestore(newToken);
     });
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    _messageSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       RemoteNotification? notification = message.notification;
       AndroidNotification? android = message.notification?.android;
 
@@ -129,6 +144,13 @@ class NotificationService {
         );
       }
     });
+  }
+
+  static Future<void> saveCurrentToken() async {
+    try {
+      final token = await _fcm.getToken();
+      if (token != null) await saveTokenToFirestore(token);
+    } catch (_) {}
   }
 
   static Future<void> saveTokenToFirestore(String token) async {
@@ -701,6 +723,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'createdAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
         await NotificationService.initialize();
+        await NotificationService.saveCurrentToken();
       }
 
       if (!mounted) return;
@@ -831,6 +854,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (credential.user != null) {
         await ensureUserDoc(credential.user!);
         await NotificationService.initialize();
+        await NotificationService.saveCurrentToken();
       }
 
       if (!mounted) return;
@@ -1016,73 +1040,48 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _showIncomingCallDialog(Map<String, dynamic> callData, String callId) {
-    final callerAvatar = AvatarState.getByName(callData['callerAvatar']);
+  final Set<String> _shownIncomingCallIds = <String>{};
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: Text('${callData['callerName'] ?? 'User'} is Calling...'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: callerAvatar.themeColor, width: 2),
-              ),
-              child: ClipOval(
-                child: ModelViewer(
-                  key: ValueKey('incoming_${callerAvatar.modelPath}'),
-                  src: callerAvatar.modelPath,
-                  alt: 'Caller Avatar',
-                  autoRotate: true,
-                  cameraControls: false,
-                  backgroundColor: const Color(0xFF1E1E1E),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text('Incoming Real-time Voice Call'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              FirebaseFirestore.instance
-                  .collection('calls')
-                  .doc(callId)
-                  .update({'status': 'ended'});
-              Navigator.pop(ctx);
-            },
-            child: const Text('Decline', style: TextStyle(color: Colors.redAccent)),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CallScreen(
-                    peerName: callData['callerName'] ?? 'User',
-                    peerAvatar: callData['callerAvatar'] ?? 'ORANGE',
-                    peerUid: callData['callerId'] ?? '',
-                    callId: callId,
-                    isIncoming: true,
-                  ),
-                ),
-              );
-            },
-            child: const Text('Accept'),
-          ),
-        ],
+  Future<void> _showIncomingCallDialog(
+      Map<String, dynamic> callData, String callId) async {
+    if (_shownIncomingCallIds.contains(callId)) return;
+    _shownIncomingCallIds.add(callId);
+
+    final callerName = callData['callerName'] ?? 'User';
+    final callerAvatar = callData['callerAvatar'] ?? 'ORANGE';
+    final callerId = callData['callerId'] ?? '';
+
+    final params = CallKitParams(
+      id: callId,
+      nameCaller: callerName,
+      appName: 'Avatar',
+      avatar: 'https://via.placeholder.com/100',
+      handle: '$callerAvatar Avatar Voice Call',
+      type: 0,
+      textAccept: 'Accept',
+      textDecline: 'Decline',
+      duration: 30000,
+      extra: <String, dynamic>{
+        'callId': callId,
+        'callerName': callerName,
+        'callerAvatar': callerAvatar,
+        'callerId': callerId,
+      },
+      android: const AndroidParams(
+        isCustomNotification: true,
+        isShowLogo: false,
+        ringtonePath: 'system_ringtone_default',
+        backgroundColor: '#101014',
+        actionColor: '#4CAF50',
+        incomingCallNotificationChannelName: 'Incoming Call',
       ),
     );
+
+    try {
+      await FlutterCallkitIncoming.showCallkitIncoming(params);
+    } catch (_) {
+      // Keep Firestore call state alive even if CallKit is unavailable.
+    }
   }
 
   @override
@@ -1176,6 +1175,7 @@ class HomeTab extends StatelessWidget {
                     child: ModelViewer(
                       key: ValueKey('main_${character.modelPath}'),
                       src: character.modelPath,
+                      loading: Loading.eager,
                       alt: 'My 3D Avatar',
                       autoRotate: true,
                       cameraControls: true,
@@ -1260,32 +1260,68 @@ class _CallScreenState extends State<CallScreen> {
       await _signaling.answerCall(
         callId: widget.callId!,
         onRemoteStreamReceived: (stream) {
+          unawaited(FlutterCallkitIncoming.setCallConnected(widget.callId!));
           _startTimer();
         },
         onCallEnded: () {
-          FlutterCallkitIncoming.endAllCalls();
+          unawaited(FlutterCallkitIncoming.endAllCalls());
           if (mounted) Navigator.pop(context);
         },
       );
       _startTimer();
-    } else {
-      final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-      final currentName = FirebaseAuth.instance.currentUser?.displayName ?? 'User';
-
-      await _signaling.createCall(
-        callerId: currentUid,
-        calleeId: widget.peerUid,
-        callerName: currentName,
-        callerAvatar: AvatarState.current.name,
-        onRemoteStreamReceived: (stream) {
-          _startTimer();
-        },
-        onCallEnded: () {
-          FlutterCallkitIncoming.endAllCalls();
-          if (mounted) Navigator.pop(context);
-        },
-      );
+      return;
     }
+
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final currentName = FirebaseAuth.instance.currentUser?.displayName ?? 'User';
+
+    String? realCallId;
+    realCallId = await _signaling.createCall(
+      callerId: currentUid,
+      calleeId: widget.peerUid,
+      callerName: currentName,
+      callerAvatar: AvatarState.current.name,
+      onRemoteStreamReceived: (stream) {
+        if (realCallId != null) {
+          unawaited(FlutterCallkitIncoming.setCallConnected(realCallId!));
+        }
+        _startTimer();
+      },
+      onCallEnded: () {
+        unawaited(FlutterCallkitIncoming.endAllCalls());
+        if (mounted) Navigator.pop(context);
+      },
+    );
+
+    // Start the native outgoing-call UI after the real Firestore call id exists.
+    // Android uses the phone's default ringtone for the calling UI.
+    try {
+      final outgoingParams = CallKitParams(
+        id: realCallId!,
+        nameCaller: widget.peerName,
+        appName: 'Avatar',
+        handle: 'Avatar Voice Call',
+        type: 1,
+        extra: <String, dynamic>{
+          'callId': realCallId!,
+          'peerUid': widget.peerUid,
+          'callerName': currentName,
+          'callerAvatar': AvatarState.current.name,
+        },
+        callingNotification: const NotificationParams(
+          showNotification: true,
+          isShowCallback: true,
+          subtitle: 'Calling...',
+          callbackText: 'Hang Up',
+        ),
+        android: const AndroidParams(
+          isCustomNotification: true,
+          isShowCallID: false,
+          ringtonePath: 'system_ringtone_default',
+        ),
+      );
+      await FlutterCallkitIncoming.startCall(outgoingParams);
+    } catch (_) {}
   }
 
   void _startTimer() {
@@ -1320,8 +1356,8 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void dispose() {
     callTimer?.cancel();
-    _signaling.hangUp();
-    FlutterCallkitIncoming.endAllCalls();
+    unawaited(_signaling.hangUp());
+    unawaited(FlutterCallkitIncoming.endAllCalls());
     super.dispose();
   }
 
@@ -2375,6 +2411,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   int recordingSeconds = 0;
   Timer? recordingTimer;
   bool isUploadingMedia = false;
+  bool isSendingMessage = false;
   bool isVoiceEnabled = true;
   Timer? typingDebounceTimer;
   Timer? typingWriteTimer;
@@ -2427,7 +2464,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     // Debounce Firestore writes instead of writing on every key press.
     typingWriteTimer?.cancel();
     if (text.trim().isNotEmpty) {
-      typingWriteTimer = Timer(const Duration(milliseconds: 350), () {
+      typingWriteTimer = Timer(const Duration(milliseconds: 600), () {
         _updateTypingStatus(true);
       });
     } else {
@@ -2613,47 +2650,53 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  void sendMessage() async {
+  Future<void> sendMessage() async {
     final text = messageController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || isSendingMessage) return;
 
+    setState(() => isSendingMessage = true);
     messageController.clear();
     _updateTypingStatus(false);
 
-    if (isAvatarFriend) {
-      setState(() {
-        localMessages.add({'sender': 'user', 'type': 'text', 'text': text});
-        isLoading = true;
-      });
-      _saveChatHistory();
-      _scrollToBottom();
+    try {
+      if (isAvatarFriend) {
+        setState(() {
+          localMessages.add({'sender': 'user', 'type': 'text', 'text': text});
+          isLoading = true;
+        });
+        await _saveChatHistory();
+        _scrollToBottom();
 
-      final reply = await askAvatarFriend(text);
+        final reply = await askAvatarFriend(text);
+        if (!mounted) return;
 
-      if (!mounted) return;
-
-      setState(() {
-        localMessages.add({'sender': 'bot', 'type': 'text', 'text': reply});
-        isLoading = false;
-      });
-      _saveChatHistory();
-      _scrollToBottom();
-      _speak(reply);
-    } else {
-      await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(chatRoomId)
-          .collection('messages')
-          .add({
-        'senderId': currentUid,
-        'receiverId': widget.peerUid,
-        'type': 'text',
-        'text': text,
-        'isRead': false,
-        'reaction': '',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-      _scrollToBottom();
+        setState(() {
+          localMessages.add({'sender': 'bot', 'type': 'text', 'text': reply});
+          isLoading = false;
+        });
+        await _saveChatHistory();
+        _scrollToBottom();
+        unawaited(_speak(reply));
+      } else {
+        await FirebaseFirestore.instance
+            .collection('chats')
+            .doc(chatRoomId)
+            .collection('messages')
+            .add({
+          'senderId': currentUid,
+          'receiverId': widget.peerUid,
+          'type': 'text',
+          'text': text,
+          'isRead': false,
+          'reaction': '',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) _showMessage(context, 'Message send failed. Try again.');
+    } finally {
+      if (mounted) setState(() => isSendingMessage = false);
     }
   }
 
@@ -2763,18 +2806,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   children: [
                     Text(widget.userName, style: const TextStyle(fontSize: 16)),
                     if (!isAvatarFriend)
-                      StreamBuilder<DocumentSnapshot>(
-                        stream: FirebaseFirestore.instance.collection('chats').doc(chatRoomId).snapshots(),
-                        builder: (context, snap) {
-                          final data = snap.data?.data() as Map<String, dynamic>?;
-                          final isPeerTyping = data?['typing_${widget.peerUid}'] == true;
-
-                          if (isPeerTyping) {
-                            return const Text('typing...', style: TextStyle(color: Colors.greenAccent, fontSize: 12));
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
+                      const Text('Voice & media chat', style: TextStyle(color: Colors.white54, fontSize: 12)),
                   ],
                 ),
               ],
@@ -3083,15 +3115,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         if (_lastRenderedMessageCount != messages.length) {
           _lastRenderedMessageCount = messages.length;
           _scrollToBottom();
-
-          // Mark incoming messages as read only when the message list changes,
-          // instead of issuing writes during every StreamBuilder rebuild.
-          for (final doc in messages) {
-            final d = doc.data() as Map<String, dynamic>;
-            if (d['receiverId'] == currentUid && d['isRead'] == false) {
-              doc.reference.update({'isRead': true});
-            }
-          }
         }
 
         return ListView.builder(
@@ -3110,10 +3133,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
             return GestureDetector(
               onLongPress: () => _showMessageOptions(doc, data, isMe),
-              child: AnimatedBubble(
-                child: Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Stack(
+              child: Align(
+                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: Stack(
                     clipBehavior: Clip.none,
                     children: [
                       Container(
@@ -3235,6 +3257,7 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                 child: ModelViewer(
                   key: ValueKey('selector_${activeChar.modelPath}'),
                   src: activeChar.modelPath,
+                  loading: Loading.eager,
                   alt: 'Character Preview',
                   autoRotate: true,
                   cameraControls: true,
@@ -3370,6 +3393,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      requestFocus: true,
       backgroundColor: const Color(0xFF1E1E1E),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -3389,6 +3413,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 18),
             TextField(
               controller: nameCtrl,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(labelText: 'Username', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 14),
@@ -3431,7 +3457,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      nameCtrl.dispose();
+      bioCtrl.dispose();
+    });
   }
 
   @override
