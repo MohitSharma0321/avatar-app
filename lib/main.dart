@@ -3412,7 +3412,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     : null,
               ),
               child: Row(
-                mainAxisSize: dynamic ? MainAxisSize.min : MainAxisSize.min,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Flexible(
                     child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 15)),
