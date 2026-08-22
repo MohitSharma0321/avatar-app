@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -73,9 +72,11 @@ Future<void> main() async {
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
+  // Do not block the first frame on FCM permission/token work.
   await AvatarState.loadSavedAvatar();
   runApp(const AvatarApp());
 
+  // Notifications are initialized after the UI is already visible.
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(NotificationService.initialize());
   });
@@ -955,6 +956,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int currentIndex = 0;
   StreamSubscription? callSubscription;
 
+  // Build tabs lazily. The old IndexedStack created Home + Chat + Profile
+  // (including all 3D viewers and Firestore streams) immediately at startup.
+  // This keeps the same UI and state while making app launch lighter.
   final List<Widget?> pages = [null, null, null];
 
   Widget _pageAt(int index) {
@@ -1075,7 +1079,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       await FlutterCallkitIncoming.showCallkitIncoming(params);
-    } catch (_) {}
+    } catch (_) {
+      // Keep Firestore call state alive even if CallKit is unavailable.
+    }
   }
 
   @override
@@ -1125,7 +1131,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ==================================================
-// HOME TAB (FAST LOAD AVATAR)
+// HOME TAB
 // ==================================================
 
 class HomeTab extends StatelessWidget {
@@ -1173,7 +1179,6 @@ class HomeTab extends StatelessWidget {
                       alt: 'My 3D Avatar',
                       autoRotate: true,
                       cameraControls: true,
-                      disableZoom: true,
                       backgroundColor: const Color(0xFF1E1E1E),
                     ),
                   ),
@@ -1211,7 +1216,7 @@ class HomeTab extends StatelessWidget {
 }
 
 // ==================================================
-// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN (LAG-FREE + CALLER RINGING TONE)
+// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN
 // ==================================================
 
 class CallScreen extends StatefulWidget {
@@ -1234,101 +1239,18 @@ class CallScreen extends StatefulWidget {
   State<CallScreen> createState() => _CallScreenState();
 }
 
-class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
+class _CallScreenState extends State<CallScreen> {
   final WebRtcSignalingService _signaling = WebRtcSignalingService();
-  final AudioPlayer _dialTonePlayer = AudioPlayer();
-
   bool isMuted = false;
   bool isSpeaker = false;
   bool isConnected = false;
   int callSeconds = 0;
   Timer? callTimer;
 
-  // Animation Controllers for UI Simulation
-  late AnimationController _walkingBounceController;
-  late AnimationController _walkingHorizontalController;
-  late AnimationController _thoughtBubbleController;
-  late AnimationController _connectedEntryController;
-  late AnimationController _talkingPulseController;
-
-  late Animation<double> _walkVerticalAnimation;
-  late Animation<double> _walkHorizontalAnimation;
-  late Animation<double> _thoughtScaleAnimation;
-  late Animation<Offset> _leftAvatarSlideAnimation;
-  late Animation<Offset> _rightAvatarSlideAnimation;
-
   @override
   void initState() {
     super.initState();
-    _initUiAnimations();
-    _playOutgoingRingingTone();
     _startWebRtcCall();
-  }
-
-  Future<void> _playOutgoingRingingTone() async {
-    if (!widget.isIncoming) {
-      try {
-        await _dialTonePlayer.setReleaseMode(ReleaseMode.loop);
-        await _dialTonePlayer.play(
-          UrlSource('https://actions.google.com/sounds/v1/telephones/phone_ring.ogg'),
-        );
-      } catch (_) {}
-    }
-  }
-
-  void _stopOutgoingRingingTone() {
-    try {
-      _dialTonePlayer.stop();
-    } catch (_) {}
-  }
-
-  void _initUiAnimations() {
-    _walkingBounceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    )..repeat(reverse: true);
-
-    _walkVerticalAnimation = Tween<double>(begin: 0.0, end: -15.0).animate(
-      CurvedAnimation(parent: _walkingBounceController, curve: Curves.easeInOut),
-    );
-
-    _walkingHorizontalController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2800),
-    )..repeat(reverse: true);
-
-    _walkHorizontalAnimation = Tween<double>(begin: -35.0, end: 35.0).animate(
-      CurvedAnimation(parent: _walkingHorizontalController, curve: Curves.easeInOut),
-    );
-
-    _thoughtBubbleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-
-    _thoughtScaleAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _thoughtBubbleController, curve: Curves.easeInOutSine),
-    );
-
-    _connectedEntryController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _leftAvatarSlideAnimation = Tween<Offset>(
-      begin: const Offset(-1.2, 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _connectedEntryController, curve: Curves.easeOutCubic));
-
-    _rightAvatarSlideAnimation = Tween<Offset>(
-      begin: const Offset(1.2, 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _connectedEntryController, curve: Curves.easeOutCubic));
-
-    _talkingPulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
   }
 
   Future<void> _startWebRtcCall() async {
@@ -1339,13 +1261,14 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
         callId: widget.callId!,
         onRemoteStreamReceived: (stream) {
           unawaited(FlutterCallkitIncoming.setCallConnected(widget.callId!));
-          _triggerConnectedState();
+          _startTimer();
         },
         onCallEnded: () {
           unawaited(FlutterCallkitIncoming.endAllCalls());
           if (mounted) Navigator.pop(context);
         },
       );
+      _startTimer();
       return;
     }
 
@@ -1362,7 +1285,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
         if (realCallId != null) {
           unawaited(FlutterCallkitIncoming.setCallConnected(realCallId!));
         }
-        _triggerConnectedState();
+        _startTimer();
       },
       onCallEnded: () {
         unawaited(FlutterCallkitIncoming.endAllCalls());
@@ -1370,6 +1293,8 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
       },
     );
 
+    // Start the native outgoing-call UI after the real Firestore call id exists.
+    // Android uses the phone's default ringtone for the calling UI.
     try {
       final outgoingParams = CallKitParams(
         id: realCallId!,
@@ -1399,19 +1324,9 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
     } catch (_) {}
   }
 
-  void _triggerConnectedState() {
+  void _startTimer() {
     if (!isConnected && mounted) {
-      _stopOutgoingRingingTone();
-
-      // Free CPU & GPU cycles to eliminate call lag
-      _walkingBounceController.stop();
-      _walkingHorizontalController.stop();
-      _thoughtBubbleController.stop();
-
       setState(() => isConnected = true);
-      _connectedEntryController.forward();
-      _talkingPulseController.repeat(reverse: true);
-
       callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (mounted) setState(() => callSeconds++);
       });
@@ -1440,325 +1355,66 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _stopOutgoingRingingTone();
-    _dialTonePlayer.dispose();
     callTimer?.cancel();
-    _walkingBounceController.dispose();
-    _walkingHorizontalController.dispose();
-    _thoughtBubbleController.dispose();
-    _connectedEntryController.dispose();
-    _talkingPulseController.dispose();
-
     unawaited(_signaling.hangUp());
     unawaited(FlutterCallkitIncoming.endAllCalls());
     super.dispose();
   }
 
-  Widget _buildCallerWalkingScene(AvatarCharacter myAvatar) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_walkingBounceController, _walkingHorizontalController]),
-      child: Container(
-        width: 220,
-        height: 320,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: myAvatar.themeColor.withOpacity(0.25),
-              blurRadius: 20,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: ModelViewer(
-          key: ValueKey('walking_${myAvatar.modelPath}'),
-          src: myAvatar.modelPath,
-          loading: Loading.eager,
-          alt: 'Walking Avatar',
-          autoRotate: false,
-          cameraControls: false,
-          disableZoom: true,
-          backgroundColor: Colors.transparent,
-        ),
-      ),
-      builder: (context, cachedModel) {
-        return Transform.translate(
-          offset: Offset(_walkHorizontalAnimation.value, _walkVerticalAnimation.value),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              cachedModel!,
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E1E1E),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: myAvatar.themeColor.withOpacity(0.4)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.ring_volume, color: Colors.orangeAccent, size: 18),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Calling ${widget.peerName}...',
-                      style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildReceiverThinkingScene(AvatarCharacter myAvatar) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Container(
-          width: 240,
-          height: 340,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: myAvatar.themeColor.withOpacity(0.2),
-                blurRadius: 24,
-              ),
-            ],
-          ),
-          child: ModelViewer(
-            key: ValueKey('receiver_idle_${myAvatar.modelPath}'),
-            src: myAvatar.modelPath,
-            loading: Loading.eager,
-            alt: 'Standing Avatar',
-            autoRotate: false,
-            cameraControls: false,
-            disableZoom: true,
-            backgroundColor: Colors.transparent,
-          ),
-        ),
-        Positioned(
-          top: 15,
-          child: ScaleTransition(
-            scale: _thoughtScaleAnimation,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.cloud, color: myAvatar.themeColor, size: 22),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Thinking of ${widget.peerName}... 💭',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildConnectedMeetScene(AvatarCharacter myAvatar, AvatarCharacter peerAvatar) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Row(
-            children: [
-              // Left Avatar
-              Expanded(
-                child: SlideTransition(
-                  position: _leftAvatarSlideAnimation,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 145,
-                        height: 210,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: myAvatar.themeColor.withOpacity(0.4),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: ModelViewer(
-                            key: ValueKey('left_${myAvatar.modelPath}'),
-                            src: myAvatar.modelPath,
-                            loading: Loading.eager,
-                            alt: 'My Avatar',
-                            autoRotate: false,
-                            cameraControls: false,
-                            disableZoom: true,
-                            backgroundColor: const Color(0xFF16161C),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'You (${myAvatar.name})',
-                        style: TextStyle(
-                          color: myAvatar.themeColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Middle Connected Badge
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF1E1E1E),
-                    ),
-                    child: const Icon(Icons.handshake, color: Colors.greenAccent, size: 22),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text('Talking', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                ],
-              ),
-
-              // Right Avatar
-              Expanded(
-                child: SlideTransition(
-                  position: _rightAvatarSlideAnimation,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 145,
-                        height: 210,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: peerAvatar.themeColor.withOpacity(0.4),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: ModelViewer(
-                            key: ValueKey('right_${peerAvatar.modelPath}'),
-                            src: peerAvatar.modelPath,
-                            loading: Loading.eager,
-                            alt: 'Peer Avatar',
-                            autoRotate: false,
-                            cameraControls: false,
-                            disableZoom: true,
-                            backgroundColor: const Color(0xFF16161C),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${widget.peerName} (${peerAvatar.name})',
-                        style: TextStyle(
-                          color: peerAvatar.themeColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // Sitting & Talking status pill
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E1E1E),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white12),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.airline_seat_recline_normal, color: Colors.blueAccent, size: 16),
-              SizedBox(width: 6),
-              Text(
-                'Sitting together & speaking...',
-                style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final myAvatarObj = AvatarState.current;
-    final peerAvatarObj = AvatarState.getByName(widget.peerAvatar);
+    final avatarObj = AvatarState.getByName(widget.peerAvatar);
 
     return Scaffold(
       backgroundColor: const Color(0xFF101014),
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 20),
+            const SizedBox(height: 40),
             Text(
               widget.peerName,
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
-              isConnected
-                  ? 'Connected • ${_formatTime(callSeconds)}'
-                  : (widget.isIncoming ? 'Incoming Call...' : 'Calling...'),
+              isConnected ? 'Connected • ${_formatTime(callSeconds)}' : 'Calling...',
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 16,
                 color: isConnected ? Colors.greenAccent : Colors.white60,
               ),
             ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: Center(
-                child: isConnected
-                    ? _buildConnectedMeetScene(myAvatarObj, peerAvatarObj)
-                    : (widget.isIncoming
-                        ? _buildReceiverThinkingScene(myAvatarObj)
-                        : _buildCallerWalkingScene(myAvatarObj)),
+            const Spacer(),
+            // Lightweight call avatar: 3D ModelViewer intentionally removed from calls.
+            // This prevents GLB loading during a call and keeps the call screen responsive.
+            Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF1E1E1E),
+                border: Border.all(color: avatarObj.themeColor, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: avatarObj.themeColor.withOpacity(0.20),
+                    blurRadius: 24,
+                    spreadRadius: 4,
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                backgroundColor: const Color(0xFF1E1E1E),
+                child: Icon(
+                  Icons.person_rounded,
+                  size: 110,
+                  color: avatarObj.themeColor,
+                ),
               ),
             ),
-            const SizedBox(height: 10),
+            /*
+              Old 3D call avatar removed intentionally.
+            
+            */
+            const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -1793,7 +1449,7 @@ class _CallScreenState extends State<CallScreen> with TickerProviderStateMixin {
                 ),
               ],
             ),
-            const SizedBox(height: 35),
+            const SizedBox(height: 50),
           ],
         ),
       ),
@@ -1941,7 +1597,6 @@ class _ChatScreenState extends State<ChatScreen> {
                                 child: ModelViewer(
                                   key: ValueKey('tile_${currentAvatar.modelPath}'),
                                   src: currentAvatar.modelPath,
-                                  loading: Loading.eager,
                                   alt: 'Avatar',
                                   autoRotate: true,
                                   cameraControls: false,
@@ -2032,7 +1687,6 @@ class _ChatScreenState extends State<ChatScreen> {
                                       child: ModelViewer(
                                         key: ValueKey('peer_${peerUid}_${peerAvatar.modelPath}'),
                                         src: peerAvatar.modelPath,
-                                        loading: Loading.eager,
                                         alt: 'Peer Avatar',
                                         autoRotate: false,
                                         cameraControls: false,
@@ -2142,7 +1796,6 @@ class _ChatScreenState extends State<ChatScreen> {
                                   child: ModelViewer(
                                     key: ValueKey('suggest_${peerUid}_${peerAvatar.modelPath}'),
                                     src: peerAvatar.modelPath,
-                                    loading: Loading.eager,
                                     alt: 'Avatar',
                                     autoRotate: false,
                                     cameraControls: false,
@@ -2331,7 +1984,6 @@ class _NewChatScreenState extends State<NewChatScreen> {
                                 child: ModelViewer(
                                   key: ValueKey('newchat_${peerUid}_${peerAvatar.modelPath}'),
                                   src: peerAvatar.modelPath,
-                                  loading: Loading.eager,
                                   alt: 'Avatar',
                                   autoRotate: false,
                                   cameraControls: false,
@@ -2460,11 +2112,9 @@ class UserProfileViewScreen extends StatelessWidget {
                       child: ModelViewer(
                         key: ValueKey('preview_${peerAvatar.modelPath}'),
                         src: peerAvatar.modelPath,
-                        loading: Loading.eager,
                         alt: '$name Avatar',
                         autoRotate: true,
                         cameraControls: true,
-                        disableZoom: true,
                         backgroundColor: const Color(0xFF1E1E1E),
                       ),
                     ),
@@ -2822,6 +2472,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   void _onTextChanged(String text) {
     if (isAvatarFriend) return;
 
+    // Debounce Firestore writes instead of writing on every key press.
     typingWriteTimer?.cancel();
     if (text.trim().isNotEmpty) {
       typingWriteTimer = Timer(const Duration(milliseconds: 600), () {
@@ -3153,7 +2804,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     child: ModelViewer(
                       key: ValueKey('header_${headerAvatar.modelPath}'),
                       src: headerAvatar.modelPath,
-                      loading: Loading.eager,
                       alt: 'Avatar',
                       autoRotate: true,
                       cameraControls: false,
@@ -3347,7 +2997,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   child: ModelViewer(
                     key: ValueKey('chat_${currentAvatar.modelPath}'),
                     src: currentAvatar.modelPath,
-                    loading: Loading.eager,
                     alt: 'Avatar 3D Preview',
                     autoRotate: true,
                     cameraControls: false,
@@ -3472,6 +3121,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
         final messages = snapshot.data!.docs;
 
+        // Scroll only when the message count changes. This prevents every
+        // Firestore rebuild (typing/read updates) from looking like a reload.
         if (_lastRenderedMessageCount != messages.length) {
           _lastRenderedMessageCount = messages.length;
           _scrollToBottom();
@@ -3496,81 +3147,82 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               child: Align(
                 alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                 child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: type == 'image'
-                          ? const EdgeInsets.all(4)
-                          : (type == 'audio'
-                              ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
-                              : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
-                      decoration: BoxDecoration(
-                        color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                        children: [
-                          if (type == 'image')
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => FullImageViewScreen(imageData: imgPayload),
-                                  ),
-                                );
-                              },
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: imgPayload.startsWith('http')
-                                    ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
-                                    : (() {
-                                        final bytes = _decodeImageCached(doc.id, imgPayload);
-                                        return bytes != null
-                                            ? Image.memory(bytes, width: 220, height: 220, fit: BoxFit.cover, gaplessPlayback: true)
-                                            : const SizedBox(width: 220, height: 220, child: Icon(Icons.broken_image));
-                                      })(),
-                              ),
-                            )
-                          else if (type == 'audio')
-                            VoiceNoteBubble(key: ValueKey(doc.id), audioBase64: audioPayload, isMe: isMe)
-                          else
-                            Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
-
-                          if (isMe) ...[
-                            const SizedBox(height: 3),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isRead ? Icons.done_all : Icons.done,
-                                  size: 15,
-                                  color: isRead ? Colors.lightBlueAccent : Colors.white54,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: type == 'image'
+                            ? const EdgeInsets.all(4)
+                            : (type == 'audio'
+                                ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+                                : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
+                        decoration: BoxDecoration(
+                          color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          children: [
+                            if (type == 'image')
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => FullImageViewScreen(imageData: imgPayload),
+                                    ),
+                                  );
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: imgPayload.startsWith('http')
+                                      ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
+                                      : (() {
+                                          final bytes = _decodeImageCached(doc.id, imgPayload);
+                                          return bytes != null
+                                              ? Image.memory(bytes, width: 220, height: 220, fit: BoxFit.cover, gaplessPlayback: true)
+                                              : const SizedBox(width: 220, height: 220, child: Icon(Icons.broken_image));
+                                        })(),
                                 ),
-                              ],
-                            ),
+                              )
+                            else if (type == 'audio')
+                              VoiceNoteBubble(key: ValueKey(doc.id), audioBase64: audioPayload, isMe: isMe)
+                            else
+                              Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
+
+                            if (isMe) ...[
+                              const SizedBox(height: 3),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isRead ? Icons.done_all : Icons.done,
+                                    size: 15,
+                                    color: isRead ? Colors.lightBlueAccent : Colors.white54,
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                    ),
-                    if (reaction.isNotEmpty)
-                      Positioned(
-                        bottom: 2,
-                        right: isMe ? 4 : null,
-                        left: !isMe ? 4 : null,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2A2A2A),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.white24, width: 1),
-                          ),
-                          child: Text(reaction, style: const TextStyle(fontSize: 13)),
                         ),
                       ),
-                  ],
+                      if (reaction.isNotEmpty)
+                        Positioned(
+                          bottom: 2,
+                          right: isMe ? 4 : null,
+                          left: !isMe ? 4 : null,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2A2A2A),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white24, width: 1),
+                            ),
+                            child: Text(reaction, style: const TextStyle(fontSize: 13)),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -3620,7 +3272,6 @@ class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
                   alt: 'Character Preview',
                   autoRotate: true,
                   cameraControls: true,
-                  disableZoom: true,
                   backgroundColor: const Color(0xFF1E1E1E),
                 ),
               ),
@@ -3864,7 +3515,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: ModelViewer(
                         key: ValueKey('profile_static_${currentAvatar.modelPath}'),
                         src: currentAvatar.modelPath,
-                        loading: Loading.eager,
                         alt: 'Avatar Profile',
                         autoRotate: true,
                         cameraControls: false,
