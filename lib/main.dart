@@ -522,6 +522,7 @@ Future<void> ensureUserDoc(User user) async {
         'bio': 'Hey there! I am on Avatar.',
         'photoBase64': '',
         'connections': [],
+        'isPrivate': false,
         'isOnline': true,
         'lastSeen': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
@@ -532,10 +533,75 @@ Future<void> ensureUserDoc(User user) async {
   } catch (_) {}
 }
 
+void showUserAvatarPreview(BuildContext context, {required String photoBase64, required String name, String? bio}) {
+  ImageProvider? provider;
+  if (photoBase64.isNotEmpty) {
+    try {
+      final clean = photoBase64.replaceFirst(RegExp(r'data:image\/[a-zA-Z]+;base64,'), '');
+      provider = MemoryImage(base64Decode(clean));
+    } catch (_) {}
+  }
+
+  showDialog(
+    context: context,
+    builder: (ctx) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(24),
+      child: Center(
+        child: Container(
+          width: 280,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              )
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: provider != null
+                    ? Image(image: provider, width: 248, height: 248, fit: BoxFit.cover)
+                    : Container(
+                        width: 248,
+                        height: 248,
+                        color: kLightBg,
+                        child: Center(
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                            style: const TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: kDarkSurface),
+                          ),
+                        ),
+                      ),
+              ),
+              const SizedBox(height: 14),
+              Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              if (bio != null && bio.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(bio, maxLines: 2, textAlign: TextAlign.center, style: const TextStyle(color: kTextSubtle, fontSize: 13)),
+              ],
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 Widget buildUserAvatar({
+  required BuildContext context,
   required String photoBase64,
   required String name,
+  String? bio,
   double radius = 24,
+  bool enablePreview = true,
 }) {
   ImageProvider? imageProvider;
   if (photoBase64.isNotEmpty) {
@@ -545,7 +611,7 @@ Widget buildUserAvatar({
     } catch (_) {}
   }
 
-  return Container(
+  final avatarWidget = Container(
     padding: const EdgeInsets.all(2.5),
     decoration: const BoxDecoration(
       shape: BoxShape.circle,
@@ -570,6 +636,13 @@ Widget buildUserAvatar({
             )
           : null,
     ),
+  );
+
+  if (!enablePreview) return avatarWidget;
+
+  return GestureDetector(
+    onLongPress: () => showUserAvatarPreview(context, photoBase64: photoBase64, name: name, bio: bio),
+    child: avatarWidget,
   );
 }
 
@@ -694,7 +767,7 @@ class AuthGate extends StatelessWidget {
 }
 
 // ==================================================
-// WELCOME SCREEN
+// WELCOME SCREEN (WITH ORIGINAL ASSET APP ICON)
 // ==================================================
 
 class WelcomeScreen extends StatelessWidget {
@@ -712,8 +785,9 @@ class WelcomeScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 110,
-                  height: 110,
+                  width: 120,
+                  height: 120,
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: const LinearGradient(
@@ -724,14 +798,20 @@ class WelcomeScreen extends StatelessWidget {
                     boxShadow: [
                       BoxShadow(
                         color: kPrimaryNeon.withOpacity(0.35),
-                        blurRadius: 20,
+                        blurRadius: 24,
                         offset: const Offset(0, 10),
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.chat_bubble_rounded, size: 55, color: Colors.white),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/icon/app_icon.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.bolt, size: 60, color: Colors.white),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 28),
                 const Text(
                   'Avatar',
                   style: TextStyle(
@@ -852,6 +932,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'bio': 'Hey there! I am on Avatar.',
           'photoBase64': '',
           'connections': [],
+          'isPrivate': false,
           'isOnline': true,
           'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
@@ -1450,7 +1531,7 @@ class NotificationsScreen extends StatelessWidget {
                 stream: FirebaseFirestore.instance.collection('users').where('connections', arrayContains: currentUid).snapshots(),
                 builder: (context, reqSnap) {
                   if (reqSnap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
                   }
 
                   final usersWhoConnectedMe = reqSnap.data?.docs ?? [];
@@ -1467,6 +1548,7 @@ class NotificationsScreen extends StatelessWidget {
                       final uData = doc.data() as Map<String, dynamic>;
                       final peerUid = uData['uid'] ?? doc.id;
                       final peerName = uData['name'] ?? 'User';
+                      final peerBio = uData['bio'] ?? '';
                       final peerPhoto = uData['photoBase64'] ?? '';
                       final isMutual = myConnections.contains(peerUid);
 
@@ -1482,7 +1564,10 @@ class NotificationsScreen extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            buildUserAvatar(photoBase64: peerPhoto, name: peerName, radius: 20),
+                            GestureDetector(
+                              onTap: () => showUserAvatarPreview(context, photoBase64: peerPhoto, name: peerName, bio: peerBio),
+                              child: buildUserAvatar(context: context, photoBase64: peerPhoto, name: peerName, bio: peerBio, radius: 20),
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -1575,7 +1660,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
               final allDocs = allUsersSnap.data?.docs ?? [];
 
-              // MUTUAL CONNECTIONS FILTER: Only show users if both have connected with each other
               final mutualUsers = allDocs.where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 final uid = data['uid'] ?? doc.id;
@@ -1662,6 +1746,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       final data = doc.data() as Map<String, dynamic>;
                       final peerUid = data['uid'] ?? doc.id;
                       final name = data['name'] ?? 'User';
+                      final bio = data['bio'] ?? '';
                       final photo = data['photoBase64'] ?? '';
                       final isOnline = data['isOnline'] == true;
 
@@ -1678,7 +1763,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                           leading: Stack(
                             children: [
-                              buildUserAvatar(photoBase64: photo, name: name, radius: 22),
+                              buildUserAvatar(context: context, photoBase64: photo, name: name, bio: bio, radius: 22),
                               if (isOnline)
                                 Positioned(
                                   right: 0,
@@ -1856,7 +1941,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                           ),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                            leading: buildUserAvatar(photoBase64: photo, name: userName, radius: 22),
+                            leading: GestureDetector(
+                              onTap: () => showUserAvatarPreview(context, photoBase64: photo, name: userName, bio: userBio),
+                              child: buildUserAvatar(context: context, photoBase64: photo, name: userName, bio: userBio, radius: 22),
+                            ),
                             title: Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
                             subtitle: Text(userBio, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle)),
                             trailing: ElevatedButton(
@@ -2139,9 +2227,11 @@ class _CallScreenState extends State<CallScreen> {
             ),
             const Spacer(),
             buildUserAvatar(
+              context: context,
               photoBase64: widget.peerPhoto,
               name: widget.peerName,
               radius: 75,
+              enablePreview: false,
             ),
             const Spacer(),
             Row(
@@ -2330,7 +2420,7 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN
+// CHAT CONVERSATION SCREEN (SMOOTH SCROLL FIX)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -2382,6 +2472,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     } else {
       _markMessagesAsRead();
     }
+
+    messageFocusNode.addListener(() {
+      if (messageFocusNode.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 300), () => _scrollToBottom());
+      }
+    });
   }
 
   void _markMessagesAsRead() async {
@@ -2430,11 +2526,19 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !scrollController.hasClients) return;
-      scrollController.animateTo(
-        0.0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      );
+      if (isAvatarFriend) {
+        scrollController.animateTo(
+          scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      } else {
+        scrollController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -2461,6 +2565,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           localMessages.add(Map<String, String>.from(item));
         }
       });
+      _scrollToBottom();
     }
   }
 
@@ -2620,6 +2725,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           isLoading = true;
         });
         await _saveChatHistory();
+        _scrollToBottom();
 
         final reply = await askAvatarFriend(text);
         if (!mounted) return;
@@ -2629,6 +2735,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           isLoading = false;
         });
         await _saveChatHistory();
+        _scrollToBottom();
         unawaited(_speak(reply));
       } else {
         await FirebaseFirestore.instance
@@ -2751,6 +2858,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     ),
                   )
                 : buildUserAvatar(
+                    context: context,
                     photoBase64: widget.peerPhoto ?? '',
                     name: widget.userName,
                     radius: 17,
@@ -3150,7 +3258,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 }
 
 // ==================================================
-// PROFILE SCREEN
+// PROFILE SCREEN (WITH PRIVATE ACCOUNT TOGGLE)
 // ==================================================
 
 class ProfileScreen extends StatefulWidget {
@@ -3165,6 +3273,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String displayName = '';
   String displayBio = 'Hey there! I am on Avatar.';
   String photoBase64 = '';
+  bool isPrivateAccount = false;
 
   @override
   void initState() {
@@ -3183,8 +3292,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           displayBio = data?['bio'] ?? displayBio;
           photoBase64 = data?['photoBase64'] ?? '';
+          isPrivateAccount = data?['isPrivate'] ?? false;
         });
       }
+    }
+  }
+
+  Future<void> _togglePrivacy(bool value) async {
+    setState(() => isPrivateAccount = value);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'isPrivate': value,
+      }, SetOptions(merge: true));
+      if (mounted) _showMessage(context, value ? 'Account set to Private 🔒' : 'Account set to Public 🌍');
     }
   }
 
@@ -3341,8 +3462,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Stack(
                 children: [
                   buildUserAvatar(
+                    context: context,
                     photoBase64: photoBase64,
                     name: displayName,
+                    bio: displayBio,
                     radius: 60,
                   ),
                   Positioned(
@@ -3369,7 +3492,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Text(displayBio, textAlign: TextAlign.center, style: const TextStyle(color: kTextSubtle, fontSize: 14)),
               const SizedBox(height: 24),
 
-              // Instagram Style Connecting / Connectors Counts
+              // Connected / Connectors Counts
               StreamBuilder<DocumentSnapshot>(
                 stream: FirebaseFirestore.instance.collection('users').doc(myUid).snapshots(),
                 builder: (context, mySnap) {
@@ -3435,7 +3558,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
+
+              // Privacy Switch (For future Reels & Posts)
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
+                  ],
+                ),
+                child: SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                  activeColor: kPrimaryNeon,
+                  secondary: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: kLightBg,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(isPrivateAccount ? Icons.lock_rounded : Icons.public_rounded, color: kDarkSurface, size: 22),
+                  ),
+                  title: const Text('Private Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kDarkSurface)),
+                  subtitle: Text(
+                    isPrivateAccount ? 'Only mutual connections can see posts & reels' : 'Anyone can view your public content',
+                    style: const TextStyle(color: kTextSubtle, fontSize: 12),
+                  ),
+                  value: isPrivateAccount,
+                  onChanged: _togglePrivacy,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
               SizedBox(
                 width: double.infinity,
                 height: 50,
