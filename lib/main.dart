@@ -18,7 +18,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -36,15 +35,15 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (message.data['type'] == 'call') {
     final callId = message.data['callId'] ?? '';
     final callerName = message.data['callerName'] ?? 'Incoming Call';
-    final callerAvatar = message.data['callerAvatar'] ?? 'ORANGE';
+    final callerPhoto = message.data['callerPhoto'] ?? '';
     final callerId = message.data['callerId'] ?? '';
 
     final params = CallKitParams(
       id: callId,
       nameCaller: callerName,
       appName: 'Avatar',
-      avatar: 'https://via.placeholder.com/100',
-      handle: '$callerAvatar Avatar Voice Call',
+      avatar: callerPhoto.isNotEmpty ? callerPhoto : 'https://via.placeholder.com/150',
+      handle: 'Voice Call',
       type: 0,
       textAccept: 'Accept',
       textDecline: 'Decline',
@@ -52,7 +51,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       extra: <String, dynamic>{
         'callId': callId,
         'callerName': callerName,
-        'callerAvatar': callerAvatar,
+        'callerPhoto': callerPhoto,
         'callerId': callerId,
       },
       android: const AndroidParams(
@@ -75,7 +74,6 @@ Future<void> main() async {
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  await AvatarState.loadSavedAvatar();
   runApp(const AvatarApp());
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -184,7 +182,7 @@ class NotificationService {
     required String calleeId,
     required String callId,
     required String callerName,
-    required String callerAvatar,
+    required String callerPhoto,
     required String callerId,
   }) async {
     try {
@@ -201,7 +199,7 @@ class NotificationService {
           'fcmToken': fcmToken,
           'callId': callId,
           'callerName': callerName,
-          'callerAvatar': callerAvatar,
+          'callerPhoto': callerPhoto,
           'callerId': callerId,
         }),
       );
@@ -284,7 +282,7 @@ class WebRtcSignalingService {
     required String callerId,
     required String calleeId,
     required String callerName,
-    required String callerAvatar,
+    required String callerPhoto,
     required StreamCallback onRemoteStreamReceived,
     required VoidCallback onCallEnded,
   }) async {
@@ -319,7 +317,7 @@ class WebRtcSignalingService {
       'callerId': callerId,
       'calleeId': calleeId,
       'callerName': callerName,
-      'callerAvatar': callerAvatar,
+      'callerPhoto': callerPhoto,
       'offer': offer.toMap(),
       'status': 'calling',
       'createdAt': FieldValue.serverTimestamp(),
@@ -330,7 +328,7 @@ class WebRtcSignalingService {
         calleeId: calleeId,
         callId: currentCallId!,
         callerName: callerName,
-        callerAvatar: callerAvatar,
+        callerPhoto: callerPhoto,
         callerId: callerId,
       ),
     );
@@ -489,7 +487,7 @@ class WebRtcSignalingService {
 }
 
 // ==================================================
-// TOP-LEVEL HELPERS & PRESENCE
+// TOP-LEVEL HELPERS, AVATAR WIDGET & PRESENCE
 // ==================================================
 
 void _showMessage(BuildContext context, String message) {
@@ -525,20 +523,54 @@ Future<void> ensureUserDoc(User user) async {
         'uid': user.uid,
         'name': (user.displayName?.isNotEmpty == true) ? user.displayName : 'User',
         'bio': 'Hey there! I am using Avatar.',
-        'avatar': AvatarState.current.name,
+        'photoBase64': '',
         'bonds': [],
         'isOnline': true,
         'lastSeen': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } else {
-      final data = doc.data();
-      if (data != null && data['avatar'] != null) {
-        AvatarState.setByName(data['avatar']);
-      }
       updateUserPresence(true);
     }
   } catch (_) {}
+}
+
+Widget buildUserAvatar({
+  required String photoBase64,
+  required String name,
+  double radius = 24,
+  Color borderColor = const Color(0xFFFF7A00),
+}) {
+  ImageProvider? imageProvider;
+  if (photoBase64.isNotEmpty) {
+    try {
+      final cleanData = photoBase64.replaceFirst(RegExp(r'data:image\/[a-zA-Z]+;base64,'), '');
+      imageProvider = MemoryImage(base64Decode(cleanData));
+    } catch (_) {}
+  }
+
+  return Container(
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(color: borderColor, width: 2),
+    ),
+    child: CircleAvatar(
+      radius: radius,
+      backgroundColor: const Color(0xFF2A2A2A),
+      backgroundImage: imageProvider,
+      child: imageProvider == null
+          ? Text(
+              name.isNotEmpty ? name[0].toUpperCase() : 'U',
+              style: TextStyle(
+                fontSize: radius * 0.9,
+                fontWeight: FontWeight.bold,
+                color: borderColor,
+              ),
+            )
+          : null,
+    ),
+  );
 }
 
 // ==================================================
@@ -563,77 +595,6 @@ Future<String> askAvatarFriend(String userMessage) async {
     }
   } catch (e) {
     return 'Connection error: Internet check karein.';
-  }
-}
-
-// ==================================================
-// GLOBAL AVATAR STATE
-// ==================================================
-
-class AvatarCharacter {
-  final String name;
-  final Color themeColor;
-  final String modelPath;
-
-  const AvatarCharacter({
-    required this.name,
-    required this.themeColor,
-    required this.modelPath,
-  });
-}
-
-class AvatarState {
-  static final List<AvatarCharacter> characters = [
-    const AvatarCharacter(
-      name: 'ORANGE',
-      themeColor: Color(0xFFFF7A00),
-      modelPath: 'assets/models/avatar_orange.glb',
-    ),
-    const AvatarCharacter(
-      name: 'BLUE',
-      themeColor: Color(0xFF2196F3),
-      modelPath: 'assets/models/avatar_blue.glb',
-    ),
-    const AvatarCharacter(
-      name: 'GREEN',
-      themeColor: Color(0xFF5DB835),
-      modelPath: 'assets/models/avatar_green.glb',
-    ),
-  ];
-
-  static final ValueNotifier<int> selectedIndexNotifier = ValueNotifier<int>(0);
-
-  static int get selectedIndex => selectedIndexNotifier.value;
-  static AvatarCharacter get current => characters[selectedIndexNotifier.value];
-
-  static Future<void> equip(int index) async {
-    if (index >= 0 && index < characters.length) {
-      selectedIndexNotifier.value = index;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('saved_avatar_index', index);
-    }
-  }
-
-  static Future<void> loadSavedAvatar() async {
-    final prefs = await SharedPreferences.getInstance();
-    final idx = prefs.getInt('saved_avatar_index');
-    if (idx != null && idx >= 0 && idx < characters.length) {
-      selectedIndexNotifier.value = idx;
-    }
-  }
-
-  static void setByName(String name) {
-    final idx = characters.indexWhere((c) => c.name.toUpperCase() == name.toUpperCase());
-    if (idx != -1) {
-      equip(idx);
-    }
-  }
-
-  static AvatarCharacter getByName(String? name) {
-    return characters.firstWhere(
-      (c) => c.name.toUpperCase() == (name ?? '').toUpperCase(),
-      orElse: () => characters[selectedIndexNotifier.value],
-    );
   }
 }
 
@@ -682,7 +643,7 @@ class _AvatarAppState extends State<AvatarApp> with WidgetsBindingObserver {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF121212),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
+          seedColor: const Color(0xFFFF7A00),
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
@@ -738,10 +699,15 @@ class WelcomeScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const CircleAvatar(
-                  radius: 70,
-                  backgroundColor: Color(0xFF1E1E1E),
-                  child: Icon(Icons.person, size: 80, color: Colors.white70),
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFFF7A00).withOpacity(0.15),
+                    border: Border.all(color: const Color(0xFFFF7A00), width: 3),
+                  ),
+                  child: const Icon(Icons.bolt, size: 70, color: Color(0xFFFF7A00)),
                 ),
                 const SizedBox(height: 28),
                 const Text(
@@ -750,7 +716,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Choose your original character and make bonds.',
+                  'Ultra-fast Real-time Voice Calling & Secret Bonds.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16, color: Colors.white70),
                 ),
@@ -759,13 +725,14 @@ class WelcomeScreen extends StatelessWidget {
                   width: double.infinity,
                   height: 52,
                   child: FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const CreateAccountScreen()),
                       );
                     },
-                    child: const Text('Create Account', style: TextStyle(fontSize: 16)),
+                    child: const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -840,7 +807,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'uid': user.uid,
           'name': name,
           'bio': 'Hey there! I am using Avatar.',
-          'avatar': AvatarState.current.name,
+          'photoBase64': '',
           'bonds': [],
           'isOnline': true,
           'lastSeen': FieldValue.serverTimestamp(),
@@ -926,10 +893,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               SizedBox(
                 height: 50,
                 child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
                   onPressed: loading ? null : createAccount,
                   child: loading
                       ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator())
-                      : const Text('Create Account'),
+                      : const Text('Create Account', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -1016,7 +984,7 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 30),
-              const Icon(Icons.account_circle, size: 100),
+              const Icon(Icons.account_circle, size: 100, color: Color(0xFFFF7A00)),
               const SizedBox(height: 20),
               const Text(
                 'Welcome Back',
@@ -1051,10 +1019,11 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(
                 height: 50,
                 child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
                   onPressed: loading ? null : login,
                   child: loading
                       ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator())
-                      : const Text('Login'),
+                      : const Text('Login', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -1066,7 +1035,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (ALL PERMISSIONS DIALOG AUTO-POPUP)
+// HOME SCREEN
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1085,8 +1054,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _pageAt(int index) {
     if (pages[index] == null) {
       pages[index] = switch (index) {
-        0 => const HomeTab(),
-        1 => const ChatScreen(),
+        0 => const ChatScreen(),
+        1 => const DiscoverScreen(),
         _ => const ProfileScreen(),
       };
     }
@@ -1110,104 +1079,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _requestAllPermissions() async {
     final prefs = await SharedPreferences.getInstance();
-    final bool alreadyAsked = prefs.getBool('full_permissions_asked_v2') ?? false;
+    final bool alreadyAsked = prefs.getBool('full_permissions_asked_v3') ?? false;
 
     if (!alreadyAsked) {
-      if (!mounted) return;
-      _showAllPermissionSheet(prefs);
+      await prefs.setBool('full_permissions_asked_v3', true);
+      await [
+        Permission.microphone,
+        Permission.camera,
+        Permission.notification,
+        Permission.photos,
+        Permission.storage,
+      ].request();
+
+      if (await Permission.ignoreBatteryOptimizations.isDenied) {
+        await Permission.ignoreBatteryOptimizations.request();
+      }
     }
-  }
-
-  void _showAllPermissionSheet(SharedPreferences prefs) {
-    showModalBottomSheet(
-      context: context,
-      isDismissible: false,
-      enableDrag: false,
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.greenAccent.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.security, color: Colors.greenAccent, size: 28),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Allow App Permissions',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'To enable Real-time calling on lockscreen, microphone, media sharing and notifications, please allow permissions.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.4),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: () {
-                        prefs.setBool('full_permissions_asked_v2', true);
-                        Navigator.pop(ctx);
-                      },
-                      child: const Text('Not Now', style: TextStyle(color: Colors.white70)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.greenAccent.shade700,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        await prefs.setBool('full_permissions_asked_v2', true);
-
-                        await [
-                          Permission.microphone,
-                          Permission.camera,
-                          Permission.notification,
-                          Permission.photos,
-                          Permission.storage,
-                          Permission.bluetoothConnect,
-                        ].request();
-
-                        if (await Permission.ignoreBatteryOptimizations.isDenied) {
-                          await Permission.ignoreBatteryOptimizations.request();
-                        }
-
-                        if (await Permission.systemAlertWindow.isDenied) {
-                          await Permission.systemAlertWindow.request();
-                        }
-                      },
-                      child: const Text('Allow All', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Future<void> _checkInitialCall() async {
@@ -1219,7 +1106,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final callId = extra['callId'] ?? call['id'];
         final callerName = extra['callerName'] ?? call['nameCaller'] ?? 'User';
-        final callerAvatar = extra['callerAvatar'] ?? 'ORANGE';
+        final callerPhoto = extra['callerPhoto'] ?? '';
         final callerId = extra['callerId'] ?? '';
 
         if (mounted) {
@@ -1227,7 +1114,7 @@ class _HomeScreenState extends State<HomeScreen> {
             MaterialPageRoute(
               builder: (_) => CallScreen(
                 peerName: callerName,
-                peerAvatar: callerAvatar,
+                peerPhoto: callerPhoto,
                 peerUid: callerId,
                 callId: callId,
                 isIncoming: true,
@@ -1248,14 +1135,14 @@ class _HomeScreenState extends State<HomeScreen> {
           final extra = event.body['extra'] ?? {};
           final callId = extra['callId'] ?? event.body['id'];
           final callerName = extra['callerName'] ?? event.body['nameCaller'] ?? 'User';
-          final callerAvatar = extra['callerAvatar'] ?? 'ORANGE';
+          final callerPhoto = extra['callerPhoto'] ?? '';
           final callerId = extra['callerId'] ?? '';
 
           navigatorKey.currentState?.push(
             MaterialPageRoute(
               builder: (_) => CallScreen(
                 peerName: callerName,
-                peerAvatar: callerAvatar,
+                peerPhoto: callerPhoto,
                 peerUid: callerId,
                 callId: callId,
                 isIncoming: true,
@@ -1304,15 +1191,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _shownIncomingCallIds.add(callId);
 
     final callerName = callData['callerName'] ?? 'User';
-    final callerAvatar = callData['callerAvatar'] ?? 'ORANGE';
+    final callerPhoto = callData['callerPhoto'] ?? '';
     final callerId = callData['callerId'] ?? '';
 
     final params = CallKitParams(
       id: callId,
       nameCaller: callerName,
       appName: 'Avatar',
-      avatar: 'https://via.placeholder.com/100',
-      handle: '$callerAvatar Avatar Voice Call',
+      avatar: callerPhoto.isNotEmpty ? callerPhoto : 'https://via.placeholder.com/150',
+      handle: 'Voice Call',
       type: 0,
       textAccept: 'Accept',
       textDecline: 'Decline',
@@ -1320,7 +1207,7 @@ class _HomeScreenState extends State<HomeScreen> {
       extra: <String, dynamic>{
         'callId': callId,
         'callerName': callerName,
-        'callerAvatar': callerAvatar,
+        'callerPhoto': callerPhoto,
         'callerId': callerId,
       },
       android: const AndroidParams(
@@ -1365,14 +1252,14 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Chat',
+            label: 'Chats',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Discover',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_circle_outlined),
@@ -1386,97 +1273,12 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ==================================================
-// HOME TAB
-// ==================================================
-
-class HomeTab extends StatelessWidget {
-  const HomeTab({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    return ValueListenableBuilder<int>(
-      valueListenable: AvatarState.selectedIndexNotifier,
-      builder: (context, _, __) {
-        final character = AvatarState.current;
-
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('My Avatar', style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Text(
-                  user?.displayName?.isNotEmpty == true ? user!.displayName! : 'User',
-                  style: const TextStyle(fontSize: 16, color: Colors.white70),
-                ),
-                const SizedBox(height: 25),
-                Container(
-                  width: double.infinity,
-                  height: 380,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
-                    color: const Color(0xFF1E1E1E),
-                    border: Border.all(
-                      color: character.themeColor.withOpacity(0.4),
-                      width: 2,
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
-                    child: ModelViewer(
-                      key: ValueKey('main_${character.modelPath}'),
-                      src: character.modelPath,
-                      loading: Loading.eager,
-                      alt: 'My 3D Avatar',
-                      autoRotate: true,
-                      cameraControls: true,
-                      backgroundColor: const Color(0xFF1E1E1E),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 25),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: character.themeColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SelectCharacterScreen()),
-                      );
-                    },
-                    icon: const Icon(Icons.swap_horiz, size: 26),
-                    label: Text(
-                      'Change Character (${character.name})',
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ==================================================
-// 1-ON-1 ACTIVE CALLING SCREEN (WITH OUTGOING RINGTONE)
+// 1-ON-1 ACTIVE CALLING SCREEN (WITH INSTANT RINGTONE)
 // ==================================================
 
 class CallScreen extends StatefulWidget {
   final String peerName;
-  final String peerAvatar;
+  final String peerPhoto;
   final String peerUid;
   final String? callId;
   final bool isIncoming;
@@ -1484,7 +1286,7 @@ class CallScreen extends StatefulWidget {
   const CallScreen({
     Key? key,
     required this.peerName,
-    required this.peerAvatar,
+    required this.peerPhoto,
     required this.peerUid,
     this.callId,
     this.isIncoming = false,
@@ -1556,7 +1358,7 @@ class _CallScreenState extends State<CallScreen> {
       callerId: currentUid,
       calleeId: widget.peerUid,
       callerName: currentName,
-      callerAvatar: AvatarState.current.name,
+      callerPhoto: '',
       onRemoteStreamReceived: (stream) {
         _stopOutgoingRingtone();
         if (realCallId != null) {
@@ -1577,13 +1379,13 @@ class _CallScreenState extends State<CallScreen> {
         id: realCallId!,
         nameCaller: widget.peerName,
         appName: 'Avatar',
-        handle: 'Avatar Voice Call',
+        handle: 'Voice Call',
         type: 1,
         extra: <String, dynamic>{
           'callId': realCallId!,
           'peerUid': widget.peerUid,
           'callerName': currentName,
-          'callerAvatar': AvatarState.current.name,
+          'callerPhoto': '',
         },
         callingNotification: const NotificationParams(
           showNotification: true,
@@ -1670,14 +1472,12 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final avatarObj = AvatarState.getByName(widget.peerAvatar);
-
     return Scaffold(
       backgroundColor: const Color(0xFF101014),
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 40),
+            const SizedBox(height: 50),
             Text(
               widget.peerName,
               style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
@@ -1691,29 +1491,11 @@ class _CallScreenState extends State<CallScreen> {
               ),
             ),
             const Spacer(),
-            Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF1E1E1E),
-                border: Border.all(color: avatarObj.themeColor, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: avatarObj.themeColor.withOpacity(0.20),
-                    blurRadius: 24,
-                    spreadRadius: 4,
-                  ),
-                ],
-              ),
-              child: CircleAvatar(
-                backgroundColor: const Color(0xFF1E1E1E),
-                child: Icon(
-                  Icons.person_rounded,
-                  size: 110,
-                  color: avatarObj.themeColor,
-                ),
-              ),
+            buildUserAvatar(
+              photoBase64: widget.peerPhoto,
+              name: widget.peerName,
+              radius: 75,
+              borderColor: const Color(0xFFFF7A00),
             ),
             const Spacer(),
             Row(
@@ -1878,7 +1660,7 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
                       width: 3,
                       height: 28 * barHeights[idx],
                       decoration: BoxDecoration(
-                        color: isPassed ? Colors.white : Colors.white30,
+                        color: isPassed ? const Color(0xFFFF7A00) : Colors.white30,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     );
@@ -1900,29 +1682,6 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
 }
 
 // ==================================================
-// ANIMATED MESSAGE BUBBLE
-// ==================================================
-
-class AnimatedBubble extends StatelessWidget {
-  final Widget child;
-
-  const AnimatedBubble({Key? key, required this.child}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.85, end: 1.0),
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutBack,
-      builder: (context, scale, animChild) {
-        return Transform.scale(scale: scale, child: animChild);
-      },
-      child: child,
-    );
-  }
-}
-
-// ==================================================
 // CHAT SCREEN (CHATS LIST)
 // ==================================================
 
@@ -1937,36 +1696,6 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController searchController = TextEditingController();
   String searchQuery = '';
 
-  void openNewChat() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const NewChatScreen()),
-    );
-  }
-
-  Future<void> toggleBond(String peerUid, bool isBonded) async {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUid == null) return;
-
-    final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
-
-    try {
-      if (isBonded) {
-        await userRef.set({
-          'bonds': FieldValue.arrayRemove([peerUid])
-        }, SetOptions(merge: true));
-        if (mounted) _showMessage(context, 'Bond removed.');
-      } else {
-        await userRef.set({
-          'bonds': FieldValue.arrayUnion([peerUid])
-        }, SetOptions(merge: true));
-        if (mounted) _showMessage(context, 'Bond created!');
-      }
-    } catch (e) {
-      if (mounted) _showMessage(context, 'Bond update failed: $e');
-    }
-  }
-
   @override
   void dispose() {
     searchController.dispose();
@@ -1977,355 +1706,169 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    return ValueListenableBuilder<int>(
-      valueListenable: AvatarState.selectedIndexNotifier,
-      builder: (context, _, __) {
-        final currentAvatar = AvatarState.current;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
+        builder: (context, userSnap) {
+          final myData = userSnap.data?.data() as Map<String, dynamic>?;
+          final List<dynamic> myBonds = myData?['bonds'] ?? [];
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.bold)),
-            actions: [
-              IconButton(
-                onPressed: openNewChat,
-                icon: const Icon(Icons.person_add_alt_1),
-                tooltip: 'Discover & Search',
-              ),
-            ],
-          ),
-          body: StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
-            builder: (context, userSnap) {
-              final myData = userSnap.data?.data() as Map<String, dynamic>?;
-              final List<dynamic> myBonds = myData?['bonds'] ?? [];
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('users').snapshots(),
+            builder: (context, allUsersSnap) {
+              if (allUsersSnap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-              return StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').snapshots(),
-                builder: (context, allUsersSnap) {
-                  if (allUsersSnap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+              final allDocs = allUsersSnap.data?.docs ?? [];
 
-                  final allDocs = allUsersSnap.data?.docs ?? [];
+              final bondedUsers = allDocs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final uid = data['uid'] ?? doc.id;
+                final name = (data['name'] ?? '').toString().toLowerCase();
 
-                  final bondedUsers = allDocs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final uid = data['uid'] ?? doc.id;
-                    final name = (data['name'] ?? '').toString().toLowerCase();
+                if (uid == currentUid || !myBonds.contains(uid)) return false;
+                if (searchQuery.isNotEmpty) {
+                  return name.contains(searchQuery.toLowerCase());
+                }
+                return true;
+              }).toList();
 
-                    if (uid == currentUid || !myBonds.contains(uid)) return false;
-                    if (searchQuery.isNotEmpty) {
-                      return name.contains(searchQuery.toLowerCase());
-                    }
-                    return true;
-                  }).toList();
-
-                  final suggestedUsers = allDocs.where((doc) {
-                    final uid = doc.id;
-                    return uid != currentUid && !myBonds.contains(uid);
-                  }).toList();
-
-                  return ListView(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                        child: TextField(
-                          controller: searchController,
-                          onChanged: (v) => setState(() => searchQuery = v.trim()),
-                          decoration: InputDecoration(
-                            hintText: 'Search bonded chats...',
-                            prefixIcon: const Icon(Icons.search),
-                            filled: true,
-                            fillColor: const Color(0xFF1E1E1E),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(18),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
+              return ListView(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: TextField(
+                      controller: searchController,
+                      onChanged: (v) => setState(() => searchQuery = v.trim()),
+                      decoration: InputDecoration(
+                        hintText: 'Search chats...',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: const Color(0xFF1E1E1E),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide.none,
                         ),
                       ),
+                    ),
+                  ),
 
-                      ListTile(
+                  // Avatar AI Companion Tile
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                    leading: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFFF7A00), width: 2),
+                      ),
+                      child: const CircleAvatar(
+                        radius: 22,
+                        backgroundColor: Color(0xFFFF7A00),
+                        child: Icon(Icons.auto_awesome, color: Colors.black),
+                      ),
+                    ),
+                    title: const Text('Avatar Friend', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    subtitle: const Text('AI Companion • Online', style: TextStyle(color: Colors.greenAccent, fontSize: 13)),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF7A00).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text('AI', style: TextStyle(color: Color(0xFFFF7A00), fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ChatConversationScreen(userName: 'Avatar Friend')),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, color: Colors.white10),
+
+                  // Bonded Users
+                  if (bondedUsers.isNotEmpty) ...[
+                    ...bondedUsers.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final peerUid = data['uid'] ?? doc.id;
+                      final name = data['name'] ?? 'User';
+                      final photo = data['photoBase64'] ?? '';
+                      final isOnline = data['isOnline'] == true;
+
+                      return ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                         leading: Stack(
                           children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFF1E1E1E),
-                                border: Border.all(color: currentAvatar.themeColor, width: 2),
-                              ),
-                              child: ClipOval(
-                                child: ModelViewer(
-                                  key: ValueKey('tile_${currentAvatar.modelPath}'),
-                                  src: currentAvatar.modelPath,
-                                  alt: 'Avatar',
-                                  autoRotate: true,
-                                  cameraControls: false,
-                                  backgroundColor: const Color(0xFF1E1E1E),
+                            buildUserAvatar(photoBase64: photo, name: name, radius: 22),
+                            if (isOnline)
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: Colors.greenAccent,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: const Color(0xFF121212), width: 2),
+                                  ),
                                 ),
                               ),
-                            ),
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: Container(
-                                width: 14,
-                                height: 14,
-                                decoration: BoxDecoration(
-                                  color: Colors.greenAccent,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: const Color(0xFF121212), width: 2),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
-                        title: const Text(
-                          'Avatar Friend',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
+                        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         subtitle: Text(
-                          'Online • ${currentAvatar.name} AI Companion',
-                          style: const TextStyle(color: Colors.greenAccent, fontSize: 13),
+                          isOnline ? 'Online' : 'Offline',
+                          style: TextStyle(color: isOnline ? Colors.greenAccent : Colors.white54, fontSize: 13),
                         ),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: currentAvatar.themeColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'AI',
-                            style: TextStyle(
-                              color: currentAvatar.themeColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
+                        trailing: const Icon(Icons.chat_bubble_outline, color: Color(0xFFFF7A00), size: 22),
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const ChatConversationScreen(userName: 'Avatar Friend'),
+                              builder: (_) => ChatConversationScreen(
+                                userName: name,
+                                peerUid: peerUid,
+                                peerPhoto: photo,
+                              ),
                             ),
                           );
                         },
-                      ),
-                      const Divider(height: 1, color: Colors.white10),
-
-                      if (bondedUsers.isNotEmpty) ...[
-                        ...bondedUsers.map((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          final peerUid = data['uid'] ?? doc.id;
-                          final name = data['name'] ?? 'User';
-                          final peerAvatar = AvatarState.getByName(data['avatar']);
-                          final isOnline = data['isOnline'] == true;
-
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                            leading: GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => UserProfileViewScreen(userData: data),
-                                  ),
-                                );
-                              },
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    width: 50,
-                                    height: 50,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: const Color(0xFF1E1E1E),
-                                      border: Border.all(color: peerAvatar.themeColor, width: 2),
-                                    ),
-                                    child: ClipOval(
-                                      child: ModelViewer(
-                                        key: ValueKey('peer_${peerUid}_${peerAvatar.modelPath}'),
-                                        src: peerAvatar.modelPath,
-                                        alt: 'Peer Avatar',
-                                        autoRotate: false,
-                                        cameraControls: false,
-                                        backgroundColor: const Color(0xFF1E1E1E),
-                                      ),
-                                    ),
-                                  ),
-                                  if (isOnline)
-                                    Positioned(
-                                      right: 0,
-                                      bottom: 0,
-                                      child: Container(
-                                        width: 14,
-                                        height: 14,
-                                        decoration: BoxDecoration(
-                                          color: Colors.greenAccent,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: const Color(0xFF121212), width: 2),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            title: Text(
-                              name,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                            subtitle: Text(
-                              isOnline ? 'Online' : 'Offline',
-                              style: TextStyle(
-                                color: isOnline ? Colors.greenAccent : Colors.white54,
-                                fontSize: 13,
-                              ),
-                            ),
-                            trailing: Icon(
-                              Icons.chat_bubble_outline,
-                              color: peerAvatar.themeColor,
-                              size: 22,
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatConversationScreen(
-                                    userName: name,
-                                    peerUid: peerUid,
-                                    peerAvatar: data['avatar'],
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        }).toList(),
-                      ] else if (searchQuery.isNotEmpty) ...[
-                        const Padding(
-                          padding: EdgeInsets.all(20),
-                          child: Center(
-                            child: Text(
-                              'No bonded contacts match your search.',
-                              style: TextStyle(color: Colors.white60),
-                            ),
-                          ),
-                        ),
-                      ],
-
-                      if (suggestedUsers.isNotEmpty) ...[
-                        const Padding(
-                          padding: EdgeInsets.fromLTRB(18, 24, 18, 10),
-                          child: Text(
-                            'SUGGESTED BONDS',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                              color: Colors.white54,
-                            ),
-                          ),
-                        ),
-                        ...suggestedUsers.take(15).map((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          final peerUid = data['uid'] ?? doc.id;
-                          final name = data['name'] ?? 'User';
-                          final peerAvatar = AvatarState.getByName(data['avatar']);
-
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                            leading: GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => UserProfileViewScreen(userData: data),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(0xFF1E1E1E),
-                                  border: Border.all(color: peerAvatar.themeColor, width: 1.5),
-                                ),
-                                child: ClipOval(
-                                  child: ModelViewer(
-                                    key: ValueKey('suggest_${peerUid}_${peerAvatar.modelPath}'),
-                                    src: peerAvatar.modelPath,
-                                    alt: 'Avatar',
-                                    autoRotate: false,
-                                    cameraControls: false,
-                                    backgroundColor: const Color(0xFF1E1E1E),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            title: GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => UserProfileViewScreen(userData: data),
-                                  ),
-                                );
-                              },
-                              child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                            trailing: SizedBox(
-                              height: 34,
-                              child: FilledButton.tonal(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: peerAvatar.themeColor.withOpacity(0.2),
-                                  foregroundColor: peerAvatar.themeColor,
-                                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                onPressed: () => toggleBond(peerUid, false),
-                                child: const Text(
-                                  '+ Bond',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ],
-                    ],
-                  );
-                },
+                      );
+                    }).toList(),
+                  ] else if (searchQuery.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(child: Text('No matching chats.', style: TextStyle(color: Colors.white60))),
+                    ),
+                  ],
+                ],
               );
             },
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: openNewChat,
-            child: const Icon(Icons.search),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
 
 // ==================================================
-// NEW CHAT / DISCOVER SCREEN
+// DISCOVER SCREEN
 // ==================================================
 
-class NewChatScreen extends StatefulWidget {
-  const NewChatScreen({Key? key}) : super(key: key);
+class DiscoverScreen extends StatefulWidget {
+  const DiscoverScreen({Key? key}) : super(key: key);
 
   @override
-  State<NewChatScreen> createState() => _NewChatScreenState();
+  State<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _NewChatScreenState extends State<NewChatScreen> {
+class _DiscoverScreenState extends State<DiscoverScreen> {
   final TextEditingController searchController = TextEditingController();
   String searchQuery = '';
 
@@ -2335,20 +1878,16 @@ class _NewChatScreenState extends State<NewChatScreen> {
 
     final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
 
-    try {
-      if (isBonded) {
-        await userRef.set({
-          'bonds': FieldValue.arrayRemove([peerUid])
-        }, SetOptions(merge: true));
-        if (mounted) _showMessage(context, 'Bond removed.');
-      } else {
-        await userRef.set({
-          'bonds': FieldValue.arrayUnion([peerUid])
-        }, SetOptions(merge: true));
-        if (mounted) _showMessage(context, 'Bond created! You can now message.');
-      }
-    } catch (e) {
-      if (mounted) _showMessage(context, 'Error updating bond: $e');
+    if (isBonded) {
+      await userRef.set({
+        'bonds': FieldValue.arrayRemove([peerUid])
+      }, SetOptions(merge: true));
+      if (mounted) _showMessage(context, 'Bond removed.');
+    } else {
+      await userRef.set({
+        'bonds': FieldValue.arrayUnion([peerUid])
+      }, SetOptions(merge: true));
+      if (mounted) _showMessage(context, 'Bond created!');
     }
   }
 
@@ -2378,7 +1917,7 @@ class _NewChatScreenState extends State<NewChatScreen> {
                   controller: searchController,
                   onChanged: (val) => setState(() => searchQuery = val.trim().toLowerCase()),
                   decoration: InputDecoration(
-                    hintText: 'Search by account name...',
+                    hintText: 'Search people by name...',
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
                     fillColor: const Color(0xFF1E1E1E),
@@ -2418,99 +1957,23 @@ class _NewChatScreenState extends State<NewChatScreen> {
                       itemBuilder: (context, index) {
                         final userData = users[index].data() as Map<String, dynamic>;
                         final userName = userData['name'] ?? 'User';
+                        final userBio = userData['bio'] ?? 'Using Avatar';
                         final peerUid = userData['uid'] ?? users[index].id;
-                        final avatarName = userData['avatar'] ?? 'ORANGE';
-                        final peerAvatar = AvatarState.getByName(avatarName);
+                        final photo = userData['photoBase64'] ?? '';
                         final isBonded = myBonds.contains(peerUid);
 
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                          leading: GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => UserProfileViewScreen(userData: userData),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFF1E1E1E),
-                                border: Border.all(color: peerAvatar.themeColor, width: 2),
-                              ),
-                              child: ClipOval(
-                                child: ModelViewer(
-                                  key: ValueKey('newchat_${peerUid}_${peerAvatar.modelPath}'),
-                                  src: peerAvatar.modelPath,
-                                  alt: 'Avatar',
-                                  autoRotate: false,
-                                  cameraControls: false,
-                                  backgroundColor: const Color(0xFF1E1E1E),
-                                ),
-                              ),
+                          leading: buildUserAvatar(photoBase64: photo, name: userName, radius: 22),
+                          title: Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          subtitle: Text(userBio, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60)),
+                          trailing: FilledButton.tonal(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: isBonded ? Colors.white12 : const Color(0xFFFF7A00).withOpacity(0.2),
+                              foregroundColor: isBonded ? Colors.white70 : const Color(0xFFFF7A00),
                             ),
-                          ),
-                          title: GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => UserProfileViewScreen(userData: userData),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              userName,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: peerAvatar.themeColor),
-                                  foregroundColor:
-                                      isBonded ? Colors.white70 : peerAvatar.themeColor,
-                                  backgroundColor: isBonded
-                                      ? Colors.white12
-                                      : peerAvatar.themeColor.withOpacity(0.15),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                onPressed: () => toggleBond(peerUid, isBonded),
-                                child: Text(
-                                  isBonded ? 'Bonded' : '+ Bond',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              if (isBonded) ...[
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  onPressed: () {
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => ChatConversationScreen(
-                                          userName: userName,
-                                          peerUid: peerUid,
-                                          peerAvatar: avatarName,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  icon: Icon(
-                                    Icons.chat_bubble_outline,
-                                    color: peerAvatar.themeColor,
-                                  ),
-                                ),
-                              ],
-                            ],
+                            onPressed: () => toggleBond(peerUid, isBonded),
+                            child: Text(isBonded ? 'Bonded' : '+ Bond'),
                           ),
                         );
                       },
@@ -2519,164 +1982,6 @@ class _NewChatScreenState extends State<NewChatScreen> {
                 ),
               ),
             ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ==================================================
-// USER PROFILE PREVIEW SCREEN
-// ==================================================
-
-class UserProfileViewScreen extends StatelessWidget {
-  final Map<String, dynamic> userData;
-
-  const UserProfileViewScreen({Key? key, required this.userData}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final peerUid = userData['uid'] ?? '';
-    final name = userData['name'] ?? 'User';
-    final bio = userData['bio'] ?? 'Hey there! I am using Avatar.';
-    final avatarName = userData['avatar'] ?? 'ORANGE';
-    final peerAvatar = AvatarState.getByName(avatarName);
-
-    return Scaffold(
-      appBar: AppBar(title: Text(name)),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
-        builder: (context, snapshot) {
-          final myData = snapshot.data?.data() as Map<String, dynamic>?;
-          final List<dynamic> myBonds = myData?['bonds'] ?? [];
-          final isBonded = myBonds.contains(peerUid);
-
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    height: 320,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      color: const Color(0xFF1E1E1E),
-                      border: Border.all(
-                        color: peerAvatar.themeColor.withOpacity(0.4),
-                        width: 2,
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
-                      child: ModelViewer(
-                        key: ValueKey('preview_${peerAvatar.modelPath}'),
-                        src: peerAvatar.modelPath,
-                        alt: '$name Avatar',
-                        autoRotate: true,
-                        cameraControls: true,
-                        backgroundColor: const Color(0xFF1E1E1E),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    name,
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    bio,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 15, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: peerAvatar.themeColor.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${peerAvatar.name} Avatar',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: peerAvatar.themeColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 52,
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: isBonded
-                                  ? const Color(0xFF2A2A2A)
-                                  : peerAvatar.themeColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            onPressed: () async {
-                              final userRef = FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(currentUid);
-                              if (isBonded) {
-                                await userRef.set({
-                                  'bonds': FieldValue.arrayRemove([peerUid])
-                                }, SetOptions(merge: true));
-                              } else {
-                                await userRef.set({
-                                  'bonds': FieldValue.arrayUnion([peerUid])
-                                }, SetOptions(merge: true));
-                              }
-                            },
-                            child: Text(
-                              isBonded ? 'Break Bond' : '+ Make Bond',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (isBonded) ...[
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          height: 52,
-                          child: FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: peerAvatar.themeColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            onPressed: () {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChatConversationScreen(
-                                    userName: name,
-                                    peerUid: peerUid,
-                                    peerAvatar: avatarName,
-                                  ),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.chat_bubble_outline),
-                            label: const Text('Message'),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
           );
         },
       ),
@@ -2728,13 +2033,13 @@ class FullImageViewScreen extends StatelessWidget {
 class ChatConversationScreen extends StatefulWidget {
   final String userName;
   final String? peerUid;
-  final String? peerAvatar;
+  final String? peerPhoto;
 
   const ChatConversationScreen({
     Key? key,
     required this.userName,
     this.peerUid,
-    this.peerAvatar,
+    this.peerPhoto,
   }) : super(key: key);
 
   @override
@@ -2759,7 +2064,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   bool isVoiceEnabled = true;
   Timer? typingDebounceTimer;
   Timer? typingWriteTimer;
-  final Map<String, Uint8List> _imageBytesCache = {};
 
   bool get isAvatarFriend => widget.userName == 'Avatar Friend';
   String get currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -2820,36 +2124,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     });
   }
 
-  void _scrollToBottom({bool animated = true}) {
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !scrollController.hasClients) return;
-      if (animated) {
-        scrollController.animateTo(
-          0.0,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      } else {
-        scrollController.jumpTo(0.0);
-      }
+      scrollController.animateTo(
+        0.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
     });
-  }
-
-  Uint8List? _decodeImageCached(String id, String payload) {
-    if (payload.isEmpty) return null;
-    final cached = _imageBytesCache[id];
-    if (cached != null) return cached;
-    try {
-      final clean = payload.replaceFirst(RegExp(r'data:image\/[a-zA-Z]+;base64,'), '');
-      final bytes = base64Decode(clean);
-      if (_imageBytesCache.length >= 40) {
-        _imageBytesCache.remove(_imageBytesCache.keys.first);
-      }
-      _imageBytesCache[id] = bytes;
-      return bytes;
-    } catch (_) {
-      return null;
-    }
   }
 
   Future<void> _initTts() async {
@@ -2890,9 +2173,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     setState(() {
       localMessages.clear();
     });
-    if (mounted) {
-      _showMessage(context, 'Chat history cleared.');
-    }
+    if (mounted) _showMessage(context, 'Chat history cleared.');
   }
 
   Future<void> _pickAndSendGalleryImage() async {
@@ -2940,7 +2221,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => isUploadingMedia = false);
-        _showMessage(context, 'Gallery error: $e');
+        _showMessage(context, 'Image error: $e');
       }
     }
   }
@@ -3147,276 +2428,204 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final peerAvatarObj = AvatarState.getByName(widget.peerAvatar);
-
-    return ValueListenableBuilder<int>(
-      valueListenable: AvatarState.selectedIndexNotifier,
-      builder: (context, _, __) {
-        final currentAvatar = AvatarState.current;
-        final headerAvatar = isAvatarFriend ? currentAvatar : peerAvatarObj;
-
-        return Scaffold(
-          resizeToAvoidBottomInset: true,
-          appBar: AppBar(
-            titleSpacing: 0,
-            title: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF1E1E1E),
-                    border: Border.all(color: headerAvatar.themeColor, width: 2),
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            isAvatarFriend
+                ? const CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Color(0xFFFF7A00),
+                    child: Icon(Icons.auto_awesome, size: 20, color: Colors.black),
+                  )
+                : buildUserAvatar(
+                    photoBase64: widget.peerPhoto ?? '',
+                    name: widget.userName,
+                    radius: 18,
                   ),
-                  child: ClipOval(
-                    child: ModelViewer(
-                      key: ValueKey('header_${headerAvatar.modelPath}'),
-                      src: headerAvatar.modelPath,
-                      alt: 'Avatar',
-                      autoRotate: true,
-                      cameraControls: false,
-                      backgroundColor: const Color(0xFF1E1E1E),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: isAvatarFriend
-                      ? Column(
+            const SizedBox(width: 12),
+            Expanded(
+              child: isAvatarFriend
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        const Text('AI Companion', style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
+                      ],
+                    )
+                  : StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance.collection('chats').doc(chatRoomId).snapshots(),
+                      builder: (context, chatDocSnap) {
+                        final chatData = chatDocSnap.data?.data() as Map<String, dynamic>?;
+                        final isPeerTyping = chatData?['typing_${widget.peerUid}'] == true;
+
+                        return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            const Text('AI Companion', style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
+                            Text(
+                              isPeerTyping ? 'typing...' : 'Online',
+                              style: TextStyle(
+                                color: isPeerTyping ? Colors.greenAccent : Colors.white54,
+                                fontSize: 12,
+                                fontWeight: isPeerTyping ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
                           ],
-                        )
-                      : StreamBuilder<DocumentSnapshot>(
-                          stream: FirebaseFirestore.instance.collection('chats').doc(chatRoomId).snapshots(),
-                          builder: (context, chatDocSnap) {
-                            final chatData = chatDocSnap.data?.data() as Map<String, dynamic>?;
-                            final isPeerTyping = chatData?['typing_${widget.peerUid}'] == true;
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                Text(
-                                  isPeerTyping ? 'typing...' : 'Voice & media ready',
-                                  style: TextStyle(
-                                    color: isPeerTyping ? Colors.greenAccent : Colors.white54,
-                                    fontSize: 12,
-                                    fontWeight: isPeerTyping ? FontWeight.bold : FontWeight.normal,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                ),
-              ],
+                        );
+                      },
+                    ),
             ),
-            actions: [
-              if (isAvatarFriend) ...[
-                IconButton(
-                  onPressed: () {
-                    setState(() => isVoiceEnabled = !isVoiceEnabled);
-                    if (!isVoiceEnabled) flutterTts.stop();
-                    _showMessage(
-                      context,
-                      isVoiceEnabled ? 'Avatar Voice Enabled 🔊' : 'Avatar Voice Muted 🔇',
-                    );
-                  },
-                  icon: Icon(
-                    isVoiceEnabled ? Icons.volume_up : Icons.volume_off,
-                    color: isVoiceEnabled ? currentAvatar.themeColor : Colors.white54,
+          ],
+        ),
+        actions: [
+          if (isAvatarFriend) ...[
+            IconButton(
+              onPressed: () {
+                setState(() => isVoiceEnabled = !isVoiceEnabled);
+                if (!isVoiceEnabled) flutterTts.stop();
+                _showMessage(
+                  context,
+                  isVoiceEnabled ? 'Voice Enabled 🔊' : 'Voice Muted 🔇',
+                );
+              },
+              icon: Icon(
+                isVoiceEnabled ? Icons.volume_up : Icons.volume_off,
+                color: isVoiceEnabled ? const Color(0xFFFF7A00) : Colors.white54,
+              ),
+            ),
+            IconButton(
+              onPressed: _clearChatHistory,
+              icon: const Icon(Icons.delete_outline),
+            ),
+          ] else ...[
+            IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CallScreen(
+                      peerName: widget.userName,
+                      peerPhoto: widget.peerPhoto ?? '',
+                      peerUid: widget.peerUid ?? '',
+                      isIncoming: false,
+                    ),
                   ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Clear Chat?'),
-                        content: const Text('Are you sure you want to delete all messages?'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              _clearChatHistory();
-                            },
-                            child: const Text('Clear', style: TextStyle(color: Colors.redAccent)),
+                );
+              },
+              icon: const Icon(Icons.call, color: Colors.greenAccent),
+              tooltip: '1-on-1 Voice Call',
+            ),
+          ],
+        ],
+      ),
+      body: Column(
+        children: [
+          if (isUploadingMedia) const LinearProgressIndicator(minHeight: 3),
+          Expanded(
+            child: isAvatarFriend ? _buildAiChat() : _buildRealUserChat(),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+              child: isRecording
+                  ? Container(
+                      height: 54,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(color: Colors.redAccent.withOpacity(0.6)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 20),
+                          const SizedBox(width: 8),
+                          Text('${recordingSeconds}s', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          const Spacer(),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(foregroundColor: Colors.white70),
+                            onPressed: _cancelRecording,
+                            icon: const Icon(Icons.delete_outline, size: 20),
+                            label: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton.filled(
+                            style: IconButton.styleFrom(backgroundColor: Colors.greenAccent.shade700),
+                            onPressed: _stopAndSendRecording,
+                            icon: const Icon(Icons.send, color: Colors.white, size: 20),
                           ),
                         ],
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.delete_outline),
-                ),
-              ] else ...[
-                IconButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CallScreen(
-                          peerName: widget.userName,
-                          peerAvatar: widget.peerAvatar ?? 'ORANGE',
-                          peerUid: widget.peerUid ?? '',
-                          isIncoming: false,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.call, color: Colors.greenAccent),
-                  tooltip: '1-on-1 Voice Call',
-                ),
-              ],
-            ],
-          ),
-          body: Column(
-            children: [
-              if (isUploadingMedia)
-                const LinearProgressIndicator(minHeight: 3),
-
-              Expanded(
-                child: isAvatarFriend ? _buildAiChat(currentAvatar) : _buildRealUserChat(),
-              ),
-
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-                  child: isRecording
-                      ? Container(
-                          height: 54,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.redAccent.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(color: Colors.redAccent.withOpacity(0.6)),
+                    )
+                  : Row(
+                      children: [
+                        if (!isAvatarFriend)
+                          IconButton(
+                            onPressed: _pickAndSendGalleryImage,
+                            icon: const Icon(Icons.photo_library_outlined),
+                            tooltip: 'Send Image',
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${recordingSeconds}s',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                              const Spacer(),
-                              TextButton.icon(
-                                style: TextButton.styleFrom(foregroundColor: Colors.white70),
-                                onPressed: _cancelRecording,
-                                icon: const Icon(Icons.delete_outline, size: 20),
-                                label: const Text('Cancel'),
-                              ),
-                              const SizedBox(width: 4),
-                              IconButton.filled(
-                                style: IconButton.styleFrom(backgroundColor: Colors.greenAccent.shade700),
-                                onPressed: _stopAndSendRecording,
-                                icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                              ),
-                            ],
-                          ),
-                        )
-                      : Row(
-                          children: [
-                            if (!isAvatarFriend)
-                              IconButton(
-                                onPressed: _pickAndSendGalleryImage,
-                                icon: const Icon(Icons.photo_library_outlined),
-                                tooltip: 'Send Image from Gallery',
-                              ),
-                            Expanded(
-                              child: TextField(
-                                controller: messageController,
-                                focusNode: messageFocusNode,
-                                keyboardType: TextInputType.multiline,
-                                textInputAction: TextInputAction.send,
-                                minLines: 1,
-                                maxLines: 5,
-                                onChanged: _onTextChanged,
-                                onSubmitted: (_) => sendMessage(),
-                                decoration: InputDecoration(
-                                  hintText: isAvatarFriend ? 'Ask anything to Avatar...' : 'Message...',
-                                  filled: true,
-                                  fillColor: const Color(0xFF1E1E1E),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(24),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
+                        Expanded(
+                          child: TextField(
+                            controller: messageController,
+                            focusNode: messageFocusNode,
+                            keyboardType: TextInputType.multiline,
+                            textInputAction: TextInputAction.send,
+                            minLines: 1,
+                            maxLines: 5,
+                            onChanged: _onTextChanged,
+                            onSubmitted: (_) => sendMessage(),
+                            decoration: InputDecoration(
+                              hintText: isAvatarFriend ? 'Ask AI anything...' : 'Message...',
+                              filled: true,
+                              fillColor: const Color(0xFF1E1E1E),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(24),
+                                borderSide: BorderSide.none,
                               ),
                             ),
-                            if (!isAvatarFriend) ...[
-                              const SizedBox(width: 4),
-                              IconButton(
-                                onPressed: _startRecording,
-                                icon: const Icon(Icons.mic, color: Colors.white70),
-                              ),
-                            ],
-                            const SizedBox(width: 2),
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundColor: isAvatarFriend ? currentAvatar.themeColor : Colors.deepPurple,
-                              child: IconButton(
-                                onPressed: sendMessage,
-                                icon: const Icon(Icons.send, size: 20),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                ),
-              ),
-            ],
+                        if (!isAvatarFriend) ...[
+                          const SizedBox(width: 4),
+                          IconButton(
+                            onPressed: _startRecording,
+                            icon: const Icon(Icons.mic, color: Colors.white70),
+                          ),
+                        ],
+                        const SizedBox(width: 2),
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor: const Color(0xFFFF7A00),
+                          child: IconButton(
+                            onPressed: sendMessage,
+                            icon: const Icon(Icons.send, color: Colors.black, size: 20),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
-  Widget _buildAiChat(AvatarCharacter currentAvatar) {
+  Widget _buildAiChat() {
     if (localMessages.isEmpty) {
-      return Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 150,
-                height: 150,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF1E1E1E),
-                  border: Border.all(color: currentAvatar.themeColor, width: 3),
-                ),
-                child: ClipOval(
-                  child: ModelViewer(
-                    key: ValueKey('chat_${currentAvatar.modelPath}'),
-                    src: currentAvatar.modelPath,
-                    alt: 'Avatar 3D Preview',
-                    autoRotate: true,
-                    cameraControls: false,
-                    backgroundColor: const Color(0xFF1E1E1E),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Say hello to ${currentAvatar.name} Avatar!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: currentAvatar.themeColor,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Your personalized 3D AI companion with voice',
-                style: TextStyle(fontSize: 14, color: Colors.white60),
-              ),
-            ],
-          ),
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.auto_awesome, size: 70, color: Color(0xFFFF7A00)),
+            SizedBox(height: 18),
+            Text('Say hello to Avatar Friend!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFF7A00))),
+            SizedBox(height: 6),
+            Text('Your smart voice AI companion', style: TextStyle(fontSize: 14, color: Colors.white60)),
+          ],
         ),
       );
     }
@@ -3432,15 +2641,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+              decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(18)),
+              child: const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
             ),
           );
         }
@@ -3448,38 +2650,32 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         final msg = localMessages[index];
         final isUser = msg['sender'] == 'user';
 
-        return AnimatedBubble(
-          child: Align(
-            alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-              decoration: BoxDecoration(
-                color: isUser ? Colors.deepPurple : const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(18),
-                border: (!isUser)
-                    ? Border.all(color: currentAvatar.themeColor.withOpacity(0.3), width: 1)
-                    : null,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 15)),
+        return Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            decoration: BoxDecoration(
+              color: isUser ? const Color(0xFFFF7A00) : const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    msg['text'] ?? '',
+                    style: TextStyle(fontSize: 15, color: isUser ? Colors.black : Colors.white, fontWeight: isUser ? FontWeight.w600 : FontWeight.normal),
                   ),
-                  if (!isUser) ...[
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () => _speak(msg['text'] ?? ''),
-                      child: Icon(
-                        Icons.volume_up,
-                        size: 16,
-                        color: currentAvatar.themeColor.withOpacity(0.8),
-                      ),
-                    ),
-                  ],
+                ),
+                if (!isUser) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _speak(msg['text'] ?? ''),
+                    child: const Icon(Icons.volume_up, size: 16, color: Color(0xFFFF7A00)),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         );
@@ -3507,10 +2703,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               children: [
                 const Icon(Icons.chat_bubble_outline, size: 70, color: Colors.white24),
                 const SizedBox(height: 15),
-                Text(
-                  'Say hello to ${widget.userName}!',
-                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
-                ),
+                Text('Say hello to ${widget.userName}!', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
               ],
             ),
           );
@@ -3543,27 +2736,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E1E1E),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isMissed ? Colors.redAccent.withOpacity(0.5) : Colors.greenAccent.withOpacity(0.5),
-                    ),
+                    border: Border.all(color: isMissed ? Colors.redAccent.withOpacity(0.5) : Colors.greenAccent.withOpacity(0.5)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        isMissed ? Icons.phone_missed : Icons.phone,
-                        size: 16,
-                        color: isMissed ? Colors.redAccent : Colors.greenAccent,
-                      ),
+                      Icon(isMissed ? Icons.phone_missed : Icons.phone, size: 16, color: isMissed ? Colors.redAccent : Colors.greenAccent),
                       const SizedBox(width: 8),
-                      Text(
-                        data['text'] ?? 'Voice Call',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isMissed ? Colors.redAccent : Colors.greenAccent,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      Text(data['text'] ?? 'Voice Call', style: TextStyle(fontSize: 13, color: isMissed ? Colors.redAccent : Colors.greenAccent, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -3585,7 +2765,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
                               : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
                       decoration: BoxDecoration(
-                        color: isMe ? Colors.deepPurple : const Color(0xFF1E1E1E),
+                        color: isMe ? const Color(0xFFFF7A00) : const Color(0xFF1E1E1E),
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Column(
@@ -3596,39 +2776,29 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               onTap: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(
-                                    builder: (_) => FullImageViewScreen(imageData: imgPayload),
-                                  ),
+                                  MaterialPageRoute(builder: (_) => FullImageViewScreen(imageData: imgPayload)),
                                 );
                               },
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(14),
                                 child: imgPayload.startsWith('http')
                                     ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
-                                    : (() {
-                                        final bytes = _decodeImageCached(doc.id, imgPayload);
-                                        return bytes != null
-                                            ? Image.memory(bytes, width: 220, height: 220, fit: BoxFit.cover, gaplessPlayback: true)
-                                            : const SizedBox(width: 220, height: 220, child: Icon(Icons.broken_image));
-                                      })(),
+                                    : Image.memory(base64Decode(imgPayload), width: 220, height: 220, fit: BoxFit.cover),
                               ),
                             )
                           else if (type == 'audio')
                             VoiceNoteBubble(key: ValueKey(doc.id), audioBase64: audioPayload, isMe: isMe)
                           else
-                            Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
-
+                            Text(
+                              data['text'] ?? '',
+                              style: TextStyle(fontSize: 15, color: isMe ? Colors.black : Colors.white, fontWeight: isMe ? FontWeight.w500 : FontWeight.normal),
+                            ),
                           if (isMe) ...[
                             const SizedBox(height: 3),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isRead ? Icons.done_all : Icons.done,
-                                  size: 15,
-                                  color: isRead ? Colors.lightBlueAccent : Colors.white54,
-                                ),
-                              ],
+                            Icon(
+                              isRead ? Icons.done_all : Icons.done,
+                              size: 15,
+                              color: isRead ? Colors.black : Colors.black54,
                             ),
                           ],
                         ],
@@ -3661,149 +2831,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 }
 
 // ==================================================
-// CHARACTER SELECTOR
-// ==================================================
-
-class SelectCharacterScreen extends StatefulWidget {
-  const SelectCharacterScreen({Key? key}) : super(key: key);
-
-  @override
-  State<SelectCharacterScreen> createState() => _SelectCharacterScreenState();
-}
-
-class _SelectCharacterScreenState extends State<SelectCharacterScreen> {
-  int tempIndex = AvatarState.selectedIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    final activeChar = AvatarState.characters[tempIndex];
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Choose Character')),
-      body: Column(
-        children: [
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                color: const Color(0xFF1E1E1E),
-                border: Border.all(color: activeChar.themeColor.withOpacity(0.4), width: 2),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: ModelViewer(
-                  key: ValueKey('selector_${activeChar.modelPath}'),
-                  src: activeChar.modelPath,
-                  loading: Loading.eager,
-                  alt: 'Character Preview',
-                  autoRotate: true,
-                  cameraControls: true,
-                  backgroundColor: const Color(0xFF1E1E1E),
-                ),
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-            decoration: const BoxDecoration(
-              color: Color(0xFF181818),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'COLOR OPTIONS',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                    color: Colors.white60,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: List.generate(
-                    AvatarState.characters.length,
-                    (index) {
-                      final char = AvatarState.characters[index];
-                      final isSelected = tempIndex == index;
-
-                      return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: GestureDetector(
-                            onTap: () => setState(() => tempIndex = index),
-                            child: Container(
-                              height: 52,
-                              decoration: BoxDecoration(
-                                color: isSelected ? char.themeColor : char.themeColor.withOpacity(0.18),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: isSelected ? Colors.white : char.themeColor,
-                                  width: isSelected ? 2.5 : 1,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  char.name,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: isSelected ? Colors.white : char.themeColor,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 55,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: activeChar.themeColor,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: () async {
-                      await AvatarState.equip(tempIndex);
-
-                      final user = FirebaseAuth.instance.currentUser;
-                      if (user != null) {
-                        await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(user.uid)
-                            .set({'avatar': AvatarState.current.name}, SetOptions(merge: true));
-                      }
-
-                      if (!mounted) return;
-                      _showMessage(context, '${AvatarState.current.name} Avatar equipped!');
-                      Navigator.pop(context);
-                    },
-                    child: Text(
-                      'Equip ${activeChar.name}',
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================================================
-// PROFILE SCREEN
+// PROFILE SCREEN (WITH GALLERY PROFILE PHOTO PICKER)
 // ==================================================
 
 class ProfileScreen extends StatefulWidget {
@@ -3814,14 +2842,59 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final ImagePicker _picker = ImagePicker();
   String displayName = '';
   String displayBio = 'Hey there! I am using Avatar.';
+  String photoBase64 = '';
 
   @override
   void initState() {
     super.initState();
     final user = FirebaseAuth.instance.currentUser;
     displayName = user?.displayName ?? 'User';
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        setState(() {
+          displayBio = data?['bio'] ?? displayBio;
+          photoBase64 = data?['photoBase64'] ?? '';
+        });
+      }
+    }
+  }
+
+  Future<void> _updateProfilePhoto() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 70,
+      );
+
+      if (image == null) return;
+
+      final bytes = await image.readAsBytes();
+      final base64String = base64Encode(bytes);
+
+      setState(() => photoBase64 = base64String);
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'photoBase64': base64String,
+        }, SetOptions(merge: true));
+        if (mounted) _showMessage(context, 'Profile picture updated!');
+      }
+    } catch (e) {
+      if (mounted) _showMessage(context, 'Error updating photo: $e');
+    }
   }
 
   void _openEditProfileSheet() {
@@ -3831,11 +2904,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      requestFocus: true,
       backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
@@ -3851,8 +2921,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 18),
             TextField(
               controller: nameCtrl,
-              autofocus: true,
-              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(labelText: 'Username', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 14),
@@ -3865,6 +2933,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SizedBox(
               height: 50,
               child: FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
                 onPressed: () async {
                   final newName = nameCtrl.text.trim();
                   final newBio = bioCtrl.text.trim();
@@ -3889,196 +2958,112 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (mounted) _showMessage(context, 'Profile updated successfully!');
                   }
                 },
-                child: const Text('Save Changes'),
+                child: const Text('Save Changes', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
         ),
       ),
-    ).whenComplete(() {
-      nameCtrl.dispose();
-      bioCtrl.dispose();
-    });
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
-    return ValueListenableBuilder<int>(
-      valueListenable: AvatarState.selectedIndexNotifier,
-      builder: (context, _, __) {
-        final currentAvatar = AvatarState.current;
-
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Profile'),
-            actions: [
-              IconButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  );
-                },
-                icon: const Icon(Icons.settings),
-              ),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: [
+          IconButton(
+            onPressed: () async {
+              updateUserPresence(false);
+              await FirebaseAuth.instance.signOut();
+            },
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
           ),
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
+        ],
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              Stack(
                 children: [
-                  Container(
-                    width: 140,
-                    height: 140,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF1E1E1E),
-                      border: Border.all(color: currentAvatar.themeColor, width: 3),
-                    ),
-                    child: ClipOval(
-                      child: ModelViewer(
-                        key: ValueKey('profile_static_${currentAvatar.modelPath}'),
-                        src: currentAvatar.modelPath,
-                        alt: 'Avatar Profile',
-                        autoRotate: true,
-                        cameraControls: false,
-                        backgroundColor: const Color(0xFF1E1E1E),
+                  buildUserAvatar(
+                    photoBase64: photoBase64,
+                    name: displayName,
+                    radius: 65,
+                    borderColor: const Color(0xFFFF7A00),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: GestureDetector(
+                      onTap: _updateProfilePhoto,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFFFF7A00),
+                        ),
+                        child: const Icon(Icons.camera_alt, size: 20, color: Colors.black),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    displayName.isNotEmpty ? displayName : (user?.displayName ?? 'User'),
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    displayBio,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  const SizedBox(height: 20),
-                  StreamBuilder<DocumentSnapshot>(
-                    stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
-                    builder: (context, snapshot) {
-                      final data = snapshot.data?.data() as Map<String, dynamic>?;
-                      final List<dynamic> bonds = data?['bonds'] ?? [];
-
-                      if (data != null && data['bio'] != null && displayBio == 'Hey there! I am using Avatar.') {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) setState(() => displayBio = data['bio']);
-                        });
-                      }
-
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E1E1E),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white10),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  '${bonds.length}',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: currentAvatar.themeColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                const Text('Bonds', style: TextStyle(color: Colors.white60, fontSize: 13)),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E1E1E),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white10),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  currentAvatar.name,
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: currentAvatar.themeColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                const Text('Equipped', style: TextStyle(color: Colors.white60, fontSize: 13)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: currentAvatar.themeColor),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: _openEditProfileSheet,
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: const Text('Edit Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 18),
+              Text(displayName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              Text(displayBio, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 24),
+              StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
+                builder: (context, snapshot) {
+                  final data = snapshot.data?.data() as Map<String, dynamic>?;
+                  final List<dynamic> bonds = data?['bonds'] ?? [];
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1E1E),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          '${bonds.length}',
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFF7A00)),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text('Active Bonds', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFFF7A00)),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: _openEditProfileSheet,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Edit Profile & Status', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
           ),
-        );
-      },
-    );
-  }
-}
-
-// ==================================================
-// SETTINGS SCREEN
-// ==================================================
-
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        children: [
-          const ListTile(leading: Icon(Icons.person), title: Text('Account')),
-          const ListTile(leading: Icon(Icons.notifications), title: Text('Notifications')),
-          const ListTile(leading: Icon(Icons.lock), title: Text('Privacy')),
-          const ListTile(leading: Icon(Icons.info), title: Text('About Avatar')),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text('Logout', style: TextStyle(color: Colors.redAccent)),
-            onTap: () async {
-              updateUserPresence(false);
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.popUntil(context, (route) => route.isFirst);
-              }
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
