@@ -15,6 +15,7 @@ import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
@@ -1315,7 +1316,6 @@ class _CallScreenState extends State<CallScreen> {
   Future<void> _playOutgoingRingtone() async {
     try {
       await _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
-      // Play local downloaded audio from assets/audio/dialing.mp3
       await _ringtonePlayer.play(AssetSource('audio/dialing.mp3'));
     } catch (_) {}
   }
@@ -2367,7 +2367,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: dynamic,
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -2830,7 +2830,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 }
 
 // ==================================================
-// PROFILE SCREEN (WITH GALLERY PROFILE PHOTO PICKER)
+// PROFILE SCREEN (WITH CROP PHOTO PICKER)
 // ==================================================
 
 class ProfileScreen extends StatefulWidget {
@@ -2872,14 +2872,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 70,
       );
 
       if (image == null) return;
 
-      final bytes = await image.readAsBytes();
+      final CroppedFile? croppedFile = await ImageCropper().cropImage(
+        sourcePath: image.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Profile Photo',
+            toolbarColor: const Color(0xFF1E1E1E),
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+            activeControlsWidgetColor: const Color(0xFFFF7A00),
+          ),
+        ],
+      );
+
+      if (croppedFile == null) return;
+
+      final bytes = await croppedFile.readAsBytes();
       final base64String = base64Encode(bytes);
 
       setState(() => photoBase64 = base64String);
