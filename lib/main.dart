@@ -25,7 +25,6 @@ import 'package:flutter_tts/flutter_tts.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// App Theme Color Palette (Inspired by App Icon)
 const Color kPrimaryNeon = Color(0xFF00C6FF);
 const Color kAccentPink = Color(0xFFE03287);
 const Color kDarkSurface = Color(0xFF141724);
@@ -516,9 +515,11 @@ Future<void> ensureUserDoc(User user) async {
     final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
     final doc = await docRef.get();
     if (!doc.exists) {
+      final defaultUsername = 'user_${Random().nextInt(899999) + 100000}';
       await docRef.set({
         'uid': user.uid,
-        'name': (user.displayName?.isNotEmpty == true) ? user.displayName : 'User',
+        'name': '',
+        'username': defaultUsername,
         'bio': 'Hey there! I am on Avatar.',
         'photoBase64': '',
         'connections': [],
@@ -533,7 +534,7 @@ Future<void> ensureUserDoc(User user) async {
   } catch (_) {}
 }
 
-void showUserAvatarPreview(BuildContext context, {required String photoBase64, required String name, String? bio}) {
+void showUserAvatarPreview(BuildContext context, {required String photoBase64, required String name, String? bio, String? username}) {
   ImageProvider? provider;
   if (photoBase64.isNotEmpty) {
     try {
@@ -575,14 +576,16 @@ void showUserAvatarPreview(BuildContext context, {required String photoBase64, r
                         color: kLightBg,
                         child: Center(
                           child: Text(
-                            name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                            name.isNotEmpty ? name[0].toUpperCase() : (username != null && username.isNotEmpty ? username[0].toUpperCase() : 'U'),
                             style: const TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: kDarkSurface),
                           ),
                         ),
                       ),
               ),
               const SizedBox(height: 14),
-              Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              Text(name.isNotEmpty ? name : (username != null ? '@$username' : 'User'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              if (username != null && name.isNotEmpty)
+                Text('@$username', style: const TextStyle(color: kTextSubtle, fontSize: 13)),
               if (bio != null && bio.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(bio, maxLines: 2, textAlign: TextAlign.center, style: const TextStyle(color: kTextSubtle, fontSize: 13)),
@@ -600,6 +603,7 @@ Widget buildUserAvatar({
   required String photoBase64,
   required String name,
   String? bio,
+  String? username,
   double radius = 24,
   bool enablePreview = true,
 }) {
@@ -627,7 +631,7 @@ Widget buildUserAvatar({
       backgroundImage: imageProvider,
       child: imageProvider == null
           ? Text(
-              name.isNotEmpty ? name[0].toUpperCase() : 'U',
+              name.isNotEmpty ? name[0].toUpperCase() : (username != null && username.isNotEmpty ? username[0].toUpperCase() : 'U'),
               style: TextStyle(
                 fontSize: radius * 0.9,
                 fontWeight: FontWeight.bold,
@@ -641,7 +645,7 @@ Widget buildUserAvatar({
   if (!enablePreview) return avatarWidget;
 
   return GestureDetector(
-    onLongPress: () => showUserAvatarPreview(context, photoBase64: photoBase64, name: name, bio: bio),
+    onLongPress: () => showUserAvatarPreview(context, photoBase64: photoBase64, name: name, bio: bio, username: username),
     child: avatarWidget,
   );
 }
@@ -767,7 +771,7 @@ class AuthGate extends StatelessWidget {
 }
 
 // ==================================================
-// WELCOME SCREEN (WITH ORIGINAL ASSET APP ICON)
+// WELCOME SCREEN
 // ==================================================
 
 class WelcomeScreen extends StatelessWidget {
@@ -880,7 +884,7 @@ class WelcomeScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CREATE ACCOUNT
+// CREATE ACCOUNT (WITH UNIQUE USERNAME CHECK)
 // ==================================================
 
 class CreateAccountScreen extends StatefulWidget {
@@ -891,22 +895,29 @@ class CreateAccountScreen extends StatefulWidget {
 }
 
 class _CreateAccountScreenState extends State<CreateAccountScreen> {
-  final nameController = TextEditingController();
+  final usernameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
   bool loading = false;
   bool hidePassword = true;
+  String usernameError = '';
 
   Future<void> createAccount() async {
     FocusScope.of(context).unfocus();
+    setState(() => usernameError = '');
 
-    final name = nameController.text.trim();
+    final username = usernameController.text.trim().toLowerCase();
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
-      _showMessage(context, 'Please enter name, email and password.');
+    if (username.isEmpty || email.isEmpty || password.isEmpty) {
+      _showMessage(context, 'Please enter username, email and password.');
+      return;
+    }
+
+    if (username.contains(' ') || username.length < 3) {
+      _showMessage(context, 'Username must be at least 3 characters without spaces.');
       return;
     }
 
@@ -918,6 +929,20 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     setState(() => loading = true);
 
     try {
+      // Check if username already exists
+      final existingUser = await FirebaseFirestore.instance
+          .collection('users')
+          .where('username', isEqualTo: username)
+          .get();
+
+      if (existingUser.docs.isNotEmpty) {
+        setState(() {
+          loading = false;
+          usernameError = 'This username is already taken. Please choose another one.';
+        });
+        return;
+      }
+
       final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -925,10 +950,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
       final user = credential.user;
       if (user != null) {
-        await user.updateDisplayName(name);
+        await user.updateDisplayName(username);
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
-          'name': name,
+          'name': '',
+          'username': username,
           'bio': 'Hey there! I am on Avatar.',
           'photoBase64': '',
           'connections': [],
@@ -961,7 +987,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
   @override
   void dispose() {
-    nameController.dispose();
+    usernameController.dispose();
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
@@ -978,18 +1004,19 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Join Avatar Today', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              const Text('Pick a unique username', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: kDarkSurface)),
               const SizedBox(height: 8),
-              const Text('Create an account to start connecting with friends.', style: TextStyle(color: kTextSubtle, fontSize: 14)),
+              const Text('You can set your public display name anytime later in profile.', style: TextStyle(color: kTextSubtle, fontSize: 14)),
               const SizedBox(height: 28),
               TextField(
-                controller: nameController,
+                controller: usernameController,
                 decoration: InputDecoration(
-                  labelText: 'Full Name',
+                  labelText: 'Unique Username (e.g. mohit_01)',
                   filled: true,
                   fillColor: kLightBg,
+                  errorText: usernameError.isNotEmpty ? usernameError : null,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                  prefixIcon: const Icon(Icons.person_outline),
+                  prefixIcon: const Icon(Icons.alternate_email),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1183,7 +1210,80 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN
+// PLACEHOLDER TABS FOR 5-TAB BAR
+// ==================================================
+
+class ReelsPlaceholderScreen extends StatelessWidget {
+  const ReelsPlaceholderScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Reels & Posts', style: TextStyle(fontWeight: FontWeight.bold))),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.movie_creation_outlined, size: 70, color: kPrimaryNeon),
+            SizedBox(height: 14),
+            Text('Reels & Posts Feed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 6),
+            Text('Coming in next step with dual switch & sharing', style: TextStyle(color: kTextSubtle)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MusicPlaceholderScreen extends StatelessWidget {
+  const MusicPlaceholderScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Music Hub', style: TextStyle(fontWeight: FontWeight.bold))),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.music_note_rounded, size: 70, color: kAccentPink),
+            SizedBox(height: 14),
+            Text('Background Music & Call Sync', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 6),
+            Text('Audio streaming and live share', style: TextStyle(color: kTextSubtle)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class RewardsPlaceholderScreen extends StatelessWidget {
+  const RewardsPlaceholderScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Avatar Rewards', style: TextStyle(fontWeight: FontWeight.bold))),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.stars_rounded, size: 70, color: Colors.amber),
+            SizedBox(height: 14),
+            Text('Daily Streaks & Avatar Coins', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 6),
+            Text('Earn coins to unlock exclusive perks', style: TextStyle(color: kTextSubtle)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// HOME SCREEN (5-TAB SYSTEM WITH CENTER FLOATING PROFILE)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1194,17 +1294,19 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int currentIndex = 0;
+  int currentIndex = 2; // Default Launch on Center Profile
   StreamSubscription? callSubscription;
 
-  final List<Widget?> pages = [null, null, null];
+  final List<Widget?> pages = [null, null, null, null, null];
 
   Widget _pageAt(int index) {
     if (pages[index] == null) {
       pages[index] = switch (index) {
-        0 => const ChatScreen(),
-        1 => const DiscoverScreen(),
-        _ => const ProfileScreen(),
+        0 => const ReelsPlaceholderScreen(),
+        1 => const MusicPlaceholderScreen(),
+        2 => const ProfileScreen(),
+        3 => const RewardsPlaceholderScreen(),
+        _ => const ChatScreen(),
       };
     }
     return pages[index]!;
@@ -1399,9 +1501,12 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex == 0 || pages[0] != null ? _pageAt(0) : const SizedBox.shrink(),
           currentIndex == 1 || pages[1] != null ? _pageAt(1) : const SizedBox.shrink(),
           currentIndex == 2 || pages[2] != null ? _pageAt(2) : const SizedBox.shrink(),
+          currentIndex == 3 || pages[3] != null ? _pageAt(3) : const SizedBox.shrink(),
+          currentIndex == 4 || pages[4] != null ? _pageAt(4) : const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: Container(
+        height: 72,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -1412,26 +1517,78 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        child: NavigationBar(
-          backgroundColor: Colors.white,
-          indicatorColor: kPrimaryNeon.withOpacity(0.18),
-          selectedIndex: currentIndex,
-          onDestinationSelected: (index) => setState(() => currentIndex = index),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.chat_bubble_outline_rounded, color: kDarkSurface),
-              selectedIcon: Icon(Icons.chat_bubble_rounded, color: kAccentPink),
-              label: 'Chats',
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            // Tab 0: Reels
+            IconButton(
+              icon: Icon(
+                currentIndex == 0 ? Icons.movie_creation : Icons.movie_creation_outlined,
+                color: currentIndex == 0 ? kAccentPink : kDarkSurface,
+              ),
+              onPressed: () => setState(() => currentIndex = 0),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.explore_outlined, color: kDarkSurface),
-              selectedIcon: Icon(Icons.explore_rounded, color: kAccentPink),
-              label: 'Discover',
+            // Tab 1: Music
+            IconButton(
+              icon: Icon(
+                currentIndex == 1 ? Icons.music_note : Icons.music_note_outlined,
+                color: currentIndex == 1 ? kAccentPink : kDarkSurface,
+              ),
+              onPressed: () => setState(() => currentIndex = 1),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded, color: kDarkSurface),
-              selectedIcon: Icon(Icons.person_rounded, color: kAccentPink),
-              label: 'Profile',
+            // Tab 2: Floating Center Profile
+            GestureDetector(
+              onTap: () => setState(() => currentIndex = 2),
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [kPrimaryNeon, kAccentPink],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kPrimaryNeon.withOpacity(currentIndex == 2 ? 0.45 : 0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: Center(
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                    child: Icon(
+                      Icons.person_rounded,
+                      color: currentIndex == 2 ? kAccentPink : kDarkSurface,
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Tab 3: Rewards
+            IconButton(
+              icon: Icon(
+                currentIndex == 3 ? Icons.stars_rounded : Icons.stars_outlined,
+                color: currentIndex == 3 ? Colors.amber.shade700 : kDarkSurface,
+              ),
+              onPressed: () => setState(() => currentIndex = 3),
+            ),
+            // Tab 4: Chats
+            IconButton(
+              icon: Icon(
+                currentIndex == 4 ? Icons.chat_bubble : Icons.chat_bubble_outline_rounded,
+                color: currentIndex == 4 ? kAccentPink : kDarkSurface,
+              ),
+              onPressed: () => setState(() => currentIndex = 4),
             ),
           ],
         ),
@@ -1473,7 +1630,6 @@ class NotificationsScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // System Updates & Broadcasts
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance.collection('app_updates').orderBy('createdAt', descending: true).snapshots(),
                 builder: (context, updateSnap) {
@@ -1523,8 +1679,6 @@ class NotificationsScreen extends StatelessWidget {
                   );
                 },
               ),
-
-              // Connection Requests
               const Text('Connection Requests', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
               const SizedBox(height: 10),
               StreamBuilder<QuerySnapshot>(
@@ -1547,7 +1701,8 @@ class NotificationsScreen extends StatelessWidget {
                     children: usersWhoConnectedMe.map((doc) {
                       final uData = doc.data() as Map<String, dynamic>;
                       final peerUid = uData['uid'] ?? doc.id;
-                      final peerName = uData['name'] ?? 'User';
+                      final peerName = (uData['name'] ?? '').toString();
+                      final peerUsername = (uData['username'] ?? 'user').toString();
                       final peerBio = uData['bio'] ?? '';
                       final peerPhoto = uData['photoBase64'] ?? '';
                       final isMutual = myConnections.contains(peerUid);
@@ -1565,15 +1720,15 @@ class NotificationsScreen extends StatelessWidget {
                         child: Row(
                           children: [
                             GestureDetector(
-                              onTap: () => showUserAvatarPreview(context, photoBase64: peerPhoto, name: peerName, bio: peerBio),
-                              child: buildUserAvatar(context: context, photoBase64: peerPhoto, name: peerName, bio: peerBio, radius: 20),
+                              onTap: () => showUserAvatarPreview(context, photoBase64: peerPhoto, name: peerName, bio: peerBio, username: peerUsername),
+                              child: buildUserAvatar(context: context, photoBase64: peerPhoto, name: peerName, username: peerUsername, bio: peerBio, radius: 20),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(peerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                  Text(peerName.isNotEmpty ? peerName : '@$peerUsername', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                                   Text(isMutual ? 'Mutual Connected' : 'Connected with you', style: const TextStyle(color: kTextSubtle, fontSize: 12)),
                                 ],
                               ),
@@ -1605,7 +1760,7 @@ class NotificationsScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT SCREEN (MUTUAL CONVERSATIONS ONLY)
+// CHAT SCREEN (PUBLIC DIRECT OR MUTUAL PRIVATE)
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -1637,6 +1792,16 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: () {
               Navigator.push(
                 context,
+                MaterialPageRoute(builder: (_) => const DiscoverScreen()),
+              );
+            },
+            icon: const Icon(Icons.person_search_rounded, color: kDarkSurface, size: 26),
+            tooltip: 'Discover & Search People',
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
                 MaterialPageRoute(builder: (_) => const NotificationsScreen()),
               );
             },
@@ -1660,17 +1825,30 @@ class _ChatScreenState extends State<ChatScreen> {
 
               final allDocs = allUsersSnap.data?.docs ?? [];
 
-              final mutualUsers = allDocs.where((doc) {
+              // RULE: Allowed to chat if:
+              // 1. Peer account is PUBLIC and in my connections.
+              // OR 2. Peer account is PRIVATE and BOTH connected (Mutual).
+              final activeChatUsers = allDocs.where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 final uid = data['uid'] ?? doc.id;
                 final name = (data['name'] ?? '').toString().toLowerCase();
+                final username = (data['username'] ?? '').toString().toLowerCase();
+                final bool isPrivate = data['isPrivate'] ?? false;
                 final List<dynamic> theirConnections = data['connections'] ?? [];
 
-                final isMutual = myConnections.contains(uid) && theirConnections.contains(currentUid);
+                if (uid == currentUid) return false;
 
-                if (uid == currentUid || !isMutual) return false;
+                bool canChat = false;
+                if (!isPrivate && myConnections.contains(uid)) {
+                  canChat = true;
+                } else if (isPrivate && myConnections.contains(uid) && theirConnections.contains(currentUid)) {
+                  canChat = true;
+                }
+
+                if (!canChat) return false;
+
                 if (searchQuery.isNotEmpty) {
-                  return name.contains(searchQuery.toLowerCase());
+                  return name.contains(searchQuery.toLowerCase()) || username.contains(searchQuery.toLowerCase());
                 }
                 return true;
               }).toList();
@@ -1740,15 +1918,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
                   const SizedBox(height: 8),
 
-                  // Mutual Friends Live Chats
-                  if (mutualUsers.isNotEmpty) ...[
-                    ...mutualUsers.map((doc) {
+                  if (activeChatUsers.isNotEmpty) ...[
+                    ...activeChatUsers.map((doc) {
                       final data = doc.data() as Map<String, dynamic>;
                       final peerUid = data['uid'] ?? doc.id;
-                      final name = data['name'] ?? 'User';
+                      final name = (data['name'] ?? '').toString();
+                      final username = (data['username'] ?? 'user').toString();
                       final bio = data['bio'] ?? '';
                       final photo = data['photoBase64'] ?? '';
                       final isOnline = data['isOnline'] == true;
+
+                      final displayName = name.isNotEmpty ? name : '@$username';
 
                       return Container(
                         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -1763,7 +1943,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                           leading: Stack(
                             children: [
-                              buildUserAvatar(context: context, photoBase64: photo, name: name, bio: bio, radius: 22),
+                              buildUserAvatar(context: context, photoBase64: photo, name: name, username: username, bio: bio, radius: 22),
                               if (isOnline)
                                 Positioned(
                                   right: 0,
@@ -1780,7 +1960,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                             ],
                           ),
-                          title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+                          title: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
                           subtitle: Text(
                             isOnline ? 'Active now' : 'Offline',
                             style: TextStyle(color: isOnline ? Colors.green : kTextSubtle, fontSize: 13),
@@ -1791,7 +1971,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (_) => ChatConversationScreen(
-                                  userName: name,
+                                  userName: displayName,
                                   peerUid: peerUid,
                                   peerPhoto: photo,
                                 ),
@@ -1809,9 +1989,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           children: const [
                             Icon(Icons.people_outline_rounded, size: 50, color: kTextSubtle),
                             SizedBox(height: 10),
-                            Text('No mutual chats yet.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+                            Text('No active chats.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
                             SizedBox(height: 4),
-                            Text('Connect with users in Discover and make sure they connect back to unlock private messaging.', textAlign: TextAlign.center, style: TextStyle(color: kTextSubtle, fontSize: 13)),
+                            Text('Connect with Public accounts to chat directly, or wait for Private accounts to connect back.', textAlign: TextAlign.center, style: TextStyle(color: kTextSubtle, fontSize: 13)),
                           ],
                         ),
                       ),
@@ -1828,7 +2008,7 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 // ==================================================
-// DISCOVER SCREEN
+// DISCOVER & SEARCH PEOPLE SCREEN
 // ==================================================
 
 class DiscoverScreen extends StatefulWidget {
@@ -1857,7 +2037,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       await userRef.set({
         'connections': FieldValue.arrayUnion([peerUid])
       }, SetOptions(merge: true));
-      if (mounted) _showMessage(context, 'Connection request sent!');
+      if (mounted) _showMessage(context, 'Connected successfully!');
     }
   }
 
@@ -1872,7 +2052,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Discover People', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24))),
+      appBar: AppBar(title: const Text('Discover People', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22))),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
         builder: (context, userSnap) {
@@ -1887,7 +2067,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   controller: searchController,
                   onChanged: (val) => setState(() => searchQuery = val.trim().toLowerCase()),
                   decoration: InputDecoration(
-                    hintText: 'Search people by name...',
+                    hintText: 'Search by name or @username...',
                     prefixIcon: const Icon(Icons.search, color: kTextSubtle),
                     filled: true,
                     fillColor: Colors.white,
@@ -1912,8 +2092,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       if (uid == currentUid) return false;
 
                       final name = (data['name'] ?? '').toString().toLowerCase();
+                      final username = (data['username'] ?? '').toString().toLowerCase();
+
                       if (searchQuery.isEmpty) return true;
-                      return name.contains(searchQuery);
+                      return name.contains(searchQuery) || username.contains(searchQuery);
                     }).toList();
 
                     if (users.isEmpty) {
@@ -1927,7 +2109,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       itemBuilder: (context, index) {
                         final userData = users[index].data() as Map<String, dynamic>;
-                        final userName = userData['name'] ?? 'User';
+                        final userName = (userData['name'] ?? '').toString();
+                        final userUsername = (userData['username'] ?? 'user').toString();
                         final userBio = userData['bio'] ?? 'Using Avatar';
                         final peerUid = userData['uid'] ?? users[index].id;
                         final photo = userData['photoBase64'] ?? '';
@@ -1942,11 +2125,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                             leading: GestureDetector(
-                              onTap: () => showUserAvatarPreview(context, photoBase64: photo, name: userName, bio: userBio),
-                              child: buildUserAvatar(context: context, photoBase64: photo, name: userName, bio: userBio, radius: 22),
+                              onTap: () => showUserAvatarPreview(context, photoBase64: photo, name: userName, bio: userBio, username: userUsername),
+                              child: buildUserAvatar(context: context, photoBase64: photo, name: userName, username: userUsername, bio: userBio, radius: 22),
                             ),
-                            title: Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
-                            subtitle: Text(userBio, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle)),
+                            title: Text(userName.isNotEmpty ? userName : '@$userUsername', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+                            subtitle: Text('@$userUsername • $userBio', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle)),
                             trailing: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isConnected ? kLightBg : kDarkSurface,
@@ -2420,7 +2603,7 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN (SMOOTH SCROLL FIX)
+// CHAT CONVERSATION SCREEN
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -3258,7 +3441,177 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 }
 
 // ==================================================
-// PROFILE SCREEN (WITH PRIVATE ACCOUNT TOGGLE)
+// INTERACTIVE CONNECTED & CONNECTORS POPUP SHEET
+// ==================================================
+
+class ConnectionsListModal extends StatefulWidget {
+  final String title;
+  final bool isConnectedMode; // true: Connected (I follow), false: Connectors (Followers)
+  final String myUid;
+  final List<dynamic> myConnections;
+
+  const ConnectionsListModal({
+    Key? key,
+    required this.title,
+    required this.isConnectedMode,
+    required this.myUid,
+    required this.myConnections,
+  }) : super(key: key);
+
+  @override
+  State<ConnectionsListModal> createState() => _ConnectionsListModalState();
+}
+
+class _ConnectionsListModalState extends State<ConnectionsListModal> {
+  final TextEditingController searchCtrl = TextEditingController();
+  String query = '';
+
+  Future<void> _toggleConnection(String peerUid, bool currentlyConnected) async {
+    final userRef = FirebaseFirestore.instance.collection('users').doc(widget.myUid);
+    if (currentlyConnected) {
+      await userRef.set({
+        'connections': FieldValue.arrayRemove([peerUid])
+      }, SetOptions(merge: true));
+      if (mounted) _showMessage(context, 'Disconnected.');
+    } else {
+      await userRef.set({
+        'connections': FieldValue.arrayUnion([peerUid])
+      }, SetOptions(merge: true));
+      if (mounted) _showMessage(context, 'Connected back!');
+    }
+  }
+
+  @override
+  void dispose() {
+    searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, size: 22)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: searchCtrl,
+              onChanged: (v) => setState(() => query = v.trim().toLowerCase()),
+              decoration: InputDecoration(
+                hintText: 'Search people...',
+                prefixIcon: const Icon(Icons.search, color: kTextSubtle),
+                filled: true,
+                fillColor: kLightBg,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('users').doc(widget.myUid).snapshots(),
+              builder: (context, mySnap) {
+                final myLiveConnections = (mySnap.data?.data() as Map<String, dynamic>?)?['connections'] as List<dynamic>? ?? widget.myConnections;
+
+                Query userQuery = FirebaseFirestore.instance.collection('users');
+                if (widget.isConnectedMode) {
+                  // People I connected
+                  if (myLiveConnections.isEmpty) {
+                    return const Center(child: Text('No connected users yet.', style: TextStyle(color: kTextSubtle)));
+                  }
+                }
+
+                return StreamBuilder<QuerySnapshot>(
+                  stream: widget.isConnectedMode
+                      ? userQuery.snapshots()
+                      : userQuery.where('connections', arrayContains: widget.myUid).snapshots(),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+                    }
+
+                    var docs = snap.data?.docs ?? [];
+                    if (widget.isConnectedMode) {
+                      docs = docs.where((d) => myLiveConnections.contains(d.id)).toList();
+                    }
+
+                    final filtered = docs.where((doc) {
+                      final d = doc.data() as Map<String, dynamic>;
+                      final name = (d['name'] ?? '').toString().toLowerCase();
+                      final username = (d['username'] ?? '').toString().toLowerCase();
+                      if (query.isEmpty) return true;
+                      return name.contains(query) || username.contains(query);
+                    }).toList();
+
+                    if (filtered.isEmpty) {
+                      return const Center(child: Text('No matching users found.', style: TextStyle(color: kTextSubtle)));
+                    }
+
+                    return ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, idx) {
+                        final uData = filtered[idx].data() as Map<String, dynamic>;
+                        final peerUid = uData['uid'] ?? filtered[idx].id;
+                        final name = (uData['name'] ?? '').toString();
+                        final username = (uData['username'] ?? 'user').toString();
+                        final bio = uData['bio'] ?? '';
+                        final photo = uData['photoBase64'] ?? '';
+                        final isAlreadyConnectedByMe = myLiveConnections.contains(peerUid);
+
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: GestureDetector(
+                            onTap: () => showUserAvatarPreview(context, photoBase64: photo, name: name, username: username, bio: bio),
+                            child: buildUserAvatar(context: context, photoBase64: photo, name: name, username: username, bio: bio, radius: 22),
+                          ),
+                          title: Text(name.isNotEmpty ? name : '@$username', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          subtitle: Text('@$username', style: const TextStyle(color: kTextSubtle, fontSize: 13)),
+                          trailing: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isAlreadyConnectedByMe ? kLightBg : kPrimaryNeon,
+                              foregroundColor: isAlreadyConnectedByMe ? kTextDark : Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: () => _toggleConnection(peerUid, isAlreadyConnectedByMe),
+                            child: Text(
+                              isAlreadyConnectedByMe ? 'Disconnect' : 'Connect Back',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================
+// PROFILE SCREEN
 // ==================================================
 
 class ProfileScreen extends StatefulWidget {
@@ -3271,6 +3624,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ImagePicker _picker = ImagePicker();
   String displayName = '';
+  String username = '';
   String displayBio = 'Hey there! I am on Avatar.';
   String photoBase64 = '';
   bool isPrivateAccount = false;
@@ -3278,8 +3632,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final user = FirebaseAuth.instance.currentUser;
-    displayName = user?.displayName ?? 'User';
     _loadProfileData();
   }
 
@@ -3290,6 +3642,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (doc.exists && mounted) {
         final data = doc.data();
         setState(() {
+          displayName = data?['name'] ?? '';
+          username = data?['username'] ?? '';
           displayBio = data?['bio'] ?? displayBio;
           photoBase64 = data?['photoBase64'] ?? '';
           isPrivateAccount = data?['isPrivate'] ?? false;
@@ -3350,65 +3704,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _openEditProfileSheet() {
     final nameCtrl = TextEditingController(text: displayName);
+    final usernameCtrl = TextEditingController(text: username);
     final bioCtrl = TextEditingController(text: displayBio);
+    String sheetError = '';
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          left: 20,
-          right: 20,
-          top: 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Edit Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: kDarkSurface)),
-            const SizedBox(height: 18),
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(
-                labelText: 'Username',
-                filled: true,
-                fillColor: kLightBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: bioCtrl,
-              maxLines: 2,
-              decoration: InputDecoration(
-                labelText: 'Bio / Status',
-                filled: true,
-                fillColor: kLightBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              height: 50,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Edit Profile Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              const SizedBox(height: 18),
+              TextField(
+                controller: usernameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Unique Username (@)',
+                  filled: true,
+                  fillColor: kLightBg,
+                  errorText: sheetError.isNotEmpty ? sheetError : null,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                 ),
-                onPressed: () async {
-                  final newName = nameCtrl.text.trim();
-                  final newBio = bioCtrl.text.trim();
-                  final user = FirebaseAuth.instance.currentUser;
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Display Name (Shown in chats)',
+                  hintText: 'e.g. Mohit Sharma',
+                  filled: true,
+                  fillColor: kLightBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: bioCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Bio / Status',
+                  filled: true,
+                  fillColor: kLightBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: const LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
+                ),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                  ),
+                  onPressed: () async {
+                    final newUsername = usernameCtrl.text.trim().toLowerCase();
+                    final newName = nameCtrl.text.trim();
+                    final newBio = bioCtrl.text.trim();
+                    final user = FirebaseAuth.instance.currentUser;
 
-                  if (newName.isNotEmpty) {
+                    if (newUsername.isEmpty || newUsername.contains(' ') || newUsername.length < 3) {
+                      setModalState(() => sheetError = 'Valid username (min 3 chars, no space) required.');
+                      return;
+                    }
+
+                    if (newUsername != username) {
+                      final check = await FirebaseFirestore.instance
+                          .collection('users')
+                          .where('username', isEqualTo: newUsername)
+                          .get();
+
+                      if (check.docs.isNotEmpty) {
+                        setModalState(() => sheetError = 'This username is already taken. Please choose another one.');
+                        return;
+                      }
+                    }
+
                     setState(() {
+                      username = newUsername;
                       displayName = newName;
                       displayBio = newBio;
                     });
@@ -3416,21 +3803,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Navigator.pop(ctx);
 
                     if (user != null) {
-                      await user.updateDisplayName(newName);
                       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                        'username': newUsername,
                         'name': newName,
                         'bio': newBio,
                       }, SetOptions(merge: true));
                     }
 
                     if (mounted) _showMessage(context, 'Profile updated!');
-                  }
-                },
-                child: const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  },
+                  child: const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  void _openConnectionsModal(bool isConnectedMode, List<dynamic> myConnections, String myUid) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ConnectionsListModal(
+        title: isConnectedMode ? 'People You Connected' : 'Your Connectors',
+        isConnectedMode: isConnectedMode,
+        myUid: myUid,
+        myConnections: myConnections,
       ),
     );
   }
@@ -3442,7 +3843,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24)),
+        title: Text(username.isNotEmpty ? '@$username' : 'My Profile', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22)),
         actions: [
           IconButton(
             onPressed: () async {
@@ -3465,6 +3866,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     context: context,
                     photoBase64: photoBase64,
                     name: displayName,
+                    username: username,
                     bio: displayBio,
                     radius: 60,
                   ),
@@ -3487,12 +3889,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text(displayName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              Text(displayName.isNotEmpty ? displayName : (username.isNotEmpty ? '@$username' : 'Set Your Name'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              if (displayName.isNotEmpty && username.isNotEmpty)
+                Text('@$username', style: const TextStyle(color: kTextSubtle, fontSize: 13, fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
               Text(displayBio, textAlign: TextAlign.center, style: const TextStyle(color: kTextSubtle, fontSize: 14)),
               const SizedBox(height: 24),
 
-              // Connected / Connectors Counts
+              // Interactive Connected & Connectors Counts
               StreamBuilder<DocumentSnapshot>(
                 stream: FirebaseFirestore.instance.collection('users').doc(myUid).snapshots(),
                 builder: (context, mySnap) {
@@ -3507,47 +3911,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       return Row(
                         children: [
                           Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    '${connectedList.length}',
-                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kPrimaryNeon),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text('Connected', style: TextStyle(color: kTextSubtle, fontSize: 13, fontWeight: FontWeight.w600)),
-                                ],
+                            child: GestureDetector(
+                              onTap: () => _openConnectionsModal(true, connectedList, myUid),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      '${connectedList.length}',
+                                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kPrimaryNeon),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text('Connected', style: TextStyle(color: kTextSubtle, fontSize: 13, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    '$connectorCount',
-                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kAccentPink),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text('Connectors', style: TextStyle(color: kTextSubtle, fontSize: 13, fontWeight: FontWeight.w600)),
-                                ],
+                            child: GestureDetector(
+                              onTap: () => _openConnectionsModal(false, connectedList, myUid),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      '$connectorCount',
+                                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kAccentPink),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text('Connectors', style: TextStyle(color: kTextSubtle, fontSize: 13, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -3560,7 +3970,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 18),
 
-              // Privacy Switch (For future Reels & Posts)
+              // Privacy Switch
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -3582,7 +3992,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   title: const Text('Private Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: kDarkSurface)),
                   subtitle: Text(
-                    isPrivateAccount ? 'Only mutual connections can see posts & reels' : 'Anyone can view your public content',
+                    isPrivateAccount ? 'Only mutual connections can chat & view content' : 'Anyone connected can message you',
                     style: const TextStyle(color: kTextSubtle, fontSize: 12),
                   ),
                   value: isPrivateAccount,
