@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -163,7 +164,7 @@ class NotificationService {
 }
 
 // ==================================================
-// WEBRTC SIGNALING SERVICE (WITH TURN & QUEUEING)
+// WEBRTC SIGNALING SERVICE
 // ==================================================
 
 typedef StreamCallback = void Function(MediaStream stream);
@@ -985,7 +986,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (WITH CALLKIT & TERMINATED HANDLER)
+// HOME SCREEN (WITH CALLKIT & IN-APP NOTIFICATIONS)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1024,7 +1025,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // App band hone par CallKit Accept dabane par seedhe call screen open karna
   Future<void> _checkInitialCall() async {
     try {
       final calls = await FlutterCallkitIncoming.activeCalls();
@@ -1285,7 +1285,7 @@ class HomeTab extends StatelessWidget {
 }
 
 // ==================================================
-// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN
+// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN + LOG MAKER
 // ==================================================
 
 class CallScreen extends StatefulWidget {
@@ -1334,6 +1334,7 @@ class _CallScreenState extends State<CallScreen> {
         },
         onCallEnded: () {
           unawaited(FlutterCallkitIncoming.endAllCalls());
+          _logCallHistory();
           if (mounted) Navigator.pop(context);
         },
       );
@@ -1358,6 +1359,7 @@ class _CallScreenState extends State<CallScreen> {
       },
       onCallEnded: () {
         unawaited(FlutterCallkitIncoming.endAllCalls());
+        _logCallHistory();
         if (mounted) Navigator.pop(context);
       },
     );
@@ -1420,9 +1422,36 @@ class _CallScreenState extends State<CallScreen> {
     return '$m:$s';
   }
 
+  Future<void> _logCallHistory() async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid == null || widget.peerUid.isEmpty) return;
+
+    try {
+      final roomId = getChatRoomId(currentUid, widget.peerUid);
+      final logText = isConnected
+          ? 'Voice Call • ${_formatTime(callSeconds)}'
+          : (widget.isIncoming ? 'Missed Voice Call' : 'Cancelled Voice Call');
+
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(roomId)
+          .collection('messages')
+          .add({
+        'senderId': currentUid,
+        'receiverId': widget.peerUid,
+        'type': 'call_log',
+        'text': logText,
+        'callStatus': isConnected ? 'connected' : (widget.isIncoming ? 'missed' : 'cancelled'),
+        'isRead': true,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     callTimer?.cancel();
+    _logCallHistory();
     unawaited(_signaling.hangUp());
     unawaited(FlutterCallkitIncoming.endAllCalls());
     super.dispose();
@@ -1514,6 +1543,171 @@ class _CallScreenState extends State<CallScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ==================================================
+// AUDIO WAVEFORM VOICE NOTE PLAYER
+// ==================================================
+
+class VoiceNoteBubble extends StatefulWidget {
+  final String audioBase64;
+  final bool isMe;
+
+  const VoiceNoteBubble({Key? key, required this.audioBase64, required this.isMe}) : super(key: key);
+
+  @override
+  State<VoiceNoteBubble> createState() => _VoiceNoteBubbleState();
+}
+
+class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool isPlaying = false;
+  Duration duration = Duration.zero;
+  Duration position = Duration.zero;
+  String? tempAudioPath;
+  late final List<double> barHeights;
+
+  @override
+  void initState() {
+    super.initState();
+    // Deterministic waveform bars based on string hash
+    final rand = Random(widget.audioBase64.hashCode);
+    barHeights = List.generate(24, (_) => 0.25 + rand.nextDouble() * 0.75);
+
+    _prepareAudio();
+
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() => isPlaying = state == PlayerState.playing);
+      }
+    });
+
+    _audioPlayer.onDurationChanged.listen((d) {
+      if (mounted) setState(() => duration = d);
+    });
+
+    _audioPlayer.onPositionChanged.listen((p) {
+      if (mounted) setState(() => position = p);
+    });
+  }
+
+  Future<void> _prepareAudio() async {
+    try {
+      final bytes = base64Decode(widget.audioBase64);
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/${DateTime.now().microsecondsSinceEpoch}.m4a');
+      await file.writeAsBytes(bytes);
+      tempAudioPath = file.path;
+    } catch (_) {}
+  }
+
+  Future<void> _togglePlay() async {
+    if (isPlaying) {
+      await _audioPlayer.pause();
+    } else {
+      if (tempAudioPath != null) {
+        await _audioPlayer.play(DeviceFileSource(tempAudioPath!));
+      }
+    }
+  }
+
+  void _seek(double progress) {
+    if (duration.inMilliseconds > 0) {
+      final targetMs = (progress * duration.inMilliseconds).toInt();
+      _audioPlayer.seek(Duration(milliseconds: targetMs));
+    }
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = duration.inMilliseconds > 0
+        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          onPressed: _togglePlay,
+          icon: Icon(
+            isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+            size: 38,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onHorizontalDragUpdate: (details) {
+                final RenderBox box = context.findRenderObject() as RenderBox;
+                final tapPos = box.globalToLocal(details.globalPosition);
+                _seek((tapPos.dx / 130).clamp(0.0, 1.0));
+              },
+              onTapDown: (details) {
+                _seek((details.localPosition.dx / 130).clamp(0.0, 1.0));
+              },
+              child: SizedBox(
+                width: 130,
+                height: 28,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(barHeights.length, (idx) {
+                    final barProgress = idx / barHeights.length;
+                    final isPassed = barProgress <= progress;
+                    return Container(
+                      width: 3,
+                      height: 28 * barHeights[idx],
+                      decoration: BoxDecoration(
+                        color: isPassed ? Colors.white : Colors.white30,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${position.inSeconds}s / ${duration.inSeconds}s',
+              style: const TextStyle(fontSize: 11, color: Colors.white70),
+            ),
+          ],
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+}
+
+// ==================================================
+// ANIMATED MESSAGE BUBBLE
+// ==================================================
+
+class AnimatedBubble extends StatelessWidget {
+  final Widget child;
+
+  const AnimatedBubble({Key? key, required this.child}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.85, end: 1.0),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, animChild) {
+        return Transform.scale(scale: scale, child: animChild);
+      },
+      child: child,
     );
   }
 }
@@ -2321,136 +2515,7 @@ class FullImageViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// AUDIO VOICE NOTE PLAYER WIDGET
-// ==================================================
-
-class VoiceNoteBubble extends StatefulWidget {
-  final String audioBase64;
-  final bool isMe;
-
-  const VoiceNoteBubble({Key? key, required this.audioBase64, required this.isMe}) : super(key: key);
-
-  @override
-  State<VoiceNoteBubble> createState() => _VoiceNoteBubbleState();
-}
-
-class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  bool isPlaying = false;
-  Duration duration = Duration.zero;
-  Duration position = Duration.zero;
-  String? tempAudioPath;
-
-  @override
-  void initState() {
-    super.initState();
-    _prepareAudio();
-
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) {
-        setState(() => isPlaying = state == PlayerState.playing);
-      }
-    });
-
-    _audioPlayer.onDurationChanged.listen((d) {
-      if (mounted) setState(() => duration = d);
-    });
-
-    _audioPlayer.onPositionChanged.listen((p) {
-      if (mounted) setState(() => position = p);
-    });
-  }
-
-  Future<void> _prepareAudio() async {
-    try {
-      final bytes = base64Decode(widget.audioBase64);
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/${DateTime.now().microsecondsSinceEpoch}.m4a');
-      await file.writeAsBytes(bytes);
-      tempAudioPath = file.path;
-    } catch (_) {}
-  }
-
-  Future<void> _togglePlay() async {
-    if (isPlaying) {
-      await _audioPlayer.pause();
-    } else {
-      if (tempAudioPath != null) {
-        await _audioPlayer.play(DeviceFileSource(tempAudioPath!));
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          onPressed: _togglePlay,
-          icon: Icon(
-            isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-            size: 36,
-            color: Colors.white,
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 130,
-              child: LinearProgressIndicator(
-                value: duration.inMilliseconds > 0
-                    ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
-                    : 0.0,
-                backgroundColor: Colors.white24,
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${position.inSeconds}s / ${duration.inSeconds}s',
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
-            ),
-          ],
-        ),
-        const SizedBox(width: 8),
-      ],
-    );
-  }
-}
-
-// ==================================================
-// ANIMATED MESSAGE BUBBLE
-// ==================================================
-
-class AnimatedBubble extends StatelessWidget {
-  final Widget child;
-
-  const AnimatedBubble({Key? key, required this.child}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.8, end: 1.0),
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOutBack,
-      builder: (context, scale, animChild) {
-        return Transform.scale(scale: scale, child: animChild);
-      },
-      child: child,
-    );
-  }
-}
-
-// ==================================================
-// CHAT CONVERSATION SCREEN (SMOOTH & NO-JUMP)
+// CHAT CONVERSATION SCREEN (WITH REAL-TIME TYPING & LOGS)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -2534,7 +2599,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
     typingWriteTimer?.cancel();
     if (text.trim().isNotEmpty) {
-      typingWriteTimer = Timer(const Duration(milliseconds: 600), () {
+      typingWriteTimer = Timer(const Duration(milliseconds: 400), () {
         _updateTypingStatus(true);
       });
     } else {
@@ -2867,13 +2932,37 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(widget.userName, style: const TextStyle(fontSize: 16)),
-                    if (!isAvatarFriend)
-                      const Text('Voice & media chat', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                  ],
+                Expanded(
+                  child: isAvatarFriend
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            const Text('AI Companion', style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
+                          ],
+                        )
+                      : StreamBuilder<DocumentSnapshot>(
+                          stream: FirebaseFirestore.instance.collection('chats').doc(chatRoomId).snapshots(),
+                          builder: (context, chatDocSnap) {
+                            final chatData = chatDocSnap.data?.data() as Map<String, dynamic>?;
+                            final isPeerTyping = chatData?['typing_${widget.peerUid}'] == true;
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                Text(
+                                  isPeerTyping ? 'typing...' : 'Voice & media ready',
+                                  style: TextStyle(
+                                    color: isPeerTyping ? Colors.greenAccent : Colors.white54,
+                                    fontSize: 12,
+                                    fontWeight: isPeerTyping ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -3185,6 +3274,43 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             final isRead = data['isRead'] == true;
             final reaction = data['reaction'] ?? '';
 
+            // 1. Call Log Bubble
+            if (type == 'call_log') {
+              final status = data['callStatus'] ?? 'connected';
+              final isMissed = status == 'missed';
+              return Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: isMissed ? Colors.redAccent.withOpacity(0.5) : Colors.greenAccent.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isMissed ? Icons.phone_missed : Icons.phone,
+                        size: 16,
+                        color: isMissed ? Colors.redAccent : Colors.greenAccent,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        data['text'] ?? 'Voice Call',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isMissed ? Colors.redAccent : Colors.greenAccent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            // 2. Regular Messages
             return GestureDetector(
               onLongPress: () => _showMessageOptions(doc, data, isMe),
               child: Align(
