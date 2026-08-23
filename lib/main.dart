@@ -161,6 +161,34 @@ class NotificationService {
       }, SetOptions(merge: true));
     }
   }
+
+  // Trigger push notification to callee via Cloudflare Worker
+  static Future<void> triggerCallPush({
+    required String calleeId,
+    required String callId,
+    required String callerName,
+    required String callerAvatar,
+    required String callerId,
+  }) async {
+    try {
+      final calleeDoc = await FirebaseFirestore.instance.collection('users').doc(calleeId).get();
+      final String? fcmToken = calleeDoc.data()?['fcmToken'];
+
+      if (fcmToken == null || fcmToken.isEmpty) return;
+
+      await http.post(
+        Uri.parse('https://avatar-call-notifier.projectkhurafat.workers.dev/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'fcmToken': fcmToken,
+          'callId': callId,
+          'callerName': callerName,
+          'callerAvatar': callerAvatar,
+          'callerId': callerId,
+        }),
+      );
+    } catch (_) {}
+  }
 }
 
 // ==================================================
@@ -254,6 +282,16 @@ class WebRtcSignalingService {
       'status': 'calling',
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    unawaited(
+      NotificationService.triggerCallPush(
+        calleeId: calleeId,
+        callId: currentCallId!,
+        callerName: callerName,
+        callerAvatar: callerAvatar,
+        callerId: callerId,
+      ),
+    );
 
     callDocSubscription = callDoc.snapshots().listen((snapshot) async {
       final data = snapshot.data();
@@ -1028,7 +1066,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Automatic In-App Permission Flow for Background Calling
   Future<void> _checkAndAskInAppPermissions() async {
     final prefs = await SharedPreferences.getInstance();
     final bool alreadyAsked = prefs.getBool('permissions_asked_v1') ?? false;
@@ -1105,13 +1142,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.pop(ctx);
                         await prefs.setBool('permissions_asked_v1', true);
 
-                        // 1. Microphone & Notifications
                         await [
                           Permission.microphone,
                           Permission.notification,
                         ].request();
 
-                        // 2. Battery Saver Bypass (App band hone par background call aane ke liye)
                         if (await Permission.ignoreBatteryOptimizations.isDenied) {
                           await Permission.ignoreBatteryOptimizations.request();
                         }
