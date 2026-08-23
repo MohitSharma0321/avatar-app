@@ -75,10 +75,6 @@ Future<void> main() async {
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   runApp(const AvatarApp());
-
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    unawaited(NotificationService.initialize());
-  });
 }
 
 // ==================================================
@@ -102,12 +98,6 @@ class NotificationService {
       return;
     }
     _initialized = true;
-
-    await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -778,6 +768,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   bool hidePassword = true;
 
   Future<void> createAccount() async {
+    FocusScope.of(context).unfocus();
+
     final name = nameController.text.trim();
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
@@ -813,8 +805,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        await NotificationService.initialize();
-        await NotificationService.saveCurrentToken();
       }
 
       if (!mounted) return;
@@ -927,6 +917,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool hidePassword = true;
 
   Future<void> login() async {
+    FocusScope.of(context).unfocus();
+
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
@@ -945,8 +937,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (credential.user != null) {
         await ensureUserDoc(credential.user!);
-        await NotificationService.initialize();
-        await NotificationService.saveCurrentToken();
       }
 
       if (!mounted) return;
@@ -1035,7 +1025,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN
+// HOME SCREEN (WITH 3-SECOND DELAYED PERMISSION SETUP)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1071,18 +1061,29 @@ class _HomeScreenState extends State<HomeScreen> {
       _listenForIncomingCalls(user.uid);
       _listenToCallKitEvents();
       _checkInitialCall();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _requestAllPermissions();
+
+      // Home Screen aane ke 3 second baad permission request hogi
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          FocusManager.instance.primaryFocus?.unfocus();
+          _requestAllPermissions();
+        }
       });
     }
   }
 
   Future<void> _requestAllPermissions() async {
     final prefs = await SharedPreferences.getInstance();
-    final bool alreadyAsked = prefs.getBool('full_permissions_asked_v3') ?? false;
+    final bool alreadyAsked = prefs.getBool('full_permissions_asked_v4') ?? false;
 
     if (!alreadyAsked) {
-      await prefs.setBool('full_permissions_asked_v3', true);
+      await prefs.setBool('full_permissions_asked_v4', true);
+      
+      // Initialize FCM notification channel
+      await NotificationService.initialize();
+      await NotificationService.saveCurrentToken();
+
+      // Request runtime permissions smoothly
       await [
         Permission.microphone,
         Permission.camera,
@@ -1094,6 +1095,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (await Permission.ignoreBatteryOptimizations.isDenied) {
         await Permission.ignoreBatteryOptimizations.request();
       }
+    } else {
+      await NotificationService.initialize();
     }
   }
 
