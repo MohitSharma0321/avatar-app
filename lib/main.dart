@@ -2367,7 +2367,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: Column(
-          mainAxisSize: dynamic,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
