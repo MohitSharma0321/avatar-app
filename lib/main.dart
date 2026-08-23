@@ -48,7 +48,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       type: 0,
       textAccept: 'Accept',
       textDecline: 'Decline',
-      duration: 30000,
+      duration: 35000,
       extra: <String, dynamic>{
         'callId': callId,
         'callerName': callerName,
@@ -62,6 +62,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         backgroundColor: '#101014',
         actionColor: '#4CAF50',
         incomingCallNotificationChannelName: 'Incoming Call',
+        isShowCallID: true,
       ),
     );
 
@@ -116,6 +117,21 @@ class NotificationService {
         InitializationSettings(android: androidSettings);
 
     await _localNotifications.initialize(initSettings);
+
+    // High Importance Notification Channel for Android OS
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'avatar_chat_channel',
+      'Chat Notifications',
+      description: 'Instant messages and alerts',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+    );
+
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
 
     final token = await _fcm.getToken();
     if (token != null) {
@@ -1051,7 +1067,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (WITH IN-APP PERMISSION SHEET)
+// HOME SCREEN (ALL PERMISSIONS AUTO-POPUP)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1088,25 +1104,22 @@ class _HomeScreenState extends State<HomeScreen> {
       _listenToCallKitEvents();
       _checkInitialCall();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkAndAskInAppPermissions();
+        _requestAllPermissions();
       });
     }
   }
 
-  Future<void> _checkAndAskInAppPermissions() async {
+  Future<void> _requestAllPermissions() async {
     final prefs = await SharedPreferences.getInstance();
-    final bool alreadyAsked = prefs.getBool('permissions_asked_v1') ?? false;
+    final bool alreadyAsked = prefs.getBool('full_permissions_asked_v2') ?? false;
 
-    final micStatus = await Permission.microphone.status;
-    final notifStatus = await Permission.notification.status;
-
-    if (!alreadyAsked || micStatus.isDenied || notifStatus.isDenied) {
+    if (!alreadyAsked) {
       if (!mounted) return;
-      _showPermissionSheet(prefs);
+      _showAllPermissionSheet(prefs);
     }
   }
 
-  void _showPermissionSheet(SharedPreferences prefs) {
+  void _showAllPermissionSheet(SharedPreferences prefs) {
     showModalBottomSheet(
       context: context,
       isDismissible: false,
@@ -1128,16 +1141,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.greenAccent.withOpacity(0.15),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.phone_in_talk, color: Colors.greenAccent, size: 28),
+                child: const Icon(Icons.security, color: Colors.greenAccent, size: 28),
               ),
               const SizedBox(height: 16),
               const Text(
-                'Enable Real-time Calling',
+                'Allow App Permissions',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
               const Text(
-                'To receive incoming voice calls and alerts when your phone is locked or app is closed, please allow the necessary permissions.',
+                'To enable Real-time calling on lockscreen, microphone, media sharing and notifications, please allow permissions.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.4),
               ),
@@ -1151,7 +1164,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       onPressed: () {
-                        prefs.setBool('permissions_asked_v1', true);
+                        prefs.setBool('full_permissions_asked_v2', true);
                         Navigator.pop(ctx);
                       },
                       child: const Text('Not Now', style: TextStyle(color: Colors.white70)),
@@ -1167,15 +1180,24 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       onPressed: () async {
                         Navigator.pop(ctx);
-                        await prefs.setBool('permissions_asked_v1', true);
+                        await prefs.setBool('full_permissions_asked_v2', true);
 
+                        // Request all required runtime permissions
                         await [
                           Permission.microphone,
+                          Permission.camera,
                           Permission.notification,
+                          Permission.photos,
+                          Permission.storage,
+                          Permission.bluetoothConnect,
                         ].request();
 
                         if (await Permission.ignoreBatteryOptimizations.isDenied) {
                           await Permission.ignoreBatteryOptimizations.request();
+                        }
+
+                        if (await Permission.systemAlertWindow.isDenied) {
+                          await Permission.systemAlertWindow.request();
                         }
                       },
                       child: const Text('Allow All', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1296,7 +1318,7 @@ class _HomeScreenState extends State<HomeScreen> {
       type: 0,
       textAccept: 'Accept',
       textDecline: 'Decline',
-      duration: 30000,
+      duration: 35000,
       extra: <String, dynamic>{
         'callId': callId,
         'callerName': callerName,
@@ -1310,6 +1332,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: '#101014',
         actionColor: '#4CAF50',
         incomingCallNotificationChannelName: 'Incoming Call',
+        isShowCallID: true,
       ),
     );
 
@@ -1450,7 +1473,7 @@ class HomeTab extends StatelessWidget {
 }
 
 // ==================================================
-// 1-ON-1 WEBRTC ACTIVE CALLING SCREEN + LOG MAKER
+// 1-ON-1 ACTIVE CALLING SCREEN (WITH OUTGOING RINGTONE)
 // ==================================================
 
 class CallScreen extends StatefulWidget {
@@ -1475,6 +1498,8 @@ class CallScreen extends StatefulWidget {
 
 class _CallScreenState extends State<CallScreen> {
   final WebRtcSignalingService _signaling = WebRtcSignalingService();
+  final AudioPlayer _ringtonePlayer = AudioPlayer();
+
   bool isMuted = false;
   bool isSpeaker = false;
   bool isConnected = false;
@@ -1485,6 +1510,21 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     _startWebRtcCall();
+  }
+
+  Future<void> _playOutgoingRingtone() async {
+    try {
+      await _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
+      await _ringtonePlayer.play(
+        UrlSource('https://actions.google.com/sounds/v1/telephones/telephone_dialing.ogg'),
+      );
+    } catch (_) {}
+  }
+
+  void _stopOutgoingRingtone() {
+    try {
+      _ringtonePlayer.stop();
+    } catch (_) {}
   }
 
   Future<void> _startWebRtcCall() async {
@@ -1498,6 +1538,7 @@ class _CallScreenState extends State<CallScreen> {
           _startTimer();
         },
         onCallEnded: () {
+          _stopOutgoingRingtone();
           unawaited(FlutterCallkitIncoming.endAllCalls());
           _logCallHistory();
           if (mounted) Navigator.pop(context);
@@ -1506,6 +1547,9 @@ class _CallScreenState extends State<CallScreen> {
       _startTimer();
       return;
     }
+
+    // Outgoing call started -> play ringtone
+    _playOutgoingRingtone();
 
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final currentName = FirebaseAuth.instance.currentUser?.displayName ?? 'User';
@@ -1517,12 +1561,14 @@ class _CallScreenState extends State<CallScreen> {
       callerName: currentName,
       callerAvatar: AvatarState.current.name,
       onRemoteStreamReceived: (stream) {
+        _stopOutgoingRingtone();
         if (realCallId != null) {
           unawaited(FlutterCallkitIncoming.setCallConnected(realCallId!));
         }
         _startTimer();
       },
       onCallEnded: () {
+        _stopOutgoingRingtone();
         unawaited(FlutterCallkitIncoming.endAllCalls());
         _logCallHistory();
         if (mounted) Navigator.pop(context);
@@ -1559,6 +1605,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _startTimer() {
+    _stopOutgoingRingtone();
     if (!isConnected && mounted) {
       setState(() => isConnected = true);
       callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -1615,6 +1662,8 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    _stopOutgoingRingtone();
+    _ringtonePlayer.dispose();
     callTimer?.cancel();
     _logCallHistory();
     unawaited(_signaling.hangUp());
@@ -2856,9 +2905,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1080, // WhatsApp style 1080p limit
+        maxWidth: 1080,
         maxHeight: 1080,
-        imageQuality: 75, // Crisp quality, small size (~200 KB)
+        imageQuality: 75,
       );
 
       if (pickedFile == null) return;
@@ -3049,7 +3098,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisAlignment: dynamic,
                 children: ['❤️', '😂', '👍', '🔥', '😮', '😢'].map((emoji) {
                   return GestureDetector(
                     onTap: () {
