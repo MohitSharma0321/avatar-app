@@ -1062,7 +1062,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _listenToCallKitEvents();
       _checkInitialCall();
 
-      // Home Screen aane ke 3 second baad permission request hogi
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           FocusManager.instance.primaryFocus?.unfocus();
@@ -1079,11 +1078,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!alreadyAsked) {
       await prefs.setBool('full_permissions_asked_v4', true);
       
-      // Initialize FCM notification channel
       await NotificationService.initialize();
       await NotificationService.saveCurrentToken();
 
-      // Request runtime permissions smoothly
       await [
         Permission.microphone,
         Permission.camera,
@@ -1276,7 +1273,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ==================================================
-// 1-ON-1 ACTIVE CALLING SCREEN (WITH INSTANT RINGTONE)
+// 1-ON-1 ACTIVE CALLING SCREEN (LOCAL ASSET RINGTONE)
 // ==================================================
 
 class CallScreen extends StatefulWidget {
@@ -1318,9 +1315,8 @@ class _CallScreenState extends State<CallScreen> {
   Future<void> _playOutgoingRingtone() async {
     try {
       await _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
-      await _ringtonePlayer.play(
-        UrlSource('https://actions.google.com/sounds/v1/telephones/telephone_dialing.ogg'),
-      );
+      // Play local downloaded audio from assets/audio/dialing.mp3
+      await _ringtonePlayer.play(AssetSource('audio/dialing.mp3'));
     } catch (_) {}
   }
 
