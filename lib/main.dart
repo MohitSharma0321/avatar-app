@@ -25,9 +25,13 @@ import 'package:flutter_tts/flutter_tts.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// ==================================================
-// FCM BACKGROUND HANDLER & CALLKIT TRIGGER
-// ==================================================
+// App Theme Color Palette (Inspired by App Icon)
+const Color kPrimaryNeon = Color(0xFF00C6FF);
+const Color kAccentPink = Color(0xFFE03287);
+const Color kDarkSurface = Color(0xFF141724);
+const Color kLightBg = Color(0xFFF8F9FD);
+const Color kTextDark = Color(0xFF1B1E28);
+const Color kTextSubtle = Color(0xFF7D8494);
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -59,8 +63,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         isCustomNotification: true,
         isShowLogo: false,
         ringtonePath: 'system_ringtone_default',
-        backgroundColor: '#101014',
-        actionColor: '#4CAF50',
+        backgroundColor: '#141724',
+        actionColor: '#00C6FF',
         incomingCallNotificationChannelName: 'Incoming Call',
         isShowCallID: true,
       ),
@@ -478,14 +482,16 @@ class WebRtcSignalingService {
 }
 
 // ==================================================
-// TOP-LEVEL HELPERS, AVATAR WIDGET & PRESENCE
+// TOP-LEVEL HELPERS & CUSTOM WIDGETS
 // ==================================================
 
 void _showMessage(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Text(message),
+      content: Text(message, style: const TextStyle(fontWeight: FontWeight.w600)),
+      backgroundColor: kDarkSurface,
       behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       duration: const Duration(seconds: 2),
     ),
   );
@@ -513,9 +519,9 @@ Future<void> ensureUserDoc(User user) async {
       await docRef.set({
         'uid': user.uid,
         'name': (user.displayName?.isNotEmpty == true) ? user.displayName : 'User',
-        'bio': 'Hey there! I am using Avatar.',
+        'bio': 'Hey there! I am on Avatar.',
         'photoBase64': '',
-        'bonds': [],
+        'connections': [],
         'isOnline': true,
         'lastSeen': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
@@ -530,7 +536,6 @@ Widget buildUserAvatar({
   required String photoBase64,
   required String name,
   double radius = 24,
-  Color borderColor = const Color(0xFFFF7A00),
 }) {
   ImageProvider? imageProvider;
   if (photoBase64.isNotEmpty) {
@@ -541,14 +546,18 @@ Widget buildUserAvatar({
   }
 
   return Container(
-    padding: const EdgeInsets.all(2),
-    decoration: BoxDecoration(
+    padding: const EdgeInsets.all(2.5),
+    decoration: const BoxDecoration(
       shape: BoxShape.circle,
-      border: Border.all(color: borderColor, width: 2),
+      gradient: LinearGradient(
+        colors: [kPrimaryNeon, kAccentPink],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
     ),
     child: CircleAvatar(
       radius: radius,
-      backgroundColor: const Color(0xFF2A2A2A),
+      backgroundColor: Colors.white,
       backgroundImage: imageProvider,
       child: imageProvider == null
           ? Text(
@@ -556,7 +565,7 @@ Widget buildUserAvatar({
               style: TextStyle(
                 fontSize: radius * 0.9,
                 fontWeight: FontWeight.bold,
-                color: borderColor,
+                color: kDarkSurface,
               ),
             )
           : null,
@@ -590,7 +599,7 @@ Future<String> askAvatarFriend(String userMessage) async {
 }
 
 // ==================================================
-// APP & LIFECYCLE OBSERVER
+// APP MAIN OBSERVER
 // ==================================================
 
 class AvatarApp extends StatefulWidget {
@@ -631,11 +640,22 @@ class _AvatarAppState extends State<AvatarApp> with WidgetsBindingObserver {
       debugShowCheckedModeBanner: false,
       title: 'Avatar',
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF121212),
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: kLightBg,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFF7A00),
-          brightness: Brightness.dark,
+          seedColor: kPrimaryNeon,
+          brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          iconTheme: IconThemeData(color: kDarkSurface),
+          titleTextStyle: TextStyle(
+            color: kDarkSurface,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         useMaterial3: true,
       ),
@@ -658,7 +678,7 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: Center(child: CircularProgressIndicator(color: kPrimaryNeon)),
           );
         }
 
@@ -683,61 +703,91 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(28),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 120,
-                  height: 120,
+                  width: 110,
+                  height: 110,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFFFF7A00).withOpacity(0.15),
-                    border: Border.all(color: const Color(0xFFFF7A00), width: 3),
+                    gradient: const LinearGradient(
+                      colors: [kPrimaryNeon, kAccentPink],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimaryNeon.withOpacity(0.35),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.bolt, size: 70, color: Color(0xFFFF7A00)),
+                  child: const Icon(Icons.chat_bubble_rounded, size: 55, color: Colors.white),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 30),
                 const Text(
                   'Avatar',
-                  style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                    color: kDarkSurface,
+                  ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 const Text(
-                  'Ultra-fast Real-time Voice Calling & Secret Bonds.',
+                  'Clean, Ultra-fast Voice & Mutual Connections.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.white70),
+                  style: TextStyle(fontSize: 15, color: kTextSubtle, fontWeight: FontWeight.w500),
                 ),
-                const SizedBox(height: 40),
-                SizedBox(
+                const SizedBox(height: 44),
+                Container(
                   width: double.infinity,
                   height: 52,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: const LinearGradient(
+                      colors: [kPrimaryNeon, kAccentPink],
+                    ),
+                  ),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const CreateAccountScreen()),
                       );
                     },
-                    child: const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: const Text('Get Started', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
                       );
                     },
-                    child: const Text('Login', style: TextStyle(fontSize: 16)),
+                    child: const Text('I already have an account', style: TextStyle(fontSize: 15, color: kDarkSurface, fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],
@@ -799,9 +849,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'name': name,
-          'bio': 'Hey there! I am using Avatar.',
+          'bio': 'Hey there! I am on Avatar.',
           'photoBase64': '',
-          'bonds': [],
+          'connections': [],
           'isOnline': true,
           'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
@@ -839,6 +889,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(title: const Text('Create Account')),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -846,24 +897,30 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Create your account', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 24),
+              const Text('Join Avatar Today', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              const SizedBox(height: 8),
+              const Text('Create an account to start connecting with friends.', style: TextStyle(color: kTextSubtle, fontSize: 14)),
+              const SizedBox(height: 28),
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Your Username / Name',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
+                decoration: InputDecoration(
+                  labelText: 'Full Name',
+                  filled: true,
+                  fillColor: kLightBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  prefixIcon: const Icon(Icons.person_outline),
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email),
+                decoration: InputDecoration(
+                  labelText: 'Email Address',
+                  filled: true,
+                  fillColor: kLightBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  prefixIcon: const Icon(Icons.email_outlined),
                 ),
               ),
               const SizedBox(height: 16),
@@ -872,23 +929,33 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 obscureText: hidePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.lock),
+                  filled: true,
+                  fillColor: kLightBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
                     onPressed: () => setState(() => hidePassword = !hidePassword),
                     icon: Icon(hidePassword ? Icons.visibility : Icons.visibility_off),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 50,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
+              const SizedBox(height: 28),
+              Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: const LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
+                ),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
                   onPressed: loading ? null : createAccount,
                   child: loading
-                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator())
-                      : const Text('Create Account', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white))
+                      : const Text('Create Account', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
                 ),
               ),
             ],
@@ -951,7 +1018,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       _showMessage(context, message);
     } catch (e) {
-      _showMessage(context, 'Other error: $e');
+      _showMessage(context, 'Error: $e');
     }
 
     if (mounted) setState(() => loading = false);
@@ -967,6 +1034,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(title: const Text('Login')),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -974,22 +1042,20 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 30),
-              const Icon(Icons.account_circle, size: 100, color: Color(0xFFFF7A00)),
               const SizedBox(height: 20),
-              const Text(
-                'Welcome Back',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 30),
+              const Text('Welcome Back', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              const SizedBox(height: 8),
+              const Text('Enter your credentials to continue.', style: TextStyle(color: kTextSubtle, fontSize: 14)),
+              const SizedBox(height: 32),
               TextField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Email',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email),
+                  filled: true,
+                  fillColor: kLightBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  prefixIcon: const Icon(Icons.email_outlined),
                 ),
               ),
               const SizedBox(height: 16),
@@ -998,23 +1064,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 obscureText: hidePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.lock),
+                  filled: true,
+                  fillColor: kLightBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
                     onPressed: () => setState(() => hidePassword = !hidePassword),
                     icon: Icon(hidePassword ? Icons.visibility : Icons.visibility_off),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 50,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
+              const SizedBox(height: 28),
+              Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: const LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
+                ),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
                   onPressed: loading ? null : login,
                   child: loading
-                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator())
-                      : const Text('Login', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white))
+                      : const Text('Login', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
                 ),
               ),
             ],
@@ -1026,7 +1102,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (WITH 3-SECOND DELAYED PERMISSION SETUP)
+// HOME SCREEN
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1215,8 +1291,8 @@ class _HomeScreenState extends State<HomeScreen> {
         isCustomNotification: true,
         isShowLogo: false,
         ringtonePath: 'system_ringtone_default',
-        backgroundColor: '#101014',
-        actionColor: '#4CAF50',
+        backgroundColor: '#141724',
+        actionColor: '#00C6FF',
         incomingCallNotificationChannelName: 'Incoming Call',
         isShowCallID: true,
       ),
@@ -1244,37 +1320,609 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex == 2 || pages[2] != null ? _pageAt(2) : const SizedBox.shrink(),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Chats',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore),
-            label: 'Discover',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_circle_outlined),
-            selectedIcon: Icon(Icons.account_circle),
-            label: 'Profile',
-          ),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 15,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: NavigationBar(
+          backgroundColor: Colors.white,
+          indicatorColor: kPrimaryNeon.withOpacity(0.18),
+          selectedIndex: currentIndex,
+          onDestinationSelected: (index) => setState(() => currentIndex = index),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline_rounded, color: kDarkSurface),
+              selectedIcon: Icon(Icons.chat_bubble_rounded, color: kAccentPink),
+              label: 'Chats',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.explore_outlined, color: kDarkSurface),
+              selectedIcon: Icon(Icons.explore_rounded, color: kAccentPink),
+              label: 'Discover',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline_rounded, color: kDarkSurface),
+              selectedIcon: Icon(Icons.person_rounded, color: kAccentPink),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 // ==================================================
-// 1-ON-1 ACTIVE CALLING SCREEN (LOCAL ASSET RINGTONE)
+// NOTIFICATIONS & BROADCASTS SCREEN
+// ==================================================
+
+class NotificationsScreen extends StatelessWidget {
+  const NotificationsScreen({Key? key}) : super(key: key);
+
+  Future<void> _connectBack(BuildContext context, String peerUid) async {
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    if (myUid == null) return;
+
+    await FirebaseFirestore.instance.collection('users').doc(myUid).set({
+      'connections': FieldValue.arrayUnion([peerUid])
+    }, SetOptions(merge: true));
+
+    _showMessage(context, 'Connected back! Chat is now open.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Notifications & Updates')),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
+        builder: (context, mySnap) {
+          final myData = mySnap.data?.data() as Map<String, dynamic>?;
+          final List<dynamic> myConnections = myData?['connections'] ?? [];
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // System Updates & Broadcasts
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('app_updates').orderBy('createdAt', descending: true).snapshots(),
+                builder: (context, updateSnap) {
+                  final updates = updateSnap.data?.docs ?? [];
+                  if (updates.isEmpty) return const SizedBox.shrink();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Official Updates', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+                      const SizedBox(height: 10),
+                      ...updates.map((doc) {
+                        final u = doc.data() as Map<String, dynamic>;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: kPrimaryNeon.withOpacity(0.4)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const CircleAvatar(
+                                radius: 18,
+                                backgroundColor: kPrimaryNeon,
+                                child: Icon(Icons.campaign, color: Colors.white, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(u['title'] ?? 'App Update', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    const SizedBox(height: 4),
+                                    Text(u['message'] ?? '', style: const TextStyle(color: kTextDark, fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      const Divider(height: 28),
+                    ],
+                  );
+                },
+              ),
+
+              // Connection Requests
+              const Text('Connection Requests', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+              const SizedBox(height: 10),
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').where('connections', arrayContains: currentUid).snapshots(),
+                builder: (context, reqSnap) {
+                  if (reqSnap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final usersWhoConnectedMe = reqSnap.data?.docs ?? [];
+
+                  if (usersWhoConnectedMe.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(child: Text('No new connection requests.', style: TextStyle(color: kTextSubtle))),
+                    );
+                  }
+
+                  return Column(
+                    children: usersWhoConnectedMe.map((doc) {
+                      final uData = doc.data() as Map<String, dynamic>;
+                      final peerUid = uData['uid'] ?? doc.id;
+                      final peerName = uData['name'] ?? 'User';
+                      final peerPhoto = uData['photoBase64'] ?? '';
+                      final isMutual = myConnections.contains(peerUid);
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2))
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            buildUserAvatar(photoBase64: peerPhoto, name: peerName, radius: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(peerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                  Text(isMutual ? 'Mutual Connected' : 'Connected with you', style: const TextStyle(color: kTextSubtle, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                            if (!isMutual)
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kAccentPink,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                ),
+                                onPressed: () => _connectBack(context, peerUid),
+                                child: const Text('Connect Back', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ==================================================
+// CHAT SCREEN (MUTUAL CONVERSATIONS ONLY)
+// ==================================================
+
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = '';
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24)),
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              );
+            },
+            icon: const Icon(Icons.notifications_none_rounded, color: kDarkSurface, size: 26),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
+        builder: (context, userSnap) {
+          final myData = userSnap.data?.data() as Map<String, dynamic>?;
+          final List<dynamic> myConnections = myData?['connections'] ?? [];
+
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('users').snapshots(),
+            builder: (context, allUsersSnap) {
+              if (allUsersSnap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+              }
+
+              final allDocs = allUsersSnap.data?.docs ?? [];
+
+              // MUTUAL CONNECTIONS FILTER: Only show users if both have connected with each other
+              final mutualUsers = allDocs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final uid = data['uid'] ?? doc.id;
+                final name = (data['name'] ?? '').toString().toLowerCase();
+                final List<dynamic> theirConnections = data['connections'] ?? [];
+
+                final isMutual = myConnections.contains(uid) && theirConnections.contains(currentUid);
+
+                if (uid == currentUid || !isMutual) return false;
+                if (searchQuery.isNotEmpty) {
+                  return name.contains(searchQuery.toLowerCase());
+                }
+                return true;
+              }).toList();
+
+              return ListView(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                    child: TextField(
+                      controller: searchController,
+                      onChanged: (v) => setState(() => searchQuery = v.trim()),
+                      decoration: InputDecoration(
+                        hintText: 'Search chats...',
+                        prefixIcon: const Icon(Icons.search, color: kTextSubtle),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Avatar AI Companion
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
+                      ],
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      leading: Container(
+                        padding: const EdgeInsets.all(2.5),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
+                        ),
+                        child: const CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.white,
+                          child: Icon(Icons.auto_awesome, color: kAccentPink, size: 20),
+                        ),
+                      ),
+                      title: const Text('Avatar Friend', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+                      subtitle: const Text('AI Companion • Always Online', style: TextStyle(color: Colors.green, fontSize: 13)),
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: kPrimaryNeon.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text('AI', style: TextStyle(color: kPrimaryNeon, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ChatConversationScreen(userName: 'Avatar Friend')),
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Mutual Friends Live Chats
+                  if (mutualUsers.isNotEmpty) ...[
+                    ...mutualUsers.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final peerUid = data['uid'] ?? doc.id;
+                      final name = data['name'] ?? 'User';
+                      final photo = data['photoBase64'] ?? '';
+                      final isOnline = data['isOnline'] == true;
+
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
+                          ],
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                          leading: Stack(
+                            children: [
+                              buildUserAvatar(photoBase64: photo, name: name, radius: 22),
+                              if (isOnline)
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+                          subtitle: Text(
+                            isOnline ? 'Active now' : 'Offline',
+                            style: TextStyle(color: isOnline ? Colors.green : kTextSubtle, fontSize: 13),
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded, color: kTextSubtle),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChatConversationScreen(
+                                  userName: name,
+                                  peerUid: peerUid,
+                                  peerPhoto: photo,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ] else ...[
+                    Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Center(
+                        child: Column(
+                          children: const [
+                            Icon(Icons.people_outline_rounded, size: 50, color: kTextSubtle),
+                            SizedBox(height: 10),
+                            Text('No mutual chats yet.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+                            SizedBox(height: 4),
+                            Text('Connect with users in Discover and make sure they connect back to unlock private messaging.', textAlign: TextAlign.center, style: TextStyle(color: kTextSubtle, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ==================================================
+// DISCOVER SCREEN
+// ==================================================
+
+class DiscoverScreen extends StatefulWidget {
+  const DiscoverScreen({Key? key}) : super(key: key);
+
+  @override
+  State<DiscoverScreen> createState() => _DiscoverScreenState();
+}
+
+class _DiscoverScreenState extends State<DiscoverScreen> {
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = '';
+
+  Future<void> toggleConnection(String peerUid, bool isConnected) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid == null) return;
+
+    final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
+
+    if (isConnected) {
+      await userRef.set({
+        'connections': FieldValue.arrayRemove([peerUid])
+      }, SetOptions(merge: true));
+      if (mounted) _showMessage(context, 'Disconnected.');
+    } else {
+      await userRef.set({
+        'connections': FieldValue.arrayUnion([peerUid])
+      }, SetOptions(merge: true));
+      if (mounted) _showMessage(context, 'Connection request sent!');
+    }
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Discover People', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24))),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
+        builder: (context, userSnap) {
+          final myData = userSnap.data?.data() as Map<String, dynamic>?;
+          final List<dynamic> myConnections = myData?['connections'] ?? [];
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: searchController,
+                  onChanged: (val) => setState(() => searchQuery = val.trim().toLowerCase()),
+                  decoration: InputDecoration(
+                    hintText: 'Search people by name...',
+                    prefixIcon: const Icon(Icons.search, color: kTextSubtle),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection('users').snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+                    }
+
+                    final users = (snapshot.data?.docs ?? []).where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final uid = data['uid'] ?? doc.id;
+                      if (uid == currentUid) return false;
+
+                      final name = (data['name'] ?? '').toString().toLowerCase();
+                      if (searchQuery.isEmpty) return true;
+                      return name.contains(searchQuery);
+                    }).toList();
+
+                    if (users.isEmpty) {
+                      return const Center(
+                        child: Text('No users found.', style: TextStyle(color: kTextSubtle)),
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: users.length,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemBuilder: (context, index) {
+                        final userData = users[index].data() as Map<String, dynamic>;
+                        final userName = userData['name'] ?? 'User';
+                        final userBio = userData['bio'] ?? 'Using Avatar';
+                        final peerUid = userData['uid'] ?? users[index].id;
+                        final photo = userData['photoBase64'] ?? '';
+                        final isConnected = myConnections.contains(peerUid);
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            leading: buildUserAvatar(photoBase64: photo, name: userName, radius: 22),
+                            title: Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+                            subtitle: Text(userBio, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle)),
+                            trailing: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isConnected ? kLightBg : kDarkSurface,
+                                foregroundColor: isConnected ? kTextDark : Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () => toggleConnection(peerUid, isConnected),
+                              child: Text(isConnected ? 'Connected' : 'Connect', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ==================================================
+// FULL SCREEN IMAGE VIEWER
+// ==================================================
+
+class FullImageViewScreen extends StatelessWidget {
+  final String imageData;
+
+  const FullImageViewScreen({Key? key, required this.imageData}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    Widget imageWidget;
+    if (imageData.startsWith('http')) {
+      imageWidget = Image.network(imageData, fit: BoxFit.contain);
+    } else {
+      try {
+        final cleanData = imageData.replaceFirst(RegExp(r'data:image\/[a-zA-Z]+;base64,'), '');
+        final bytes = base64Decode(cleanData);
+        imageWidget = Image.memory(bytes, fit: BoxFit.contain);
+      } catch (_) {
+        imageWidget = const Icon(Icons.broken_image, size: 80, color: Colors.white54);
+      }
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Center(
+        child: InteractiveViewer(child: imageWidget),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// 1-ON-1 ACTIVE CALLING SCREEN
 // ==================================================
 
 class CallScreen extends StatefulWidget {
@@ -1472,21 +2120,21 @@ class _CallScreenState extends State<CallScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF101014),
+      backgroundColor: kDarkSurface,
       body: SafeArea(
         child: Column(
           children: [
             const SizedBox(height: 50),
             Text(
               widget.peerName,
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             const SizedBox(height: 8),
             Text(
               isConnected ? 'Connected • ${_formatTime(callSeconds)}' : 'Calling...',
               style: TextStyle(
                 fontSize: 16,
-                color: isConnected ? Colors.greenAccent : Colors.white60,
+                color: isConnected ? kPrimaryNeon : Colors.white60,
               ),
             ),
             const Spacer(),
@@ -1494,7 +2142,6 @@ class _CallScreenState extends State<CallScreen> {
               photoBase64: widget.peerPhoto,
               name: widget.peerName,
               radius: 75,
-              borderColor: const Color(0xFFFF7A00),
             ),
             const Spacer(),
             Row(
@@ -1504,7 +2151,7 @@ class _CallScreenState extends State<CallScreen> {
                   iconSize: 30,
                   style: IconButton.styleFrom(
                     padding: const EdgeInsets.all(16),
-                    backgroundColor: isMuted ? Colors.white : const Color(0xFF2A2A2A),
+                    backgroundColor: isMuted ? Colors.white : Colors.white12,
                     foregroundColor: isMuted ? Colors.black : Colors.white,
                   ),
                   onPressed: _toggleMic,
@@ -1523,7 +2170,7 @@ class _CallScreenState extends State<CallScreen> {
                   iconSize: 30,
                   style: IconButton.styleFrom(
                     padding: const EdgeInsets.all(16),
-                    backgroundColor: isSpeaker ? Colors.white : const Color(0xFF2A2A2A),
+                    backgroundColor: isSpeaker ? Colors.white : Colors.white12,
                     foregroundColor: isSpeaker ? Colors.black : Colors.white,
                   ),
                   onPressed: _toggleSpeaker,
@@ -1631,7 +2278,7 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
           icon: Icon(
             isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
             size: 38,
-            color: Colors.white,
+            color: widget.isMe ? Colors.white : kPrimaryNeon,
           ),
         ),
         const SizedBox(width: 4),
@@ -1659,7 +2306,9 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
                       width: 3,
                       height: 28 * barHeights[idx],
                       decoration: BoxDecoration(
-                        color: isPassed ? const Color(0xFFFF7A00) : Colors.white30,
+                        color: isPassed
+                            ? (widget.isMe ? Colors.white : kPrimaryNeon)
+                            : (widget.isMe ? Colors.white38 : Colors.black12),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     );
@@ -1670,357 +2319,12 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
             const SizedBox(height: 4),
             Text(
               '${position.inSeconds}s / ${duration.inSeconds}s',
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
+              style: TextStyle(fontSize: 11, color: widget.isMe ? Colors.white70 : kTextSubtle),
             ),
           ],
         ),
         const SizedBox(width: 8),
       ],
-    );
-  }
-}
-
-// ==================================================
-// CHAT SCREEN (CHATS LIST)
-// ==================================================
-
-class ChatScreen extends StatefulWidget {
-  const ChatScreen({Key? key}) : super(key: key);
-
-  @override
-  State<ChatScreen> createState() => _ChatScreenState();
-}
-
-class _ChatScreenState extends State<ChatScreen> {
-  final TextEditingController searchController = TextEditingController();
-  String searchQuery = '';
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chats', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
-        builder: (context, userSnap) {
-          final myData = userSnap.data?.data() as Map<String, dynamic>?;
-          final List<dynamic> myBonds = myData?['bonds'] ?? [];
-
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('users').snapshots(),
-            builder: (context, allUsersSnap) {
-              if (allUsersSnap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final allDocs = allUsersSnap.data?.docs ?? [];
-
-              final bondedUsers = allDocs.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                final uid = data['uid'] ?? doc.id;
-                final name = (data['name'] ?? '').toString().toLowerCase();
-
-                if (uid == currentUid || !myBonds.contains(uid)) return false;
-                if (searchQuery.isNotEmpty) {
-                  return name.contains(searchQuery.toLowerCase());
-                }
-                return true;
-              }).toList();
-
-              return ListView(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: TextField(
-                      controller: searchController,
-                      onChanged: (v) => setState(() => searchQuery = v.trim()),
-                      decoration: InputDecoration(
-                        hintText: 'Search chats...',
-                        prefixIcon: const Icon(Icons.search),
-                        filled: true,
-                        fillColor: const Color(0xFF1E1E1E),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Avatar AI Companion Tile
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                    leading: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFFFF7A00), width: 2),
-                      ),
-                      child: const CircleAvatar(
-                        radius: 22,
-                        backgroundColor: Color(0xFFFF7A00),
-                        child: Icon(Icons.auto_awesome, color: Colors.black),
-                      ),
-                    ),
-                    title: const Text('Avatar Friend', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    subtitle: const Text('AI Companion • Online', style: TextStyle(color: Colors.greenAccent, fontSize: 13)),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF7A00).withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text('AI', style: TextStyle(color: Color(0xFFFF7A00), fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const ChatConversationScreen(userName: 'Avatar Friend')),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, color: Colors.white10),
-
-                  // Bonded Users
-                  if (bondedUsers.isNotEmpty) ...[
-                    ...bondedUsers.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final peerUid = data['uid'] ?? doc.id;
-                      final name = data['name'] ?? 'User';
-                      final photo = data['photoBase64'] ?? '';
-                      final isOnline = data['isOnline'] == true;
-
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                        leading: Stack(
-                          children: [
-                            buildUserAvatar(photoBase64: photo, name: name, radius: 22),
-                            if (isOnline)
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: BoxDecoration(
-                                    color: Colors.greenAccent,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: const Color(0xFF121212), width: 2),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        subtitle: Text(
-                          isOnline ? 'Online' : 'Offline',
-                          style: TextStyle(color: isOnline ? Colors.greenAccent : Colors.white54, fontSize: 13),
-                        ),
-                        trailing: const Icon(Icons.chat_bubble_outline, color: Color(0xFFFF7A00), size: 22),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatConversationScreen(
-                                userName: name,
-                                peerUid: peerUid,
-                                peerPhoto: photo,
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    }).toList(),
-                  ] else if (searchQuery.isNotEmpty) ...[
-                    const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Center(child: Text('No matching chats.', style: TextStyle(color: Colors.white60))),
-                    ),
-                  ],
-                ],
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ==================================================
-// DISCOVER SCREEN
-// ==================================================
-
-class DiscoverScreen extends StatefulWidget {
-  const DiscoverScreen({Key? key}) : super(key: key);
-
-  @override
-  State<DiscoverScreen> createState() => _DiscoverScreenState();
-}
-
-class _DiscoverScreenState extends State<DiscoverScreen> {
-  final TextEditingController searchController = TextEditingController();
-  String searchQuery = '';
-
-  Future<void> toggleBond(String peerUid, bool isBonded) async {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUid == null) return;
-
-    final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
-
-    if (isBonded) {
-      await userRef.set({
-        'bonds': FieldValue.arrayRemove([peerUid])
-      }, SetOptions(merge: true));
-      if (mounted) _showMessage(context, 'Bond removed.');
-    } else {
-      await userRef.set({
-        'bonds': FieldValue.arrayUnion([peerUid])
-      }, SetOptions(merge: true));
-      if (mounted) _showMessage(context, 'Bond created!');
-    }
-  }
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Discover & Bond')),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
-        builder: (context, userSnap) {
-          final myData = userSnap.data?.data() as Map<String, dynamic>?;
-          final List<dynamic> myBonds = myData?['bonds'] ?? [];
-
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: searchController,
-                  onChanged: (val) => setState(() => searchQuery = val.trim().toLowerCase()),
-                  decoration: InputDecoration(
-                    hintText: 'Search people by name...',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: const Color(0xFF1E1E1E),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance.collection('users').snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    final users = (snapshot.data?.docs ?? []).where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final uid = data['uid'] ?? doc.id;
-                      if (uid == currentUid) return false;
-
-                      final name = (data['name'] ?? '').toString().toLowerCase();
-                      if (searchQuery.isEmpty) return true;
-                      return name.contains(searchQuery);
-                    }).toList();
-
-                    if (users.isEmpty) {
-                      return const Center(
-                        child: Text('No users found.', style: TextStyle(color: Colors.white60)),
-                      );
-                    }
-
-                    return ListView.builder(
-                      itemCount: users.length,
-                      itemBuilder: (context, index) {
-                        final userData = users[index].data() as Map<String, dynamic>;
-                        final userName = userData['name'] ?? 'User';
-                        final userBio = userData['bio'] ?? 'Using Avatar';
-                        final peerUid = userData['uid'] ?? users[index].id;
-                        final photo = userData['photoBase64'] ?? '';
-                        final isBonded = myBonds.contains(peerUid);
-
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                          leading: buildUserAvatar(photoBase64: photo, name: userName, radius: 22),
-                          title: Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          subtitle: Text(userBio, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60)),
-                          trailing: FilledButton.tonal(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: isBonded ? Colors.white12 : const Color(0xFFFF7A00).withOpacity(0.2),
-                              foregroundColor: isBonded ? Colors.white70 : const Color(0xFFFF7A00),
-                            ),
-                            onPressed: () => toggleBond(peerUid, isBonded),
-                            child: Text(isBonded ? 'Bonded' : '+ Bond'),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ==================================================
-// FULL SCREEN IMAGE VIEWER
-// ==================================================
-
-class FullImageViewScreen extends StatelessWidget {
-  final String imageData;
-
-  const FullImageViewScreen({Key? key, required this.imageData}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    Widget imageWidget;
-    if (imageData.startsWith('http')) {
-      imageWidget = Image.network(imageData, fit: BoxFit.contain);
-    } else {
-      try {
-        final cleanData = imageData.replaceFirst(RegExp(r'data:image\/[a-zA-Z]+;base64,'), '');
-        final bytes = base64Decode(cleanData);
-        imageWidget = Image.memory(bytes, fit: BoxFit.contain);
-      } catch (_) {
-        imageWidget = const Icon(Icons.broken_image, size: 80, color: Colors.white54);
-      }
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Center(
-        child: InteractiveViewer(child: imageWidget),
-      ),
     );
   }
 }
@@ -2354,7 +2658,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         _scrollToBottom();
       }
     } catch (e) {
-      if (mounted) _showMessage(context, 'Message send failed. Try again.');
+      if (mounted) _showMessage(context, 'Message send failed.');
     } finally {
       if (mounted) setState(() => isSendingMessage = false);
     }
@@ -2363,7 +2667,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   void _showMessageOptions(DocumentSnapshot doc, Map<String, dynamic> data, bool isMe) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
         child: Column(
@@ -2384,20 +2688,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 }).toList(),
               ),
             ),
-            const Divider(height: 1, color: Colors.white10),
+            const Divider(height: 1),
             if (data['type'] == 'text')
               ListTile(
-                leading: const Icon(Icons.copy),
+                leading: const Icon(Icons.copy_rounded),
                 title: const Text('Copy Text'),
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: data['text'] ?? ''));
                   Navigator.pop(ctx);
-                  _showMessage(context, 'Text copied to clipboard!');
+                  _showMessage(context, 'Text copied!');
                 },
               ),
             if (isMe)
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
                 title: const Text('Delete Message', style: TextStyle(color: Colors.redAccent)),
                 onTap: () {
                   doc.reference.delete();
@@ -2434,24 +2738,31 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         title: Row(
           children: [
             isAvatarFriend
-                ? const CircleAvatar(
-                    radius: 18,
-                    backgroundColor: Color(0xFFFF7A00),
-                    child: Icon(Icons.auto_awesome, size: 20, color: Colors.black),
+                ? Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
+                    ),
+                    child: const CircleAvatar(
+                      radius: 17,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.auto_awesome, size: 18, color: kAccentPink),
+                    ),
                   )
                 : buildUserAvatar(
                     photoBase64: widget.peerPhoto ?? '',
                     name: widget.userName,
-                    radius: 18,
+                    radius: 17,
                   ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: isAvatarFriend
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        const Text('AI Companion', style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
+                        Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kDarkSurface)),
+                        const Text('AI Companion', style: TextStyle(color: Colors.green, fontSize: 12)),
                       ],
                     )
                   : StreamBuilder<DocumentSnapshot>(
@@ -2463,11 +2774,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kDarkSurface)),
                             Text(
                               isPeerTyping ? 'typing...' : 'Online',
                               style: TextStyle(
-                                color: isPeerTyping ? Colors.greenAccent : Colors.white54,
+                                color: isPeerTyping ? kAccentPink : Colors.green,
                                 fontSize: 12,
                                 fontWeight: isPeerTyping ? FontWeight.bold : FontWeight.normal,
                               ),
@@ -2491,13 +2802,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 );
               },
               icon: Icon(
-                isVoiceEnabled ? Icons.volume_up : Icons.volume_off,
-                color: isVoiceEnabled ? const Color(0xFFFF7A00) : Colors.white54,
+                isVoiceEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                color: isVoiceEnabled ? kPrimaryNeon : kTextSubtle,
               ),
             ),
             IconButton(
               onPressed: _clearChatHistory,
-              icon: const Icon(Icons.delete_outline),
+              icon: const Icon(Icons.delete_outline_rounded),
             ),
           ] else ...[
             IconButton(
@@ -2514,47 +2825,44 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   ),
                 );
               },
-              icon: const Icon(Icons.call, color: Colors.greenAccent),
-              tooltip: '1-on-1 Voice Call',
+              icon: const Icon(Icons.call_rounded, color: kPrimaryNeon),
+              tooltip: 'Voice Call',
             ),
           ],
         ],
       ),
       body: Column(
         children: [
-          if (isUploadingMedia) const LinearProgressIndicator(minHeight: 3),
+          if (isUploadingMedia) const LinearProgressIndicator(minHeight: 3, color: kPrimaryNeon),
           Expanded(
             child: isAvatarFriend ? _buildAiChat() : _buildRealUserChat(),
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
               child: isRecording
                   ? Container(
-                      height: 54,
+                      height: 52,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: Colors.redAccent.withOpacity(0.6)),
+                        color: Colors.redAccent.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
                       ),
                       child: Row(
                         children: [
                           const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 20),
                           const SizedBox(width: 8),
-                          Text('${recordingSeconds}s', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text('${recordingSeconds}s', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.redAccent)),
                           const Spacer(),
-                          TextButton.icon(
-                            style: TextButton.styleFrom(foregroundColor: Colors.white70),
+                          TextButton(
                             onPressed: _cancelRecording,
-                            icon: const Icon(Icons.delete_outline, size: 20),
-                            label: const Text('Cancel'),
+                            child: const Text('Cancel', style: TextStyle(color: kTextDark)),
                           ),
-                          const SizedBox(width: 4),
                           IconButton.filled(
-                            style: IconButton.styleFrom(backgroundColor: Colors.greenAccent.shade700),
+                            style: IconButton.styleFrom(backgroundColor: Colors.green),
                             onPressed: _stopAndSendRecording,
-                            icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                            icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
                           ),
                         ],
                       ),
@@ -2564,8 +2872,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         if (!isAvatarFriend)
                           IconButton(
                             onPressed: _pickAndSendGalleryImage,
-                            icon: const Icon(Icons.photo_library_outlined),
-                            tooltip: 'Send Image',
+                            icon: const Icon(Icons.image_outlined, color: kTextDark),
+                            tooltip: 'Send Photo',
                           ),
                         Expanded(
                           child: TextField(
@@ -2578,9 +2886,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             onChanged: _onTextChanged,
                             onSubmitted: (_) => sendMessage(),
                             decoration: InputDecoration(
-                              hintText: isAvatarFriend ? 'Ask AI anything...' : 'Message...',
+                              hintText: isAvatarFriend ? 'Ask AI anything...' : 'Type a message...',
                               filled: true,
-                              fillColor: const Color(0xFF1E1E1E),
+                              fillColor: Colors.white,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(24),
                                 borderSide: BorderSide.none,
@@ -2592,16 +2900,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           const SizedBox(width: 4),
                           IconButton(
                             onPressed: _startRecording,
-                            icon: const Icon(Icons.mic, color: Colors.white70),
+                            icon: const Icon(Icons.mic_none_rounded, color: kTextDark),
                           ),
                         ],
-                        const SizedBox(width: 2),
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: const Color(0xFFFF7A00),
+                        const SizedBox(width: 4),
+                        Container(
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
+                          ),
                           child: IconButton(
                             onPressed: sendMessage,
-                            icon: const Icon(Icons.send, color: Colors.black, size: 20),
+                            icon: const Icon(Icons.send_rounded, color: Colors.white, size: 19),
                           ),
                         ),
                       ],
@@ -2615,15 +2925,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   Widget _buildAiChat() {
     if (localMessages.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.auto_awesome, size: 70, color: Color(0xFFFF7A00)),
-            SizedBox(height: 18),
-            Text('Say hello to Avatar Friend!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFF7A00))),
-            SizedBox(height: 6),
-            Text('Your smart voice AI companion', style: TextStyle(fontSize: 14, color: Colors.white60)),
+          children: const [
+            Icon(Icons.auto_awesome, size: 60, color: kAccentPink),
+            SizedBox(height: 14),
+            Text('Say hello to Avatar Friend!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+            SizedBox(height: 4),
+            Text('Your personal voice AI companion', style: TextStyle(fontSize: 13, color: kTextSubtle)),
           ],
         ),
       );
@@ -2640,8 +2950,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(18)),
-              child: const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+              child: const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryNeon)),
             ),
           );
         }
@@ -2655,8 +2965,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: BoxDecoration(
-              color: isUser ? const Color(0xFFFF7A00) : const Color(0xFF1E1E1E),
+              gradient: isUser ? const LinearGradient(colors: [kPrimaryNeon, kAccentPink]) : null,
+              color: isUser ? null : Colors.white,
               borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2))
+              ],
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -2664,14 +2978,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 Flexible(
                   child: Text(
                     msg['text'] ?? '',
-                    style: TextStyle(fontSize: 15, color: isUser ? Colors.black : Colors.white, fontWeight: isUser ? FontWeight.w600 : FontWeight.normal),
+                    style: TextStyle(fontSize: 15, color: isUser ? Colors.white : kDarkSurface, fontWeight: isUser ? FontWeight.w500 : FontWeight.normal),
                   ),
                 ),
                 if (!isUser) ...[
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () => _speak(msg['text'] ?? ''),
-                    child: const Icon(Icons.volume_up, size: 16, color: Color(0xFFFF7A00)),
+                    child: const Icon(Icons.volume_up_rounded, size: 18, color: kPrimaryNeon),
                   ),
                 ],
               ],
@@ -2692,7 +3006,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -2700,9 +3014,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.chat_bubble_outline, size: 70, color: Colors.white24),
-                const SizedBox(height: 15),
-                Text('Say hello to ${widget.userName}!', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+                const Icon(Icons.chat_bubble_outline_rounded, size: 60, color: kTextSubtle),
+                const SizedBox(height: 12),
+                Text('Start a conversation with ${widget.userName}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kDarkSurface)),
               ],
             ),
           );
@@ -2733,16 +3047,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: isMissed ? Colors.redAccent.withOpacity(0.5) : Colors.greenAccent.withOpacity(0.5)),
+                    border: Border.all(color: isMissed ? Colors.redAccent.withOpacity(0.4) : Colors.green.withOpacity(0.4)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(isMissed ? Icons.phone_missed : Icons.phone, size: 16, color: isMissed ? Colors.redAccent : Colors.greenAccent),
+                      Icon(isMissed ? Icons.phone_missed_rounded : Icons.phone_rounded, size: 16, color: isMissed ? Colors.redAccent : Colors.green),
                       const SizedBox(width: 8),
-                      Text(data['text'] ?? 'Voice Call', style: TextStyle(fontSize: 13, color: isMissed ? Colors.redAccent : Colors.greenAccent, fontWeight: FontWeight.w600)),
+                      Text(data['text'] ?? 'Voice Call', style: TextStyle(fontSize: 13, color: isMissed ? Colors.redAccent : Colors.green, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -2764,8 +3078,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
                               : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
                       decoration: BoxDecoration(
-                        color: isMe ? const Color(0xFFFF7A00) : const Color(0xFF1E1E1E),
+                        gradient: isMe ? const LinearGradient(colors: [kPrimaryNeon, kAccentPink]) : null,
+                        color: isMe ? null : Colors.white,
                         borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2))
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -2790,14 +3108,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           else
                             Text(
                               data['text'] ?? '',
-                              style: TextStyle(fontSize: 15, color: isMe ? Colors.black : Colors.white, fontWeight: isMe ? FontWeight.w500 : FontWeight.normal),
+                              style: TextStyle(fontSize: 15, color: isMe ? Colors.white : kDarkSurface, fontWeight: isMe ? FontWeight.w500 : FontWeight.normal),
                             ),
                           if (isMe) ...[
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 2),
                             Icon(
-                              isRead ? Icons.done_all : Icons.done,
+                              isRead ? Icons.done_all_rounded : Icons.done_rounded,
                               size: 15,
-                              color: isRead ? Colors.black : Colors.black54,
+                              color: Colors.white70,
                             ),
                           ],
                         ],
@@ -2811,9 +3129,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2A2A2A),
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.white24, width: 1),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4)
+                            ],
                           ),
                           child: Text(reaction, style: const TextStyle(fontSize: 13)),
                         ),
@@ -2830,7 +3150,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 }
 
 // ==================================================
-// PROFILE SCREEN (WITH CROP PHOTO PICKER)
+// PROFILE SCREEN
 // ==================================================
 
 class ProfileScreen extends StatefulWidget {
@@ -2843,7 +3163,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ImagePicker _picker = ImagePicker();
   String displayName = '';
-  String displayBio = 'Hey there! I am using Avatar.';
+  String displayBio = 'Hey there! I am on Avatar.';
   String photoBase64 = '';
 
   @override
@@ -2870,10 +3190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _updateProfilePhoto() async {
     try {
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-      );
-
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image == null) return;
 
       final CroppedFile? croppedFile = await ImageCropper().cropImage(
@@ -2881,12 +3198,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Crop Profile Photo',
-            toolbarColor: const Color(0xFF1E1E1E),
+            toolbarTitle: 'Crop Photo',
+            toolbarColor: kDarkSurface,
             toolbarWidgetColor: Colors.white,
             initAspectRatio: CropAspectRatioPreset.square,
             lockAspectRatio: true,
-            activeControlsWidgetColor: const Color(0xFFFF7A00),
+            activeControlsWidgetColor: kPrimaryNeon,
           ),
         ],
       );
@@ -2906,7 +3223,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) _showMessage(context, 'Profile picture updated!');
       }
     } catch (e) {
-      if (mounted) _showMessage(context, 'Error updating photo: $e');
+      if (mounted) _showMessage(context, 'Error: $e');
     }
   }
 
@@ -2917,7 +3234,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E1E),
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(
@@ -2930,23 +3247,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Edit Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text('Edit Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: kDarkSurface)),
             const SizedBox(height: 18),
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Username', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                labelText: 'Username',
+                filled: true,
+                fillColor: kLightBg,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+              ),
             ),
             const SizedBox(height: 14),
             TextField(
               controller: bioCtrl,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Bio / Status', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                labelText: 'Bio / Status',
+                filled: true,
+                fillColor: kLightBg,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+              ),
             ),
             const SizedBox(height: 20),
-            SizedBox(
+            Container(
               height: 50,
-              child: FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
+              ),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                ),
                 onPressed: () async {
                   final newName = nameCtrl.text.trim();
                   final newBio = bioCtrl.text.trim();
@@ -2968,10 +3302,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       }, SetOptions(merge: true));
                     }
 
-                    if (mounted) _showMessage(context, 'Profile updated successfully!');
+                    if (mounted) _showMessage(context, 'Profile updated!');
                   }
                 },
-                child: const Text('Save Changes', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                child: const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -2983,17 +3317,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final myUid = user?.uid ?? '';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24)),
         actions: [
           IconButton(
             onPressed: () async {
               updateUserPresence(false);
               await FirebaseAuth.instance.signOut();
             },
-            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
           ),
         ],
       ),
@@ -3002,14 +3337,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
               Stack(
                 children: [
                   buildUserAvatar(
                     photoBase64: photoBase64,
                     name: displayName,
-                    radius: 65,
-                    borderColor: const Color(0xFFFF7A00),
+                    radius: 60,
                   ),
                   Positioned(
                     bottom: 0,
@@ -3018,60 +3352,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: _updateProfilePhoto,
                       child: Container(
                         padding: const EdgeInsets.all(8),
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Color(0xFFFF7A00),
+                          color: kDarkSurface,
+                          border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: const Icon(Icons.camera_alt, size: 20, color: Colors.black),
+                        child: const Icon(Icons.camera_alt_rounded, size: 18, color: Colors.white),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              Text(displayName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              Text(displayBio, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 16),
+              Text(displayName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              const SizedBox(height: 4),
+              Text(displayBio, textAlign: TextAlign.center, style: const TextStyle(color: kTextSubtle, fontSize: 14)),
               const SizedBox(height: 24),
-              StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
-                builder: (context, snapshot) {
-                  final data = snapshot.data?.data() as Map<String, dynamic>?;
-                  final List<dynamic> bonds = data?['bonds'] ?? [];
 
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1E1E),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          '${bonds.length}',
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFF7A00)),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text('Active Bonds', style: TextStyle(color: Colors.white60, fontSize: 13)),
-                      ],
-                    ),
+              // Instagram Style Connecting / Connectors Counts
+              StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').doc(myUid).snapshots(),
+                builder: (context, mySnap) {
+                  final myData = mySnap.data?.data() as Map<String, dynamic>?;
+                  final List<dynamic> connectedList = myData?['connections'] ?? [];
+
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('users').where('connections', arrayContains: myUid).snapshots(),
+                    builder: (context, connectorSnap) {
+                      final connectorCount = connectorSnap.data?.docs.length ?? 0;
+
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    '${connectedList.length}',
+                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kPrimaryNeon),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text('Connected', style: TextStyle(color: kTextSubtle, fontSize: 13, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    '$connectorCount',
+                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kAccentPink),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text('Connectors', style: TextStyle(color: kTextSubtle, fontSize: 13, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   );
                 },
               ),
-              const SizedBox(height: 30),
+
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFFF7A00)),
-                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                    foregroundColor: kDarkSurface,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: _openEditProfileSheet,
                   icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text('Edit Profile & Status', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  label: const Text('Edit Profile & Status', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
