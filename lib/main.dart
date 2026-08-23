@@ -118,7 +118,6 @@ class NotificationService {
 
     await _localNotifications.initialize(initSettings);
 
-    // High Importance Notification Channel for Android OS
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       'avatar_chat_channel',
       'Chat Notifications',
@@ -1067,7 +1066,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (ALL PERMISSIONS AUTO-POPUP)
+// HOME SCREEN (ALL PERMISSIONS DIALOG AUTO-POPUP)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1182,7 +1181,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         Navigator.pop(ctx);
                         await prefs.setBool('full_permissions_asked_v2', true);
 
-                        // Request all required runtime permissions
                         await [
                           Permission.microphone,
                           Permission.camera,
@@ -1548,7 +1546,6 @@ class _CallScreenState extends State<CallScreen> {
       return;
     }
 
-    // Outgoing call started -> play ringtone
     _playOutgoingRingtone();
 
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -2048,7 +2045,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
 
-                      // Avatar Friend AI Tile
                       ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
                         leading: Stack(
@@ -2121,7 +2117,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       const Divider(height: 1, color: Colors.white10),
 
-                      // Bonded Users List
                       if (bondedUsers.isNotEmpty) ...[
                         ...bondedUsers.map((doc) {
                           final data = doc.data() as Map<String, dynamic>;
@@ -2221,7 +2216,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ],
 
-                      // Suggested Bonds Section
                       if (suggestedUsers.isNotEmpty) ...[
                         const Padding(
                           padding: EdgeInsets.fromLTRB(18, 24, 18, 10),
@@ -3098,7 +3092,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
               child: Row(
-                mainAxisAlignment: dynamic,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: ['❤️', '😂', '👍', '🔥', '😮', '😢'].map((emoji) {
                   return GestureDetector(
                     onTap: () {
