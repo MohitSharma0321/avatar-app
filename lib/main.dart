@@ -94,6 +94,9 @@ class NotificationService {
   static StreamSubscription<String>? _tokenSubscription;
   static StreamSubscription<RemoteMessage>? _messageSubscription;
 
+  static const String workerUrl =
+      'https://avatar-call-notifier.projectkhurafat.workers.dev/';
+
   static Future<void> initialize() async {
     if (_initialized) {
       await saveCurrentToken();
@@ -162,7 +165,6 @@ class NotificationService {
     }
   }
 
-  // Trigger push notification to callee via Cloudflare Worker
   static Future<void> triggerCallPush({
     required String calleeId,
     required String callId,
@@ -177,14 +179,39 @@ class NotificationService {
       if (fcmToken == null || fcmToken.isEmpty) return;
 
       await http.post(
-        Uri.parse('https://avatar-call-notifier.projectkhurafat.workers.dev/'),
+        Uri.parse(workerUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
+          'type': 'call',
           'fcmToken': fcmToken,
           'callId': callId,
           'callerName': callerName,
           'callerAvatar': callerAvatar,
           'callerId': callerId,
+        }),
+      );
+    } catch (_) {}
+  }
+
+  static Future<void> triggerChatPush({
+    required String receiverUid,
+    required String senderName,
+    required String messageText,
+  }) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(receiverUid).get();
+      final String? fcmToken = doc.data()?['fcmToken'];
+
+      if (fcmToken == null || fcmToken.isEmpty) return;
+
+      await http.post(
+        Uri.parse(workerUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'type': 'chat',
+          'fcmToken': fcmToken,
+          'title': senderName,
+          'body': messageText,
         }),
       );
     } catch (_) {}
@@ -2693,6 +2720,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   bool get isAvatarFriend => widget.userName == 'Avatar Friend';
   String get currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
+  String get currentName => FirebaseAuth.instance.currentUser?.displayName ?? 'User';
   String get chatRoomId => getChatRoomId(currentUid, widget.peerUid ?? '');
 
   @override
@@ -2854,6 +2882,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
+      if (widget.peerUid != null) {
+        unawaited(
+          NotificationService.triggerChatPush(
+            receiverUid: widget.peerUid!,
+            senderName: currentName,
+            messageText: '📷 Photo',
+          ),
+        );
+      }
+
       _scrollToBottom();
       if (mounted) setState(() => isUploadingMedia = false);
     } catch (e) {
@@ -2887,6 +2925,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
+  Future<void> _cancelRecording() async {
+    recordingTimer?.cancel();
+    try {
+      await _audioRecorder.stop();
+    } catch (_) {}
+    setState(() => isRecording = false);
+    if (mounted) _showMessage(context, 'Recording cancelled.');
+  }
+
   Future<void> _stopAndSendRecording() async {
     recordingTimer?.cancel();
     try {
@@ -2912,6 +2959,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             'reaction': '',
             'timestamp': FieldValue.serverTimestamp(),
           });
+
+          if (widget.peerUid != null) {
+            unawaited(
+              NotificationService.triggerChatPush(
+                receiverUid: widget.peerUid!,
+                senderName: currentName,
+                messageText: '🎤 Voice message',
+              ),
+            );
+          }
+
           _scrollToBottom();
         }
       }
@@ -2959,6 +3017,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           'reaction': '',
           'timestamp': FieldValue.serverTimestamp(),
         });
+
+        if (widget.peerUid != null) {
+          unawaited(
+            NotificationService.triggerChatPush(
+              receiverUid: widget.peerUid!,
+              senderName: currentName,
+              messageText: text,
+            ),
+          );
+        }
+
         _scrollToBottom();
       }
     } catch (e) {
@@ -3176,23 +3245,33 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
                   child: isRecording
                       ? Container(
-                          height: 52,
+                          height: 54,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           decoration: BoxDecoration(
-                            color: Colors.redAccent.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(26),
-                            border: Border.all(color: Colors.redAccent),
+                            color: Colors.redAccent.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(color: Colors.redAccent.withOpacity(0.6)),
                           ),
                           child: Row(
                             children: [
                               const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 20),
                               const SizedBox(width: 8),
-                              Text('Recording... ${recordingSeconds}s',
-                                  style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text(
+                                '${recordingSeconds}s',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
                               const Spacer(),
-                              IconButton(
+                              TextButton.icon(
+                                style: TextButton.styleFrom(foregroundColor: Colors.white70),
+                                onPressed: _cancelRecording,
+                                icon: const Icon(Icons.delete_outline, size: 20),
+                                label: const Text('Cancel'),
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton.filled(
+                                style: IconButton.styleFrom(backgroundColor: Colors.greenAccent.shade700),
                                 onPressed: _stopAndSendRecording,
-                                icon: const Icon(Icons.send, color: Colors.greenAccent),
+                                icon: const Icon(Icons.send, color: Colors.white, size: 20),
                               ),
                             ],
                           ),
