@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -1713,14 +1714,20 @@ class _CallScreenState extends State<CallScreen> {
 }
 
 // ==================================================
-// AUDIO WAVEFORM VOICE NOTE PLAYER
+// AUDIO WAVEFORM VOICE NOTE PLAYER (URL & BASE64 COMPATIBLE)
 // ==================================================
 
 class VoiceNoteBubble extends StatefulWidget {
-  final String audioBase64;
+  final String? audioUrl;
+  final String? audioBase64;
   final bool isMe;
 
-  const VoiceNoteBubble({Key? key, required this.audioBase64, required this.isMe}) : super(key: key);
+  const VoiceNoteBubble({
+    Key? key,
+    this.audioUrl,
+    this.audioBase64,
+    required this.isMe,
+  }) : super(key: key);
 
   @override
   State<VoiceNoteBubble> createState() => _VoiceNoteBubbleState();
@@ -1737,10 +1744,13 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
   @override
   void initState() {
     super.initState();
-    final rand = Random(widget.audioBase64.hashCode);
+    final seed = (widget.audioUrl ?? widget.audioBase64 ?? '').hashCode;
+    final rand = Random(seed);
     barHeights = List.generate(24, (_) => 0.25 + rand.nextDouble() * 0.75);
 
-    _prepareAudio();
+    if (widget.audioBase64 != null && widget.audioBase64!.isNotEmpty) {
+      _prepareBase64Audio();
+    }
 
     _audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) {
@@ -1757,9 +1767,9 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
     });
   }
 
-  Future<void> _prepareAudio() async {
+  Future<void> _prepareBase64Audio() async {
     try {
-      final bytes = base64Decode(widget.audioBase64);
+      final bytes = base64Decode(widget.audioBase64!);
       final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/${DateTime.now().microsecondsSinceEpoch}.m4a');
       await file.writeAsBytes(bytes);
@@ -1771,7 +1781,9 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
     if (isPlaying) {
       await _audioPlayer.pause();
     } else {
-      if (tempAudioPath != null) {
+      if (widget.audioUrl != null && widget.audioUrl!.isNotEmpty) {
+        await _audioPlayer.play(UrlSource(widget.audioUrl!));
+      } else if (tempAudioPath != null) {
         await _audioPlayer.play(DeviceFileSource(tempAudioPath!));
       }
     }
@@ -2856,17 +2868,25 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 700,
-        maxHeight: 700,
-        imageQuality: 60,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 75,
       );
 
       if (pickedFile == null) return;
 
       setState(() => isUploadingMedia = true);
 
-      final Uint8List bytes = await pickedFile.readAsBytes();
-      final String base64String = base64Encode(bytes);
+      // Cloud Storage Upload
+      final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('chat_media')
+          .child(chatRoomId)
+          .child(fileName);
+
+      final uploadTask = await storageRef.putFile(File(pickedFile.path));
+      final String downloadUrl = await uploadTask.ref.getDownloadURL();
 
       await FirebaseFirestore.instance
           .collection('chats')
@@ -2876,7 +2896,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         'senderId': currentUid,
         'receiverId': widget.peerUid,
         'type': 'image',
-        'imageData': base64String,
+        'imageUrl': downloadUrl,
         'isRead': false,
         'reaction': '',
         'timestamp': FieldValue.serverTimestamp(),
@@ -2897,7 +2917,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => isUploadingMedia = false);
-        _showMessage(context, 'Gallery error: $e');
+        _showMessage(context, 'Upload error: $e');
       }
     }
   }
@@ -2941,11 +2961,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       setState(() => isRecording = false);
 
       if (path != null && recordingSeconds >= 1) {
-        final file = File(path);
-        final bytes = await file.readAsBytes();
-        final base64Audio = base64Encode(bytes);
-
         if (!isAvatarFriend) {
+          setState(() => isUploadingMedia = true);
+
+          // Cloud Storage Audio Upload
+          final fileName = 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+          final storageRef = FirebaseStorage.instance
+              .ref()
+              .child('chat_media')
+              .child(chatRoomId)
+              .child(fileName);
+
+          final uploadTask = await storageRef.putFile(File(path));
+          final String downloadUrl = await uploadTask.ref.getDownloadURL();
+
           await FirebaseFirestore.instance
               .collection('chats')
               .doc(chatRoomId)
@@ -2954,7 +2983,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             'senderId': currentUid,
             'receiverId': widget.peerUid,
             'type': 'audio',
-            'audioData': base64Audio,
+            'audioUrl': downloadUrl,
             'isRead': false,
             'reaction': '',
             'timestamp': FieldValue.serverTimestamp(),
@@ -2971,9 +3000,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           }
 
           _scrollToBottom();
+          if (mounted) setState(() => isUploadingMedia = false);
         }
       }
     } catch (e) {
+      if (mounted) setState(() => isUploadingMedia = false);
       setState(() => isRecording = false);
     }
   }
@@ -3234,7 +3265,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           body: Column(
             children: [
               if (isUploadingMedia)
-                const LinearProgressIndicator(minHeight: 2),
+                const LinearProgressIndicator(minHeight: 3),
 
               Expanded(
                 child: isAvatarFriend ? _buildAiChat(currentAvatar) : _buildRealUserChat(),
@@ -3419,7 +3450,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     : null,
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: dynamic,
                 children: [
                   Flexible(
                     child: Text(msg['text'] ?? '', style: const TextStyle(fontSize: 15)),
@@ -3485,8 +3516,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             final data = doc.data() as Map<String, dynamic>;
             final isMe = data['senderId'] == currentUid;
             final type = data['type'] ?? 'text';
-            final imgPayload = data['imageData'] ?? data['imageUrl'] ?? '';
-            final audioPayload = data['audioData'] ?? '';
+            final imgPayload = data['imageUrl'] ?? data['imageData'] ?? '';
+            final audioUrl = data['audioUrl'];
+            final audioBase64 = data['audioData'];
             final isRead = data['isRead'] == true;
             final reaction = data['reaction'] ?? '';
 
@@ -3561,7 +3593,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(14),
                                 child: imgPayload.startsWith('http')
-                                    ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
+                                    ? Image.network(
+                                        imgPayload,
+                                        width: 220,
+                                        height: 220,
+                                        fit: BoxFit.cover,
+                                        loadingBuilder: (ctx, child, progress) {
+                                          if (progress == null) return child;
+                                          return Container(
+                                            width: 220,
+                                            height: 220,
+                                            color: const Color(0xFF1E1E1E),
+                                            child: const Center(
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            ),
+                                          );
+                                        },
+                                      )
                                     : (() {
                                         final bytes = _decodeImageCached(doc.id, imgPayload);
                                         return bytes != null
@@ -3571,7 +3619,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               ),
                             )
                           else if (type == 'audio')
-                            VoiceNoteBubble(key: ValueKey(doc.id), audioBase64: audioPayload, isMe: isMe)
+                            VoiceNoteBubble(
+                              key: ValueKey(doc.id),
+                              audioUrl: audioUrl,
+                              audioBase64: audioBase64,
+                              isMe: isMe,
+                            )
                           else
                             Text(data['text'] ?? '', style: const TextStyle(fontSize: 15)),
 
