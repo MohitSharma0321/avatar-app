@@ -986,7 +986,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// HOME SCREEN (WITH CALLKIT & IN-APP NOTIFICATIONS)
+// HOME SCREEN (WITH IN-APP PERMISSION SHEET)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1022,7 +1022,110 @@ class _HomeScreenState extends State<HomeScreen> {
       _listenForIncomingCalls(user.uid);
       _listenToCallKitEvents();
       _checkInitialCall();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndAskInAppPermissions();
+      });
     }
+  }
+
+  // Automatic In-App Permission Flow for Background Calling
+  Future<void> _checkAndAskInAppPermissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool alreadyAsked = prefs.getBool('permissions_asked_v1') ?? false;
+
+    final micStatus = await Permission.microphone.status;
+    final notifStatus = await Permission.notification.status;
+
+    if (!alreadyAsked || micStatus.isDenied || notifStatus.isDenied) {
+      if (!mounted) return;
+      _showPermissionSheet(prefs);
+    }
+  }
+
+  void _showPermissionSheet(SharedPreferences prefs) {
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.greenAccent.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.phone_in_talk, color: Colors.greenAccent, size: 28),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Enable Real-time Calling',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'To receive incoming voice calls and alerts when your phone is locked or app is closed, please allow the necessary permissions.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.4),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () {
+                        prefs.setBool('permissions_asked_v1', true);
+                        Navigator.pop(ctx);
+                      },
+                      child: const Text('Not Now', style: TextStyle(color: Colors.white70)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.greenAccent.shade700,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await prefs.setBool('permissions_asked_v1', true);
+
+                        // 1. Microphone & Notifications
+                        await [
+                          Permission.microphone,
+                          Permission.notification,
+                        ].request();
+
+                        // 2. Battery Saver Bypass (App band hone par background call aane ke liye)
+                        if (await Permission.ignoreBatteryOptimizations.isDenied) {
+                          await Permission.ignoreBatteryOptimizations.request();
+                        }
+                      },
+                      child: const Text('Allow All', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _checkInitialCall() async {
@@ -1572,7 +1675,6 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
   @override
   void initState() {
     super.initState();
-    // Deterministic waveform bars based on string hash
     final rand = Random(widget.audioBase64.hashCode);
     barHeights = List.generate(24, (_) => 0.25 + rand.nextDouble() * 0.75);
 
@@ -2515,7 +2617,7 @@ class FullImageViewScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN (WITH REAL-TIME TYPING & LOGS)
+// CHAT CONVERSATION SCREEN
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -3274,7 +3376,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             final isRead = data['isRead'] == true;
             final reaction = data['reaction'] ?? '';
 
-            // 1. Call Log Bubble
             if (type == 'call_log') {
               final status = data['callStatus'] ?? 'connected';
               final isMissed = status == 'missed';
@@ -3285,7 +3386,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E1E1E),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: isMissed ? Colors.redAccent.withOpacity(0.5) : Colors.greenAccent.withOpacity(0.5)),
+                    border: Border.all(
+                      color: isMissed ? Colors.redAccent.withOpacity(0.5) : Colors.greenAccent.withOpacity(0.5),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -3310,7 +3413,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               );
             }
 
-            // 2. Regular Messages
             return GestureDetector(
               onLongPress: () => _showMessageOptions(doc, data, isMe),
               child: Align(
