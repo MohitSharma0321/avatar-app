@@ -22,6 +22,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:video_player/video_player.dart';
+import 'package:share_plus/share_plus.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -885,7 +887,7 @@ class WelcomeScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CREATE ACCOUNT (WITH UNIQUE USERNAME CHECK)
+// CREATE ACCOUNT
 // ==================================================
 
 class CreateAccountScreen extends StatefulWidget {
@@ -1211,27 +1213,357 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// PLACEHOLDER TABS FOR 5-TAB BAR
+// REELS & POSTS DUAL FEED SCREEN
 // ==================================================
 
-class ReelsPlaceholderScreen extends StatelessWidget {
-  const ReelsPlaceholderScreen({Key? key}) : super(key: key);
+class FeedScreen extends StatefulWidget {
+  const FeedScreen({Key? key}) : super(key: key);
+
+  @override
+  State<FeedScreen> createState() => _FeedScreenState();
+}
+
+class _FeedScreenState extends State<FeedScreen> {
+  int feedTab = 0; // 0 = Reels, 1 = Posts
+  final ImagePicker _picker = ImagePicker();
+
+  void _openShareModal(BuildContext context, Map<String, dynamic> postData) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 14),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Text('Share Content', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [kPrimaryNeon, kAccentPink])),
+                child: const Icon(Icons.history_toggle_off_rounded, color: Colors.white, size: 20),
+              ),
+              title: const Text('Add to Avatar Story (24h)', style: TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showMessage(context, 'Added to your Avatar Story!');
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.green.shade600),
+                child: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
+              ),
+              title: const Text('Share to WhatsApp / WhatsApp Status', style: TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(ctx);
+                Share.share('Check this out on Avatar App! 🔥\n${postData['caption'] ?? ''}');
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadContentDialog() async {
+    final captionCtrl = TextEditingController();
+    XFile? mediaFile;
+    bool isVideo = (feedTab == 0);
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(isVideo ? 'Post Reel Video' : 'Create Image Post', style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: captionCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Write a caption...',
+                  filled: true,
+                  fillColor: kLightBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: kDarkSurface, foregroundColor: Colors.white),
+                onPressed: () async {
+                  final picked = isVideo
+                      ? await _picker.pickVideo(source: ImageSource.gallery)
+                      : await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75);
+                  if (picked != null) {
+                    setDialogState(() => mediaFile = picked);
+                  }
+                },
+                icon: Icon(isVideo ? Icons.video_camera_back_outlined : Icons.image_outlined),
+                label: Text(mediaFile == null ? 'Select Media' : 'Media Selected ✅'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: kPrimaryNeon, foregroundColor: Colors.white),
+              onPressed: () async {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user == null) return;
+                Navigator.pop(ctx);
+
+                String base64Data = '';
+                if (mediaFile != null && !isVideo) {
+                  final bytes = await mediaFile!.readAsBytes();
+                  base64Data = base64Encode(bytes);
+                }
+
+                await FirebaseFirestore.instance.collection('feed_posts').add({
+                  'uid': user.uid,
+                  'creatorName': user.displayName ?? 'User',
+                  'type': isVideo ? 'reel' : 'post',
+                  'caption': captionCtrl.text.trim(),
+                  'mediaData': base64Data,
+                  'likes': [],
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+
+                if (mounted) _showMessage(context, 'Published successfully!');
+              },
+              child: const Text('Post'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Reels & Posts', style: TextStyle(fontWeight: FontWeight.bold))),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.slow_motion_video_rounded, size: 70, color: kPrimaryNeon),
-            SizedBox(height: 14),
-            Text('Reels & Posts Feed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 6),
-            Text('Coming in next step with dual switch & sharing', style: TextStyle(color: kTextSubtle)),
-          ],
+      backgroundColor: feedTab == 0 ? Colors.black : kLightBg,
+      appBar: AppBar(
+        backgroundColor: feedTab == 0 ? Colors.black : Colors.white,
+        titleSpacing: 0,
+        title: Container(
+          height: 38,
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: feedTab == 0 ? Colors.white12 : kLightBg,
+            borderRadius: BorderRadius.circular(19),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: () => setState(() => feedTab = 0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(19),
+                    gradient: feedTab == 0 ? const LinearGradient(colors: [kPrimaryNeon, kAccentPink]) : null,
+                  ),
+                  child: Text('🎬 Reels', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: feedTab == 0 ? Colors.white : (feedTab == 0 ? Colors.white70 : kTextDark))),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => setState(() => feedTab = 1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(19),
+                    gradient: feedTab == 1 ? const LinearGradient(colors: [kPrimaryNeon, kAccentPink]) : null,
+                  ),
+                  child: Text('🖼️ Posts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: feedTab == 1 ? Colors.white : (feedTab == 0 ? Colors.white70 : kTextDark))),
+                ),
+              ),
+            ],
+          ),
         ),
+        actions: [
+          IconButton(
+            onPressed: _uploadContentDialog,
+            icon: Icon(Icons.add_circle_outline_rounded, color: feedTab == 0 ? Colors.white : kDarkSurface, size: 26),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('feed_posts')
+            .where('type', isEqualTo: feedTab == 0 ? 'reel' : 'post')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+
+          if (docs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(feedTab == 0 ? Icons.movie_outlined : Icons.photo_library_outlined, size: 60, color: feedTab == 0 ? Colors.white38 : kTextSubtle),
+                  const SizedBox(height: 12),
+                  Text(feedTab == 0 ? 'No Reels uploaded yet.' : 'No Posts yet.', style: TextStyle(color: feedTab == 0 ? Colors.white70 : kDarkSurface, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 6),
+                  Text('Tap + at top right to upload.', style: TextStyle(color: feedTab == 0 ? Colors.white38 : kTextSubtle, fontSize: 13)),
+                ],
+              ),
+            );
+          }
+
+          if (feedTab == 0) {
+            // Full Screen Vertical Reel View
+            return PageView.builder(
+              scrollDirection: Axis.vertical,
+              itemCount: docs.length,
+              itemBuilder: (context, index) {
+                final data = docs[index].data() as Map<String, dynamic>;
+                final List<dynamic> likes = data['likes'] ?? [];
+                final isLiked = likes.contains(currentUid);
+
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      color: Colors.black,
+                      child: const Center(
+                        child: Icon(Icons.play_circle_outline_rounded, size: 80, color: Colors.white38),
+                      ),
+                    ),
+                    // Action Buttons Overlay
+                    Positioned(
+                      right: 16,
+                      bottom: 40,
+                      child: Column(
+                        children: [
+                          IconButton(
+                            icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : Colors.white, size: 32),
+                            onPressed: () {
+                              docs[index].reference.update({
+                                'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
+                              });
+                            },
+                          ),
+                          Text('${likes.length}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 16),
+                          IconButton(
+                            icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 28),
+                            onPressed: () {},
+                          ),
+                          const SizedBox(height: 16),
+                          IconButton(
+                            icon: const Icon(Icons.share_rounded, color: Colors.white, size: 28),
+                            onPressed: () => _openShareModal(context, data),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Caption & Profile info
+                    Positioned(
+                      left: 16,
+                      bottom: 30,
+                      right: 80,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('@${data['creatorName'] ?? 'user'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 6),
+                          Text(data['caption'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          }
+
+          // Posts Mode (Clean Vertical Feed)
+          return ListView.builder(
+            itemCount: docs.length,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            itemBuilder: (context, index) {
+              final data = docs[index].data() as Map<String, dynamic>;
+              final String mediaBase64 = data['mediaData'] ?? '';
+              final List<dynamic> likes = data['likes'] ?? [];
+              final isLiked = likes.contains(currentUid);
+
+              Widget postImage;
+              if (mediaBase64.isNotEmpty) {
+                try {
+                  postImage = Image.memory(base64Decode(mediaBase64), fit: BoxFit.cover, width: double.infinity, height: 320);
+                } catch (_) {
+                  postImage = Container(height: 200, color: Colors.grey.shade200, child: const Icon(Icons.broken_image));
+                }
+              } else {
+                postImage = Container(height: 200, color: Colors.grey.shade200, child: const Center(child: Icon(Icons.photo_outlined, size: 48, color: Colors.grey)));
+              }
+
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ListTile(
+                      leading: CircleAvatar(backgroundColor: kPrimaryNeon.withOpacity(0.2), child: Text(data['creatorName'] != null && data['creatorName'].isNotEmpty ? data['creatorName'][0].toUpperCase() : 'U')),
+                      title: Text(data['creatorName'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      trailing: IconButton(icon: const Icon(Icons.more_horiz_rounded), onPressed: () => _openShareModal(context, data)),
+                    ),
+                    ClipRRect(borderRadius: BorderRadius.circular(12), child: postImage),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : kDarkSurface, size: 26),
+                            onPressed: () {
+                              docs[index].reference.update({
+                                'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          Text('${likes.length} likes', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const Spacer(),
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.share_outlined, size: 24),
+                            onPressed: () => _openShareModal(context, data),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if ((data['caption'] ?? '').isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                        child: Text(data['caption'], style: const TextStyle(fontSize: 14)),
+                      ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -1252,7 +1584,7 @@ class MusicPlaceholderScreen extends StatelessWidget {
             SizedBox(height: 14),
             Text('Background Music & Call Sync', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SizedBox(height: 6),
-            Text('Audio streaming and live share', style: TextStyle(color: kTextSubtle)),
+            Text('Coming in next step with audio streaming and live call sync', style: TextStyle(color: kTextSubtle)),
           ],
         ),
       ),
@@ -1295,7 +1627,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int currentIndex = 2; // Default Launch on Center Profile
+  int currentIndex = 2;
   StreamSubscription? callSubscription;
 
   final List<Widget?> pages = [null, null, null, null, null];
@@ -1303,7 +1635,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _pageAt(int index) {
     if (pages[index] == null) {
       pages[index] = switch (index) {
-        0 => const ReelsPlaceholderScreen(),
+        0 => const FeedScreen(),
         1 => const MusicPlaceholderScreen(),
         2 => const ProfileScreen(),
         3 => const RewardsPlaceholderScreen(),
@@ -1762,7 +2094,7 @@ class NotificationsScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT SCREEN (WITH PINNING & DELETE FOR ME)
+// CHAT SCREEN
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -1929,7 +2261,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 return true;
               }).toList();
 
-              // Sort Pinned to top
               activeChatUsers.sort((a, b) {
                 final aPinned = pinnedChats.contains(a.id);
                 final bPinned = pinnedChats.contains(b.id);
@@ -1958,7 +2289,6 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
 
-                  // Avatar AI Companion
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     decoration: BoxDecoration(
@@ -2705,7 +3035,7 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN (ADVANCED MESSAGE ACTIONS)
+// CHAT CONVERSATION SCREEN
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -3434,7 +3764,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         }
 
         final allMessages = snapshot.data!.docs;
-        // Filter out deleted messages for this user
         final messages = allMessages.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final List<dynamic> deletedFor = data['deletedFor'] ?? [];
