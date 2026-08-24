@@ -46,6 +46,8 @@ dependencies:
   # Media, Cropper & UI
   image_picker: ^1.1.2
   image_cropper: ^8.0.2
+  video_player: ^2.9.2
+  share_plus: ^10.1.2
   http: ^1.2.2
   shared_preferences: ^2.3.2
   flutter_tts: ^4.2.2
