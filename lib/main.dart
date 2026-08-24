@@ -34,6 +34,303 @@ const Color kLightBg = Color(0xFFF8F9FD);
 const Color kTextDark = Color(0xFF1B1E28);
 const Color kTextSubtle = Color(0xFF7D8494);
 
+// ==================================================
+// GLOBAL MUSIC SERVICE & BACKGROUND MINI PLAYER
+// ==================================================
+
+class SongModel {
+  final String id;
+  final String title;
+  final String artist;
+  final String url;
+  final String artwork;
+  final String duration;
+
+  SongModel({
+    required this.id,
+    required this.title,
+    required this.artist,
+    required this.url,
+    required this.artwork,
+    this.duration = '',
+  });
+
+  factory SongModel.fromJson(Map<String, dynamic> json) {
+    return SongModel(
+      id: json['id'] ?? '',
+      title: json['title'] ?? 'Unknown Track',
+      artist: json['artist'] ?? 'Unknown Artist',
+      url: json['url'] ?? '',
+      artwork: json['artwork'] ?? '',
+      duration: json['duration'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'artist': artist,
+    'url': url,
+    'artwork': artwork,
+    'duration': duration,
+  };
+}
+
+class GlobalMusicService {
+  static final GlobalMusicService instance = GlobalMusicService._internal();
+  GlobalMusicService._internal();
+
+  final AudioPlayer audioPlayer = AudioPlayer();
+  final ValueNotifier<SongModel?> currentSongNotifier = ValueNotifier<SongModel?>(null);
+  final ValueNotifier<bool> isPlayingNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<Duration> positionNotifier = ValueNotifier<Duration>(Duration.zero);
+  final ValueNotifier<Duration> durationNotifier = ValueNotifier<Duration>(Duration.zero);
+
+  void init() {
+    audioPlayer.onPlayerStateChanged.listen((state) {
+      isPlayingNotifier.value = (state == PlayerState.playing);
+    });
+    audioPlayer.onPositionChanged.listen((pos) {
+      positionNotifier.value = pos;
+    });
+    audioPlayer.onDurationChanged.listen((dur) {
+      durationNotifier.value = dur;
+    });
+  }
+
+  Future<void> playSong(SongModel song) async {
+    currentSongNotifier.value = song;
+    await audioPlayer.stop();
+    await audioPlayer.play(UrlSource(song.url));
+  }
+
+  Future<void> pauseSong() async {
+    await audioPlayer.pause();
+  }
+
+  Future<void> resumeSong() async {
+    await audioPlayer.resume();
+  }
+
+  Future<void> seek(Duration pos) async {
+    await audioPlayer.seek(pos);
+  }
+
+  Future<void> stop() async {
+    await audioPlayer.stop();
+    currentSongNotifier.value = null;
+  }
+}
+
+// Live Music API Fetcher
+class MusicRepository {
+  static final List<SongModel> featuredTracks = [
+    SongModel(
+      id: '1',
+      title: 'Midnight Lo-Fi Chill',
+      artist: 'Avatar Beats',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      artwork: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300',
+      duration: '3:45',
+    ),
+    SongModel(
+      id: '2',
+      title: 'Neon Drift Cyberwave',
+      artist: 'Retro Synth',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+      artwork: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300',
+      duration: '4:12',
+    ),
+    SongModel(
+      id: '3',
+      title: 'Acoustic Sunset Melody',
+      artist: 'Acoustic Soul',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+      artwork: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300',
+      duration: '2:58',
+    ),
+    SongModel(
+      id: '4',
+      title: 'Urban Hip Hop Pulse',
+      artist: 'Street Rhythm',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+      artwork: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300',
+      duration: '3:20',
+    ),
+    SongModel(
+      id: '5',
+      title: 'Deep Focus Ambient',
+      artist: 'Atmospheric Cloud',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+      artwork: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300',
+      duration: '4:30',
+    ),
+  ];
+
+  static Future<List<SongModel>> searchTracks(String query) async {
+    if (query.trim().isEmpty) return featuredTracks;
+    final q = query.toLowerCase();
+    return featuredTracks
+        .where((s) => s.title.toLowerCase().contains(q) || s.artist.toLowerCase().contains(q))
+        .toList();
+  }
+}
+
+// Background Mini Player Widget
+class GlobalMiniPlayer extends StatelessWidget {
+  const GlobalMiniPlayer({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<SongModel?>(
+      valueListenable: GlobalMusicService.instance.currentSongNotifier,
+      builder: (context, song, _) {
+        if (song == null) return const SizedBox.shrink();
+
+        return Container(
+          height: 60,
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: kDarkSurface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
+            ],
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  song.artwork,
+                  width: 42,
+                  height: 42,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(width: 42, height: 42, color: Colors.white24, child: const Icon(Icons.music_note, color: Colors.white)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                  ],
+                ),
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: GlobalMusicService.instance.isPlayingNotifier,
+                builder: (context, isPlaying, _) {
+                  return IconButton(
+                    icon: Icon(isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 28),
+                    onPressed: () {
+                      isPlaying ? GlobalMusicService.instance.pauseSong() : GlobalMusicService.instance.resumeSong();
+                    },
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white60, size: 20),
+                onPressed: () => GlobalMusicService.instance.stop(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// In-App Music Picker Modal (For Posts & Reels)
+class MusicPickerModal extends StatefulWidget {
+  const MusicPickerModal({Key? key}) : super(key: key);
+
+  @override
+  State<MusicPickerModal> createState() => _MusicPickerModalState();
+}
+
+class _MusicPickerModalState extends State<MusicPickerModal> {
+  String searchQ = '';
+  List<SongModel> songs = MusicRepository.featuredTracks;
+
+  void _onSearch(String val) async {
+    setState(() => searchQ = val);
+    final results = await MusicRepository.searchTracks(val);
+    setState(() => songs = results);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 14),
+          const Text('Select Music Track', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: kDarkSurface)),
+          const SizedBox(height: 12),
+          TextField(
+            onChanged: _onSearch,
+            decoration: InputDecoration(
+              hintText: 'Search songs or artists...',
+              prefixIcon: const Icon(Icons.search, color: kTextSubtle),
+              filled: true,
+              fillColor: kLightBg,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.builder(
+              itemCount: songs.length,
+              itemBuilder: (context, idx) {
+                final song = songs[idx];
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      song.artwork,
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(width: 48, height: 48, color: Colors.black12, child: const Icon(Icons.music_note)),
+                    ),
+                  ),
+                  title: Text(song.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: Text(song.artist, style: const TextStyle(color: kTextSubtle, fontSize: 12)),
+                  trailing: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimaryNeon,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => Navigator.pop(context, song),
+                    child: const Text('Attach', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================
+// FCM BACKGROUND HANDLER & MAIN INIT
+// ==================================================
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -79,6 +376,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  GlobalMusicService.instance.init();
 
   runApp(const AvatarApp());
 }
@@ -1257,7 +1555,486 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// REELS & POSTS DUAL FEED SCREEN (CLEAN & EMOJI-FREE)
+// INSTAGRAM-STYLE POST STUDIO (PHOTO EDITOR SCREEN)
+// ==================================================
+
+class PostEditStudioScreen extends StatefulWidget {
+  final File initialImageFile;
+
+  const PostEditStudioScreen({Key? key, required this.initialImageFile}) : super(key: key);
+
+  @override
+  State<PostEditStudioScreen> createState() => _PostEditStudioScreenState();
+}
+
+class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
+  late File currentImage;
+  final TextEditingController captionController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+  
+  SongModel? selectedSong;
+  int currentFilterIndex = 0;
+  bool isPosting = false;
+
+  final List<String> filterNames = ['Normal', 'Vivid', 'Warm', 'Mono', 'Vintage', 'Neon'];
+  final List<List<double>> colorMatrices = [
+    [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0], // Normal
+    [1.2, 0, 0, 0, 0, 0, 1.2, 0, 0, 0, 0, 0, 1.2, 0, 0, 0, 0, 0, 1, 0], // Vivid
+    [1.2, 0, 0, 0, 20, 0, 1.1, 0, 0, 10, 0, 0, 0.9, 0, 0, 0, 0, 0, 1, 0], // Warm
+    [0.33, 0.33, 0.33, 0, 0, 0.33, 0.33, 0.33, 0, 0, 0.33, 0.33, 0.33, 0, 0, 0, 0, 0, 1, 0], // Mono
+    [0.393, 0.769, 0.189, 0, 0, 0.349, 0.686, 0.168, 0, 0, 0.272, 0.534, 0.131, 0, 0, 0, 0, 0, 1, 0], // Vintage
+    [0.8, 0, 0, 0, 0, 0, 1.3, 0, 0, 10, 0, 0, 1.5, 0, 30, 0, 0, 0, 1, 0], // Neon
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    currentImage = widget.initialImageFile;
+  }
+
+  Future<void> _cropImage() async {
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: currentImage.path,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop & Ratio',
+          toolbarColor: kDarkSurface,
+          toolbarWidgetColor: Colors.white,
+          initAspectRatio: CropAspectRatioPreset.original,
+          lockAspectRatio: false,
+          activeControlsWidgetColor: kPrimaryNeon,
+        ),
+      ],
+    );
+    if (cropped != null) {
+      setState(() => currentImage = File(cropped.path));
+    }
+  }
+
+  Future<void> _replaceImage() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (picked != null) {
+      setState(() => currentImage = File(picked.path));
+    }
+  }
+
+  Future<void> _pickMusic() async {
+    final SongModel? song = await showModalBottomSheet<SongModel>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const MusicPickerModal(),
+    );
+    if (song != null) {
+      setState(() => selectedSong = song);
+    }
+  }
+
+  Future<void> _publishPost() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => isPosting = true);
+
+    try {
+      final bytes = await currentImage.readAsBytes();
+      final imageBase64 = base64Encode(bytes);
+
+      await FirebaseFirestore.instance.collection('feed_posts').add({
+        'uid': user.uid,
+        'creatorName': user.displayName ?? 'User',
+        'type': 'post',
+        'caption': captionController.text.trim(),
+        'mediaData': imageBase64,
+        'videoUrl': '',
+        'attachedSong': selectedSong != null ? selectedSong!.toJson() : null,
+        'likes': [],
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        _showMessage(context, 'Post published successfully!');
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) _showMessage(context, 'Publish failed: $e');
+    } finally {
+      if (mounted) setState(() => isPosting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('New Post', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          TextButton(
+            onPressed: isPosting ? null : _publishPost,
+            child: isPosting
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryNeon))
+                : const Text('Share', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kPrimaryNeon)),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Preview Box with Live Filter
+            Container(
+              width: double.infinity,
+              height: 380,
+              color: Colors.black,
+              child: Center(
+                child: ColorFiltered(
+                  colorFilter: ColorFilter.matrix(colorMatrices[currentFilterIndex]),
+                  child: Image.file(currentImage, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+
+            // Filter Selector Carousel
+            Container(
+              height: 70,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                itemCount: filterNames.length,
+                itemBuilder: (ctx, idx) {
+                  final isSelected = (currentFilterIndex == idx);
+                  return GestureDetector(
+                    onTap: () => setState(() => currentFilterIndex = idx),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? kDarkSurface : kLightBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isSelected ? kPrimaryNeon : Colors.transparent, width: 1.5),
+                      ),
+                      child: Center(
+                        child: Text(
+                          filterNames[idx],
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : kDarkSurface,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const Divider(height: 1),
+
+            // Action Toolbar (Crop, Replace, Add Music)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Row(
+                children: [
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      foregroundColor: kDarkSurface,
+                    ),
+                    onPressed: _cropImage,
+                    icon: const Icon(Icons.crop_rotate_rounded, size: 16),
+                    label: const Text('Crop'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      foregroundColor: kDarkSurface,
+                    ),
+                    onPressed: _replaceImage,
+                    icon: const Icon(Icons.photo_library_outlined, size: 16),
+                    label: const Text('Replace'),
+                  ),
+                  const Spacer(),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: selectedSong != null ? kDarkSurface : kLightBg,
+                      foregroundColor: selectedSong != null ? Colors.white : kDarkSurface,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: _pickMusic,
+                    icon: Icon(Icons.music_note_rounded, size: 16, color: selectedSong != null ? kPrimaryNeon : kDarkSurface),
+                    label: Text(selectedSong != null ? 'Music Added' : 'Add Music'),
+                  ),
+                ],
+              ),
+            ),
+
+            if (selectedSong != null)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(color: kLightBg, borderRadius: BorderRadius.circular(10)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.audiotrack, size: 18, color: kPrimaryNeon),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('${selectedSong!.title} • ${selectedSong!.artist}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                    GestureDetector(
+                      onTap: () => setState(() => selectedSong = null),
+                      child: const Icon(Icons.close, size: 18, color: kTextSubtle),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Caption Box
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: captionController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Write a caption...',
+                  filled: true,
+                  fillColor: kLightBg,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// INSTAGRAM-STYLE REEL STUDIO (VIDEO EDITOR SCREEN)
+// ==================================================
+
+class ReelEditStudioScreen extends StatefulWidget {
+  final File initialVideoFile;
+
+  const ReelEditStudioScreen({Key? key, required this.initialVideoFile}) : super(key: key);
+
+  @override
+  State<ReelEditStudioScreen> createState() => _ReelEditStudioScreenState();
+}
+
+class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
+  late VideoPlayerController _videoController;
+  late File currentVideo;
+  final TextEditingController captionController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+
+  SongModel? selectedSong;
+  bool isUploading = false;
+  bool isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    currentVideo = widget.initialVideoFile;
+    _initVideo();
+  }
+
+  void _initVideo() {
+    _videoController = VideoPlayerController.file(currentVideo)
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => isInitialized = true);
+          _videoController.setLooping(true);
+          _videoController.play();
+        }
+      });
+  }
+
+  Future<void> _replaceVideo() async {
+    final picked = await _picker.pickVideo(source: ImageSource.gallery);
+    if (picked != null) {
+      await _videoController.dispose();
+      setState(() {
+        isInitialized = false;
+        currentVideo = File(picked.path);
+      });
+      _initVideo();
+    }
+  }
+
+  Future<void> _pickMusic() async {
+    final SongModel? song = await showModalBottomSheet<SongModel>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const MusicPickerModal(),
+    );
+    if (song != null) {
+      setState(() => selectedSong = song);
+    }
+  }
+
+  Future<String?> _uploadToCloudinary(File file) async {
+    const String cloudName = 'a6flqxr8';
+    const String uploadPreset = 'avatar_preset';
+    final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/video/upload');
+
+    try {
+      final req = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = uploadPreset
+        ..files.add(await http.MultipartFile.fromPath('file', file.path));
+
+      final streamed = await req.send();
+      if (streamed.statusCode == 200) {
+        final res = await http.Response.fromStream(streamed);
+        final data = jsonDecode(res.body);
+        return data['secure_url'];
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _publishReel() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => isUploading = true);
+
+    try {
+      final videoUrl = await _uploadToCloudinary(currentVideo);
+      if (videoUrl == null || videoUrl.isEmpty) {
+        if (mounted) _showMessage(context, 'Video upload failed. Check internet.');
+        setState(() => isUploading = false);
+        return;
+      }
+
+      await FirebaseFirestore.instance.collection('feed_posts').add({
+        'uid': user.uid,
+        'creatorName': user.displayName ?? 'User',
+        'type': 'reel',
+        'caption': captionController.text.trim(),
+        'videoUrl': videoUrl,
+        'mediaData': '',
+        'attachedSong': selectedSong != null ? selectedSong!.toJson() : null,
+        'likes': [],
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        _showMessage(context, 'Reel published successfully!');
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) _showMessage(context, 'Publish error: $e');
+    } finally {
+      if (mounted) setState(() => isUploading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController.dispose();
+    captionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('New Reel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        actions: [
+          TextButton(
+            onPressed: isUploading ? null : _publishReel,
+            child: isUploading
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryNeon))
+                : const Text('Share', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kPrimaryNeon)),
+          ),
+        ],
+      ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (isInitialized)
+            Center(
+              child: AspectRatio(
+                aspectRatio: _videoController.value.aspectRatio,
+                child: VideoPlayer(_videoController),
+              ),
+            )
+          else
+            const Center(child: CircularProgressIndicator(color: kPrimaryNeon)),
+
+          // Overlay Controls at Bottom
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [Colors.black.withOpacity(0.9), Colors.transparent],
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white38),
+                        ),
+                        onPressed: _replaceVideo,
+                        icon: const Icon(Icons.video_library_outlined, size: 16),
+                        label: const Text('Replace'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedSong != null ? kPrimaryNeon : Colors.white24,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: _pickMusic,
+                        icon: const Icon(Icons.music_note_rounded, size: 16),
+                        label: Text(selectedSong != null ? 'Sound Attached' : 'Add Sound'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: captionController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Write a reel caption...',
+                      hintStyle: const TextStyle(color: Colors.white60),
+                      filled: true,
+                      fillColor: Colors.white12,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================
+// REELS & POSTS DUAL FEED SCREEN
 // ==================================================
 
 class FeedScreen extends StatefulWidget {
@@ -1270,28 +2047,6 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   int feedTab = 0; // 0 = Reels, 1 = Posts
   final ImagePicker _picker = ImagePicker();
-  bool isUploading = false;
-
-  Future<String?> _uploadVideoToCloudinary(File videoFile) async {
-    const String cloudName = 'a6flqxr8';
-    const String uploadPreset = 'avatar_preset';
-
-    final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/video/upload');
-
-    try {
-      final request = http.MultipartRequest('POST', url)
-        ..fields['upload_preset'] = uploadPreset
-        ..files.add(await http.MultipartFile.fromPath('file', videoFile.path));
-
-      final streamedResponse = await request.send();
-      if (streamedResponse.statusCode == 200) {
-        final response = await http.Response.fromStream(streamedResponse);
-        final data = jsonDecode(response.body);
-        return data['secure_url'];
-      }
-    } catch (_) {}
-    return null;
-  }
 
   void _openShareModal(BuildContext context, Map<String, dynamic> postData) {
     showModalBottomSheet(
@@ -1340,103 +2095,24 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Future<void> _uploadContentDialog() async {
-    final captionCtrl = TextEditingController();
-    XFile? mediaFile;
-    bool isVideo = (feedTab == 0);
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(isVideo ? 'Upload Reel' : 'Create Post', style: const TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: captionCtrl,
-                decoration: InputDecoration(
-                  hintText: 'Write a caption...',
-                  filled: true,
-                  fillColor: kLightBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 14),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: kDarkSurface, foregroundColor: Colors.white),
-                onPressed: () async {
-                  final picked = isVideo
-                      ? await _picker.pickVideo(source: ImageSource.gallery)
-                      : await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-                  if (picked != null) {
-                    setDialogState(() => mediaFile = picked);
-                  }
-                },
-                icon: Icon(isVideo ? Icons.videocam_outlined : Icons.image_outlined),
-                label: Text(mediaFile == null ? 'Select Media' : 'Media Selected'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: kPrimaryNeon, foregroundColor: Colors.white),
-              onPressed: () async {
-                if (mediaFile == null) {
-                  _showMessage(context, 'Please select a file first.');
-                  return;
-                }
-
-                final user = FirebaseAuth.instance.currentUser;
-                if (user == null) return;
-                Navigator.pop(ctx);
-
-                setState(() => isUploading = true);
-
-                try {
-                  String videoUrl = '';
-                  String imageBase64 = '';
-
-                  if (isVideo) {
-                    final uploadedUrl = await _uploadVideoToCloudinary(File(mediaFile!.path));
-                    if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
-                      videoUrl = uploadedUrl;
-                    } else {
-                      if (mounted) _showMessage(context, 'Video upload failed. Check internet.');
-                      setState(() => isUploading = false);
-                      return;
-                    }
-                  } else {
-                    final bytes = await mediaFile!.readAsBytes();
-                    imageBase64 = base64Encode(bytes);
-                  }
-
-                  await FirebaseFirestore.instance.collection('feed_posts').add({
-                    'uid': user.uid,
-                    'creatorName': user.displayName ?? 'User',
-                    'type': isVideo ? 'reel' : 'post',
-                    'caption': captionCtrl.text.trim(),
-                    'videoUrl': videoUrl,
-                    'mediaData': imageBase64,
-                    'likes': [],
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-
-                  if (mounted) _showMessage(context, 'Published successfully.');
-                } catch (e) {
-                  if (mounted) _showMessage(context, 'Publish error: $e');
-                } finally {
-                  if (mounted) setState(() => isUploading = false);
-                }
-              },
-              child: const Text('Post'),
-            ),
-          ],
-        ),
-      ),
-    );
+  Future<void> _startCreationFlow() async {
+    if (feedTab == 0) {
+      final picked = await _picker.pickVideo(source: ImageSource.gallery);
+      if (picked != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ReelEditStudioScreen(initialVideoFile: File(picked.path))),
+        );
+      }
+    } else {
+      final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+      if (picked != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => PostEditStudioScreen(initialImageFile: File(picked.path))),
+        );
+      }
+    }
   }
 
   @override
@@ -1485,192 +2161,196 @@ class _FeedScreenState extends State<FeedScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: isUploading ? null : _uploadContentDialog,
+            onPressed: _startCreationFlow,
             icon: Icon(Icons.add_box_outlined, color: feedTab == 0 ? Colors.white : kDarkSurface, size: 26),
           ),
           const SizedBox(width: 8),
         ],
       ),
-      body: Column(
-        children: [
-          if (isUploading) const LinearProgressIndicator(color: kPrimaryNeon),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('feed_posts')
-                  .where('type', isEqualTo: feedTab == 0 ? 'reel' : 'post')
-                  .orderBy('createdAt', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
-                }
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('feed_posts')
+            .where('type', isEqualTo: feedTab == 0 ? 'reel' : 'post')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+          }
 
-                final docs = snapshot.data?.docs ?? [];
+          final docs = snapshot.data?.docs ?? [];
 
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(feedTab == 0 ? Icons.movie_outlined : Icons.photo_library_outlined, size: 60, color: feedTab == 0 ? Colors.white38 : kTextSubtle),
-                        const SizedBox(height: 12),
-                        Text(feedTab == 0 ? 'No Reels uploaded yet.' : 'No Posts yet.', style: TextStyle(color: feedTab == 0 ? Colors.white70 : kDarkSurface, fontWeight: FontWeight.bold, fontSize: 16)),
-                        const SizedBox(height: 6),
-                        Text('Tap + at top right to upload.', style: TextStyle(color: feedTab == 0 ? Colors.white38 : kTextSubtle, fontSize: 13)),
-                      ],
+          if (docs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(feedTab == 0 ? Icons.movie_outlined : Icons.photo_library_outlined, size: 60, color: feedTab == 0 ? Colors.white38 : kTextSubtle),
+                  const SizedBox(height: 12),
+                  Text(feedTab == 0 ? 'No Reels uploaded yet.' : 'No Posts yet.', style: TextStyle(color: feedTab == 0 ? Colors.white70 : kDarkSurface, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 6),
+                  Text('Tap + at top right to create.', style: TextStyle(color: feedTab == 0 ? Colors.white38 : kTextSubtle, fontSize: 13)),
+                ],
+              ),
+            );
+          }
+
+          if (feedTab == 0) {
+            return PageView.builder(
+              scrollDirection: Axis.vertical,
+              itemCount: docs.length,
+              itemBuilder: (context, index) {
+                final data = docs[index].data() as Map<String, dynamic>;
+                final List<dynamic> likes = data['likes'] ?? [];
+                final isLiked = likes.contains(currentUid);
+                final String videoUrl = data['videoUrl'] ?? '';
+                final Map<String, dynamic>? songData = data['attachedSong'];
+
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      color: Colors.black,
+                      child: videoUrl.isNotEmpty
+                          ? ReelVideoPlayerItem(videoUrl: videoUrl)
+                          : const Center(child: Icon(Icons.play_circle_outline_rounded, size: 80, color: Colors.white38)),
                     ),
-                  );
-                }
-
-                if (feedTab == 0) {
-                  return PageView.builder(
-                    scrollDirection: Axis.vertical,
-                    itemCount: docs.length,
-                    itemBuilder: (context, index) {
-                      final data = docs[index].data() as Map<String, dynamic>;
-                      final List<dynamic> likes = data['likes'] ?? [];
-                      final isLiked = likes.contains(currentUid);
-                      final String videoUrl = data['videoUrl'] ?? '';
-
-                      return Stack(
-                        fit: StackFit.expand,
+                    Positioned(
+                      right: 16,
+                      bottom: 40,
+                      child: Column(
                         children: [
-                          Container(
-                            color: Colors.black,
-                            child: videoUrl.isNotEmpty
-                                ? ReelVideoPlayerItem(videoUrl: videoUrl)
-                                : const Center(child: Icon(Icons.play_circle_outline_rounded, size: 80, color: Colors.white38)),
+                          IconButton(
+                            icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : Colors.white, size: 30),
+                            onPressed: () {
+                              docs[index].reference.update({
+                                'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
+                              });
+                            },
                           ),
-                          Positioned(
-                            right: 16,
-                            bottom: 40,
-                            child: Column(
-                              children: [
-                                IconButton(
-                                  icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : Colors.white, size: 30),
-                                  onPressed: () {
-                                    docs[index].reference.update({
-                                      'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
-                                    });
-                                  },
-                                ),
-                                Text('${likes.length}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 16),
-                                IconButton(
-                                  icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 26),
-                                  onPressed: () {},
-                                ),
-                                const SizedBox(height: 16),
-                                IconButton(
-                                  icon: const Icon(Icons.share_outlined, color: Colors.white, size: 26),
-                                  onPressed: () => _openShareModal(context, data),
-                                ),
-                              ],
-                            ),
+                          Text('${likes.length}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 16),
+                          IconButton(
+                            icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 26),
+                            onPressed: () {},
                           ),
-                          Positioned(
-                            left: 16,
-                            bottom: 30,
-                            right: 80,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('@${data['creatorName'] ?? 'user'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                                const SizedBox(height: 6),
-                                Text(data['caption'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                              ],
-                            ),
+                          const SizedBox(height: 16),
+                          IconButton(
+                            icon: const Icon(Icons.share_outlined, color: Colors.white, size: 26),
+                            onPressed: () => _openShareModal(context, data),
                           ),
                         ],
-                      );
-                    },
-                  );
-                }
-
-                // Posts Feed
-                return ListView.builder(
-                  itemCount: docs.length,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  itemBuilder: (context, index) {
-                    final data = docs[index].data() as Map<String, dynamic>;
-                    final String mediaBase64 = data['mediaData'] ?? '';
-                    final List<dynamic> likes = data['likes'] ?? [];
-                    final isLiked = likes.contains(currentUid);
-
-                    Widget postImage;
-                    if (mediaBase64.isNotEmpty) {
-                      try {
-                        postImage = Image.memory(
-                          base64Decode(mediaBase64),
-                          fit: BoxFit.contain,
-                          width: double.infinity,
-                        );
-                      } catch (_) {
-                        postImage = Container(height: 250, color: Colors.grey.shade200, child: const Icon(Icons.broken_image));
-                      }
-                    } else {
-                      postImage = Container(height: 250, color: Colors.grey.shade200, child: const Center(child: Icon(Icons.photo_outlined, size: 48, color: Colors.grey)));
-                    }
-
-                    return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+                      ),
+                    ),
+                    Positioned(
+                      left: 16,
+                      bottom: 30,
+                      right: 80,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ListTile(
-                            leading: CircleAvatar(backgroundColor: kPrimaryNeon.withOpacity(0.2), child: Text(data['creatorName'] != null && data['creatorName'].isNotEmpty ? data['creatorName'][0].toUpperCase() : 'U')),
-                            title: Text(data['creatorName'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            trailing: IconButton(icon: const Icon(Icons.more_horiz_rounded), onPressed: () => _openShareModal(context, data)),
-                          ),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxHeight: 450),
-                              child: postImage,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-                            child: Row(
+                          Text('@${data['creatorName'] ?? 'user'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                          if ((data['caption'] ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(data['caption'], maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                          ],
+                          if (songData != null) ...[
+                            const SizedBox(height: 8),
+                            Row(
                               children: [
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : kDarkSurface, size: 26),
-                                  onPressed: () {
-                                    docs[index].reference.update({
-                                      'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
-                                    });
-                                  },
-                                ),
-                                const SizedBox(width: 8),
-                                Text('${likes.length} likes', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                const Spacer(),
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  icon: const Icon(Icons.share_outlined, size: 24),
-                                  onPressed: () => _openShareModal(context, data),
-                                ),
+                                const Icon(Icons.music_note, color: Colors.white70, size: 14),
+                                const SizedBox(width: 4),
+                                Text('${songData['title']} • ${songData['artist']}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
                               ],
                             ),
-                          ),
-                          if ((data['caption'] ?? '').isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
-                              child: Text(data['caption'], style: const TextStyle(fontSize: 14)),
-                            ),
+                          ],
                         ],
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 );
               },
-            ),
-          ),
-        ],
+            );
+          }
+
+          // Posts Feed
+          return ListView.builder(
+            itemCount: docs.length,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            itemBuilder: (context, index) {
+              final data = docs[index].data() as Map<String, dynamic>;
+              final String mediaBase64 = data['mediaData'] ?? '';
+              final List<dynamic> likes = data['likes'] ?? [];
+              final isLiked = likes.contains(currentUid);
+              final Map<String, dynamic>? songData = data['attachedSong'];
+
+              Widget postImage;
+              if (mediaBase64.isNotEmpty) {
+                try {
+                  postImage = Image.memory(base64Decode(mediaBase64), fit: BoxFit.contain, width: double.infinity);
+                } catch (_) {
+                  postImage = Container(height: 250, color: Colors.grey.shade200, child: const Icon(Icons.broken_image));
+                }
+              } else {
+                postImage = Container(height: 250, color: Colors.grey.shade200, child: const Center(child: Icon(Icons.photo_outlined, size: 48, color: Colors.grey)));
+              }
+
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ListTile(
+                      leading: CircleAvatar(backgroundColor: kPrimaryNeon.withOpacity(0.2), child: Text(data['creatorName'] != null && data['creatorName'].isNotEmpty ? data['creatorName'][0].toUpperCase() : 'U')),
+                      title: Text(data['creatorName'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: songData != null ? Text('🎵 ${songData['title']}', style: const TextStyle(fontSize: 11, color: kPrimaryNeon)) : null,
+                      trailing: IconButton(icon: const Icon(Icons.more_horiz_rounded), onPressed: () => _openShareModal(context, data)),
+                    ),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 450),
+                        child: postImage,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : kDarkSurface, size: 26),
+                            onPressed: () {
+                              docs[index].reference.update({
+                                'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          Text('${likes.length} likes', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const Spacer(),
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.share_outlined, size: 24),
+                            onPressed: () => _openShareModal(context, data),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if ((data['caption'] ?? '').isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                        child: Text(data['caption'], style: const TextStyle(fontSize: 14)),
+                      ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -1704,9 +2384,7 @@ class _ReelVideoPlayerItemState extends State<ReelVideoPlayerItem> {
       _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
       await _controller.initialize();
       if (mounted) {
-        setState(() {
-          isInitialized = true;
-        });
+        setState(() => isInitialized = true);
         _controller.setLooping(true);
         _controller.play();
       }
@@ -1724,15 +2402,10 @@ class _ReelVideoPlayerItemState extends State<ReelVideoPlayerItem> {
   @override
   Widget build(BuildContext context) {
     if (hasError) {
-      return const Center(
-        child: Icon(Icons.error_outline_rounded, size: 50, color: Colors.white38),
-      );
+      return const Center(child: Icon(Icons.error_outline_rounded, size: 50, color: Colors.white38));
     }
-
     if (!isInitialized) {
-      return const Center(
-        child: CircularProgressIndicator(color: kPrimaryNeon, strokeWidth: 2),
-      );
+      return const Center(child: CircularProgressIndicator(color: kPrimaryNeon, strokeWidth: 2));
     }
 
     return GestureDetector(
@@ -1752,31 +2425,86 @@ class _ReelVideoPlayerItemState extends State<ReelVideoPlayerItem> {
 }
 
 // ==================================================
-// MUSIC & REWARDS PLACEHOLDERS
+// MUSIC HUB SCREEN (SOLO LISTENING & SEARCH)
 // ==================================================
 
-class MusicPlaceholderScreen extends StatelessWidget {
-  const MusicPlaceholderScreen({Key? key}) : super(key: key);
+class MusicHubScreen extends StatefulWidget {
+  const MusicHubScreen({Key? key}) : super(key: key);
+
+  @override
+  State<MusicHubScreen> createState() => _MusicHubScreenState();
+}
+
+class _MusicHubScreenState extends State<MusicHubScreen> {
+  String searchQ = '';
+  List<SongModel> songs = MusicRepository.featuredTracks;
+
+  void _onSearch(String val) async {
+    setState(() => searchQ = val);
+    final results = await MusicRepository.searchTracks(val);
+    setState(() => songs = results);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Music Hub', style: TextStyle(fontWeight: FontWeight.bold))),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.music_note_rounded, size: 70, color: kAccentPink),
-            SizedBox(height: 14),
-            Text('Background Music & Call Sync', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 6),
-            Text('Coming next with live streaming & call audio sync', style: TextStyle(color: kTextSubtle)),
-          ],
-        ),
+      appBar: AppBar(title: const Text('Music Hub', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22))),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              onChanged: _onSearch,
+              decoration: InputDecoration(
+                hintText: 'Search any track or artist...',
+                prefixIcon: const Icon(Icons.search, color: kTextSubtle),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: songs.length,
+              itemBuilder: (context, idx) {
+                final song = songs[idx];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        song.artwork,
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(width: 50, height: 50, color: Colors.black12, child: const Icon(Icons.music_note)),
+                      ),
+                    ),
+                    title: Text(song.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text('${song.artist} • ${song.duration}', style: const TextStyle(color: kTextSubtle, fontSize: 12)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.play_circle_fill_rounded, color: kPrimaryNeon, size: 36),
+                      onPressed: () => GlobalMusicService.instance.playSong(song),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
+// ==================================================
+// REWARDS SCREEN PLACEHOLDER
+// ==================================================
 
 class RewardsPlaceholderScreen extends StatelessWidget {
   const RewardsPlaceholderScreen({Key? key}) : super(key: key);
@@ -1802,7 +2530,7 @@ class RewardsPlaceholderScreen extends StatelessWidget {
 }
 
 // ==================================================
-// HOME SCREEN (5-TAB SYSTEM WITH SAFE BOTTOM BAR)
+// HOME SCREEN (5 TABS + FLOATING MINI PLAYER)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1822,7 +2550,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (pages[index] == null) {
       pages[index] = switch (index) {
         0 => const FeedScreen(),
-        1 => const MusicPlaceholderScreen(),
+        1 => const MusicHubScreen(),
         2 => const ProfileScreen(),
         3 => const RewardsPlaceholderScreen(),
         _ => const ChatScreen(),
@@ -1856,7 +2584,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!alreadyAsked) {
       await prefs.setBool('full_permissions_asked_v4', true);
-      
       await NotificationService.initialize();
       await NotificationService.saveCurrentToken();
 
@@ -1882,7 +2609,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (calls is List && calls.isNotEmpty) {
         final call = calls.first;
         final extra = call['extra'] ?? {};
-
         final callId = extra['callId'] ?? call['id'];
         final callerName = extra['callerName'] ?? call['nameCaller'] ?? 'User';
         final callerPhoto = extra['callerPhoto'] ?? '';
@@ -1932,10 +2658,7 @@ class _HomeScreenState extends State<HomeScreen> {
         case Event.actionCallDecline:
           final callId = event.body['id'];
           if (callId != null) {
-            FirebaseFirestore.instance
-                .collection('calls')
-                .doc(callId)
-                .update({'status': 'ended'});
+            FirebaseFirestore.instance.collection('calls').doc(callId).update({'status': 'ended'});
           }
           break;
         default:
@@ -1964,8 +2687,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final Set<String> _shownIncomingCallIds = <String>{};
 
-  Future<void> _showIncomingCallDialog(
-      Map<String, dynamic> callData, String callId) async {
+  Future<void> _showIncomingCallDialog(Map<String, dynamic> callData, String callId) async {
     if (_shownIncomingCallIds.contains(callId)) return;
     _shownIncomingCallIds.add(callId);
 
@@ -2014,14 +2736,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: currentIndex,
+      body: Stack(
         children: [
-          currentIndex == 0 || pages[0] != null ? _pageAt(0) : const SizedBox.shrink(),
-          currentIndex == 1 || pages[1] != null ? _pageAt(1) : const SizedBox.shrink(),
-          currentIndex == 2 || pages[2] != null ? _pageAt(2) : const SizedBox.shrink(),
-          currentIndex == 3 || pages[3] != null ? _pageAt(3) : const SizedBox.shrink(),
-          currentIndex == 4 || pages[4] != null ? _pageAt(4) : const SizedBox.shrink(),
+          IndexedStack(
+            index: currentIndex,
+            children: [
+              currentIndex == 0 || pages[0] != null ? _pageAt(0) : const SizedBox.shrink(),
+              currentIndex == 1 || pages[1] != null ? _pageAt(1) : const SizedBox.shrink(),
+              currentIndex == 2 || pages[2] != null ? _pageAt(2) : const SizedBox.shrink(),
+              currentIndex == 3 || pages[3] != null ? _pageAt(3) : const SizedBox.shrink(),
+              currentIndex == 4 || pages[4] != null ? _pageAt(4) : const SizedBox.shrink(),
+            ],
+          ),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: GlobalMiniPlayer(),
+          ),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -2118,7 +2850,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ==================================================
-// NOTIFICATIONS & BROADCASTS SCREEN
+// NOTIFICATIONS & UPDATES SCREEN
 // ==================================================
 
 class NotificationsScreen extends StatelessWidget {
@@ -2909,7 +3641,7 @@ class SingleReelScreen extends StatelessWidget {
 }
 
 // ==================================================
-// 1-ON-1 ACTIVE CALLING SCREEN
+// 1-ON-1 ACTIVE CALLING SCREEN WITH LIVE AUDIO SYNC
 // ==================================================
 
 class CallScreen extends StatefulWidget {
@@ -2935,12 +3667,18 @@ class CallScreen extends StatefulWidget {
 class _CallScreenState extends State<CallScreen> {
   final WebRtcSignalingService _signaling = WebRtcSignalingService();
   final AudioPlayer _ringtonePlayer = AudioPlayer();
+  final AudioPlayer _syncMusicPlayer = AudioPlayer();
 
   bool isMuted = false;
   bool isSpeaker = false;
   bool isConnected = false;
   int callSeconds = 0;
   Timer? callTimer;
+
+  String? activeCallId;
+  StreamSubscription? musicSyncSubscription;
+  SongModel? syncedSong;
+  bool isSyncPlaying = false;
 
   @override
   void initState() {
@@ -2965,6 +3703,9 @@ class _CallScreenState extends State<CallScreen> {
     await _signaling.openAudioStream();
 
     if (widget.isIncoming && widget.callId != null) {
+      activeCallId = widget.callId;
+      _listenToMusicSync(activeCallId!);
+
       await _signaling.answerCall(
         callId: widget.callId!,
         onRemoteStreamReceived: (stream) {
@@ -2987,16 +3728,16 @@ class _CallScreenState extends State<CallScreen> {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final currentName = FirebaseAuth.instance.currentUser?.displayName ?? 'User';
 
-    String? realCallId;
-    realCallId = await _signaling.createCall(
+    activeCallId = await _signaling.createCall(
       callerId: currentUid,
       calleeId: widget.peerUid,
       callerName: currentName,
       callerPhoto: '',
       onRemoteStreamReceived: (stream) {
         _stopOutgoingRingtone();
-        if (realCallId != null) {
-          unawaited(FlutterCallkitIncoming.setCallConnected(realCallId!));
+        if (activeCallId != null) {
+          unawaited(FlutterCallkitIncoming.setCallConnected(activeCallId!));
+          _listenToMusicSync(activeCallId!);
         }
         _startTimer();
       },
@@ -3010,13 +3751,13 @@ class _CallScreenState extends State<CallScreen> {
 
     try {
       final outgoingParams = CallKitParams(
-        id: realCallId!,
+        id: activeCallId!,
         nameCaller: widget.peerName,
         appName: 'Avatar',
         handle: 'Voice Call',
         type: 1,
         extra: <String, dynamic>{
-          'callId': realCallId!,
+          'callId': activeCallId!,
           'peerUid': widget.peerUid,
           'callerName': currentName,
           'callerPhoto': '',
@@ -3035,6 +3776,52 @@ class _CallScreenState extends State<CallScreen> {
       );
       await FlutterCallkitIncoming.startCall(outgoingParams);
     } catch (_) {}
+  }
+
+  void _listenToMusicSync(String callId) {
+    musicSyncSubscription = FirebaseFirestore.instance.collection('calls').doc(callId).snapshots().listen((snapshot) async {
+      final data = snapshot.data();
+      if (data != null && data['syncedMusic'] != null) {
+        final Map<String, dynamic> mData = data['syncedMusic'];
+        final song = SongModel.fromJson(mData['song']);
+        final playing = mData['isPlaying'] == true;
+
+        if (syncedSong?.url != song.url) {
+          syncedSong = song;
+          await _syncMusicPlayer.stop();
+          await _syncMusicPlayer.play(UrlSource(song.url));
+          await _syncMusicPlayer.setVolume(0.35); // Background volume during voice call
+        }
+
+        if (playing && !isSyncPlaying) {
+          await _syncMusicPlayer.resume();
+          setState(() => isSyncPlaying = true);
+        } else if (!playing && isSyncPlaying) {
+          await _syncMusicPlayer.pause();
+          setState(() => isSyncPlaying = false);
+        }
+      }
+    });
+  }
+
+  Future<void> _pickSyncMusic() async {
+    if (activeCallId == null) return;
+    final SongModel? song = await showModalBottomSheet<SongModel>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const MusicPickerModal(),
+    );
+
+    if (song != null) {
+      await FirebaseFirestore.instance.collection('calls').doc(activeCallId).update({
+        'syncedMusic': {
+          'song': song.toJson(),
+          'isPlaying': true,
+          'timestamp': FieldValue.serverTimestamp(),
+        }
+      });
+    }
   }
 
   void _startTimer() {
@@ -3097,6 +3884,8 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     _stopOutgoingRingtone();
     _ringtonePlayer.dispose();
+    _syncMusicPlayer.dispose();
+    musicSyncSubscription?.cancel();
     callTimer?.cancel();
     _logCallHistory();
     unawaited(_signaling.hangUp());
@@ -3111,7 +3900,7 @@ class _CallScreenState extends State<CallScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 50),
+            const SizedBox(height: 40),
             Text(
               widget.peerName,
               style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
@@ -3119,10 +3908,7 @@ class _CallScreenState extends State<CallScreen> {
             const SizedBox(height: 8),
             Text(
               isConnected ? 'Connected • ${_formatTime(callSeconds)}' : 'Calling...',
-              style: TextStyle(
-                fontSize: 16,
-                color: isConnected ? kPrimaryNeon : Colors.white60,
-              ),
+              style: TextStyle(fontSize: 16, color: isConnected ? kPrimaryNeon : Colors.white60),
             ),
             const Spacer(),
             buildUserAvatar(
@@ -3133,33 +3919,71 @@ class _CallScreenState extends State<CallScreen> {
               radius: 75,
               enablePreview: false,
             ),
+            if (syncedSong != null) ...[
+              const SizedBox(height: 20),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 40),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: kPrimaryNeon.withOpacity(0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.music_note_rounded, color: kPrimaryNeon, size: 18),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Synced: ${syncedSong!.title}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 IconButton.filledTonal(
-                  iconSize: 30,
+                  iconSize: 26,
                   style: IconButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(14),
                     backgroundColor: isMuted ? Colors.white : Colors.white12,
                     foregroundColor: isMuted ? Colors.black : Colors.white,
                   ),
                   onPressed: _toggleMic,
                   icon: Icon(isMuted ? Icons.mic_off : Icons.mic),
                 ),
-                IconButton.filled(
-                  iconSize: 34,
+                IconButton.filledTonal(
+                  iconSize: 26,
                   style: IconButton.styleFrom(
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(14),
+                    backgroundColor: kPrimaryNeon.withOpacity(0.2),
+                    foregroundColor: kPrimaryNeon,
+                  ),
+                  onPressed: _pickSyncMusic,
+                  icon: const Icon(Icons.music_note_rounded),
+                  tooltip: 'Listen Music Together',
+                ),
+                IconButton.filled(
+                  iconSize: 32,
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
                     backgroundColor: Colors.redAccent,
                   ),
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.call_end, color: Colors.white),
                 ),
                 IconButton.filledTonal(
-                  iconSize: 30,
+                  iconSize: 26,
                   style: IconButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(14),
                     backgroundColor: isSpeaker ? Colors.white : Colors.white12,
                     foregroundColor: isSpeaker ? Colors.black : Colors.white,
                   ),
@@ -4084,7 +4908,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     border: Border.all(color: isMissed ? Colors.redAccent.withOpacity(0.4) : Colors.green.withOpacity(0.4)),
                   ),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisSize: MainBuildContext.min,
                     children: [
                       Icon(isMissed ? Icons.phone_missed_rounded : Icons.phone_rounded, size: 16, color: isMissed ? Colors.redAccent : Colors.green),
                       const SizedBox(width: 8),
@@ -4366,7 +5190,7 @@ class _ConnectionsListModalState extends State<ConnectionsListModal> {
 }
 
 // ==================================================
-// MY PROFILE SCREEN (WITH CLEAN SEPARATE TABS)
+// MY PROFILE SCREEN (WITH SEPARATE REELS/POSTS TABS)
 // ==================================================
 
 class ProfileScreen extends StatefulWidget {
@@ -4774,9 +5598,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 24),
 
-              // ============================================
-              // CLEAN MINIMALIST REELS & POSTS SEGMENT
-              // ============================================
+              // Clean Separate Reels & Posts Segment
               Container(
                 decoration: BoxDecoration(
                   color: kLightBg,
