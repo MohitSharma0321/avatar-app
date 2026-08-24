@@ -928,7 +928,7 @@ void showUserAvatarPreview(BuildContext context, {
         ),
       ),
     );
-  }
+}
 
 Widget buildUserAvatar({
   required BuildContext context,
@@ -1126,7 +1126,7 @@ class WelcomeScreen extends StatelessWidget {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(28),
             child: Column(
-              mainAxisAlignment: Center(child: Text('')).hashCode > 0 ? MainAxisAlignment.center : MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
                   width: 120,
