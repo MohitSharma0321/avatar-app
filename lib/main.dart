@@ -831,7 +831,8 @@ Future<void> ensureUserDoc(User user) async {
   } catch (_) {}
 }
 
-void showUserAvatarPreview(BuildContext context, {
+void showUserAvatarPreview(
+  BuildContext context, {
   required String photoBase64,
   required String name,
   String? bio,
@@ -863,7 +864,7 @@ void showUserAvatarPreview(BuildContext context, {
                 color: Colors.black.withOpacity(0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
-              )
+              ),
             ],
           ),
           child: Column(
@@ -879,19 +880,35 @@ void showUserAvatarPreview(BuildContext context, {
                         color: kLightBg,
                         child: Center(
                           child: Text(
-                            name.isNotEmpty ? name[0].toUpperCase() : (username != null && username.isNotEmpty ? username[0].toUpperCase() : 'U'),
-                            style: const TextStyle(fontSize: 80, fontWeight: FontWeight.bold, color: kDarkSurface),
+                            name.isNotEmpty
+                                ? name[0].toUpperCase()
+                                : (username != null && username.isNotEmpty
+                                    ? username[0].toUpperCase()
+                                    : 'U'),
+                            style: const TextStyle(
+                              fontSize: 80,
+                              fontWeight: FontWeight.bold,
+                              color: kDarkSurface,
+                            ),
                           ),
                         ),
                       ),
               ),
               const SizedBox(height: 14),
-              Text(name.isNotEmpty ? name : (username != null ? '@$username' : 'User'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+              Text(
+                name.isNotEmpty ? name : (username != null ? '@$username' : 'User'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface),
+              ),
               if (username != null && name.isNotEmpty)
                 Text('@$username', style: const TextStyle(color: kTextSubtle, fontSize: 13)),
               if (bio != null && bio.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(bio, maxLines: 2, textAlign: TextAlign.center, style: const TextStyle(color: kTextSubtle, fontSize: 13)),
+                Text(
+                  bio,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: kTextSubtle, fontSize: 13),
+                ),
               ],
               if (targetUid != null && targetUid.isNotEmpty) ...[
                 const SizedBox(height: 14),
@@ -919,7 +936,10 @@ void showUserAvatarPreview(BuildContext context, {
                       );
                     },
                     icon: const Icon(Icons.grid_view_rounded, size: 16),
-                    label: const Text('View Full Profile & Media', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    label: const Text(
+                      'View Full Profile & Media',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
                   ),
                 ),
               ],
@@ -927,7 +947,8 @@ void showUserAvatarPreview(BuildContext context, {
           ),
         ),
       ),
-    );
+    ),
+  );
 }
 
 Widget buildUserAvatar({
@@ -964,7 +985,11 @@ Widget buildUserAvatar({
       backgroundImage: imageProvider,
       child: imageProvider == null
           ? Text(
-              name.isNotEmpty ? name[0].toUpperCase() : (username != null && username.isNotEmpty ? username[0].toUpperCase() : 'U'),
+              name.isNotEmpty
+                  ? name[0].toUpperCase()
+                  : (username != null && username.isNotEmpty
+                      ? username[0].toUpperCase()
+                      : 'U'),
               style: TextStyle(
                 fontSize: radius * 0.9,
                 fontWeight: FontWeight.bold,
@@ -3783,7 +3808,7 @@ class _CallScreenState extends State<CallScreen> {
         ),
         android: const AndroidParams(
           isCustomNotification: true,
-          isShowCallID: false,
+          isShowLogo: false,
           ringtonePath: 'system_ringtone_default',
         ),
       );
