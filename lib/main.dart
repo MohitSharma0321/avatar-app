@@ -929,7 +929,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     setState(() => loading = true);
 
     try {
-      // Check if username already exists
       final existingUser = await FirebaseFirestore.instance
           .collection('users')
           .where('username', isEqualTo: username)
@@ -1224,7 +1223,7 @@ class ReelsPlaceholderScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
-            Icon(Icons.movie_creation_outlined, size: 70, color: kPrimaryNeon),
+            Icon(Icons.slow_motion_video_rounded, size: 70, color: kPrimaryNeon),
             SizedBox(height: 14),
             Text('Reels & Posts Feed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SizedBox(height: 6),
@@ -1283,7 +1282,7 @@ class RewardsPlaceholderScreen extends StatelessWidget {
 }
 
 // ==================================================
-// HOME SCREEN (5-TAB SYSTEM WITH CENTER FLOATING PROFILE)
+// HOME SCREEN (WITH SAFE BOTTOM BAR & NEW REELS ICON)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1505,92 +1504,98 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex == 4 || pages[4] != null ? _pageAt(4) : const SizedBox.shrink(),
         ],
       ),
-      bottomNavigationBar: Container(
-        height: 72,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 15,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            // Tab 0: Reels
-            IconButton(
-              icon: Icon(
-                currentIndex == 0 ? Icons.movie_creation : Icons.movie_creation_outlined,
-                color: currentIndex == 0 ? kAccentPink : kDarkSurface,
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          height: 64,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 15,
+                offset: const Offset(0, -4),
               ),
-              onPressed: () => setState(() => currentIndex = 0),
-            ),
-            // Tab 1: Music
-            IconButton(
-              icon: Icon(
-                currentIndex == 1 ? Icons.music_note : Icons.music_note_outlined,
-                color: currentIndex == 1 ? kAccentPink : kDarkSurface,
-              ),
-              onPressed: () => setState(() => currentIndex = 1),
-            ),
-            // Tab 2: Floating Center Profile
-            GestureDetector(
-              onTap: () => setState(() => currentIndex = 2),
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [kPrimaryNeon, kAccentPink],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: kPrimaryNeon.withOpacity(currentIndex == 2 ? 0.45 : 0.2),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              // Tab 0: Reels (New Unique Icon: slow_motion_video_rounded)
+              IconButton(
+                icon: Icon(
+                  currentIndex == 0 ? Icons.slow_motion_video_rounded : Icons.video_collection_outlined,
+                  color: currentIndex == 0 ? kAccentPink : kDarkSurface,
+                  size: 26,
                 ),
-                child: Center(
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
+                onPressed: () => setState(() => currentIndex = 0),
+              ),
+              // Tab 1: Music
+              IconButton(
+                icon: Icon(
+                  currentIndex == 1 ? Icons.music_note : Icons.music_note_outlined,
+                  color: currentIndex == 1 ? kAccentPink : kDarkSurface,
+                  size: 26,
+                ),
+                onPressed: () => setState(() => currentIndex = 1),
+              ),
+              // Tab 2: Floating Center Profile
+              GestureDetector(
+                onTap: () => setState(() => currentIndex = 2),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [kPrimaryNeon, kAccentPink],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    child: Icon(
-                      Icons.person_rounded,
-                      color: currentIndex == 2 ? kAccentPink : kDarkSurface,
-                      size: 26,
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimaryNeon.withOpacity(currentIndex == 2 ? 0.45 : 0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      )
+                    ],
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                      child: Icon(
+                        Icons.person_rounded,
+                        color: currentIndex == 2 ? kAccentPink : kDarkSurface,
+                        size: 24,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            // Tab 3: Rewards
-            IconButton(
-              icon: Icon(
-                currentIndex == 3 ? Icons.stars_rounded : Icons.stars_outlined,
-                color: currentIndex == 3 ? Colors.amber.shade700 : kDarkSurface,
+              // Tab 3: Rewards
+              IconButton(
+                icon: Icon(
+                  currentIndex == 3 ? Icons.stars_rounded : Icons.stars_outlined,
+                  color: currentIndex == 3 ? Colors.amber.shade700 : kDarkSurface,
+                  size: 26,
+                ),
+                onPressed: () => setState(() => currentIndex = 3),
               ),
-              onPressed: () => setState(() => currentIndex = 3),
-            ),
-            // Tab 4: Chats
-            IconButton(
-              icon: Icon(
-                currentIndex == 4 ? Icons.chat_bubble : Icons.chat_bubble_outline_rounded,
-                color: currentIndex == 4 ? kAccentPink : kDarkSurface,
+              // Tab 4: Chats
+              IconButton(
+                icon: Icon(
+                  currentIndex == 4 ? Icons.chat_bubble : Icons.chat_bubble_outline_rounded,
+                  color: currentIndex == 4 ? kAccentPink : kDarkSurface,
+                  size: 26,
+                ),
+                onPressed: () => setState(() => currentIndex = 4),
               ),
-              onPressed: () => setState(() => currentIndex = 4),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1825,9 +1830,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
               final allDocs = allUsersSnap.data?.docs ?? [];
 
-              // RULE: Allowed to chat if:
-              // 1. Peer account is PUBLIC and in my connections.
-              // OR 2. Peer account is PRIVATE and BOTH connected (Mutual).
               final activeChatUsers = allDocs.where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 final uid = data['uid'] ?? doc.id;
@@ -1873,7 +1875,6 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
 
-                  // Avatar AI Companion
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     decoration: BoxDecoration(
@@ -3377,7 +3378,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         ],
                       ),
                       child: Column(
-                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           if (type == 'image')
                             GestureDetector(
@@ -3446,7 +3447,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
 class ConnectionsListModal extends StatefulWidget {
   final String title;
-  final bool isConnectedMode; // true: Connected (I follow), false: Connectors (Followers)
+  final bool isConnectedMode;
   final String myUid;
   final List<dynamic> myConnections;
 
@@ -3532,7 +3533,6 @@ class _ConnectionsListModalState extends State<ConnectionsListModal> {
 
                 Query userQuery = FirebaseFirestore.instance.collection('users');
                 if (widget.isConnectedMode) {
-                  // People I connected
                   if (myLiveConnections.isEmpty) {
                     return const Center(child: Text('No connected users yet.', style: TextStyle(color: kTextSubtle)));
                   }
@@ -3896,7 +3896,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Text(displayBio, textAlign: TextAlign.center, style: const TextStyle(color: kTextSubtle, fontSize: 14)),
               const SizedBox(height: 24),
 
-              // Interactive Connected & Connectors Counts
               StreamBuilder<DocumentSnapshot>(
                 stream: FirebaseFirestore.instance.collection('users').doc(myUid).snapshots(),
                 builder: (context, mySnap) {
@@ -3970,7 +3969,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 18),
 
-              // Privacy Switch
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
