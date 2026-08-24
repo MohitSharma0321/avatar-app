@@ -86,9 +86,14 @@ class GlobalMusicService {
   final ValueNotifier<Duration> positionNotifier = ValueNotifier<Duration>(Duration.zero);
   final ValueNotifier<Duration> durationNotifier = ValueNotifier<Duration>(Duration.zero);
 
+  bool _initialized = false;
+
   void init() {
+    if (_initialized) return;
+    _initialized = true;
+
     audioPlayer.onPlayerStateChanged.listen((state) {
-      isPlayingNotifier.value = (state == PlayerState.playing);
+      isPlayingNotifier.value = state == PlayerState.playing;
     });
     audioPlayer.onPositionChanged.listen((pos) {
       positionNotifier.value = pos;
@@ -96,33 +101,114 @@ class GlobalMusicService {
     audioPlayer.onDurationChanged.listen((dur) {
       durationNotifier.value = dur;
     });
+    audioPlayer.onPlayerComplete.listen((_) {
+      isPlayingNotifier.value = false;
+      positionNotifier.value = Duration.zero;
+    });
   }
 
   Future<void> playSong(SongModel song) async {
-    if (song.url.isEmpty) return;
-    currentSongNotifier.value = song;
+    final url = song.url.trim();
+
+    if (url.isEmpty) {
+      debugPrint('MUSIC ERROR: Empty audio URL');
+      return;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      debugPrint('MUSIC ERROR: Invalid audio URL -> $url');
+      return;
+    }
+
     try {
+      currentSongNotifier.value = song;
       await audioPlayer.stop();
       await audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
-      await audioPlayer.play(UrlSource(song.url));
-    } catch (_) {}
+      debugPrint('MUSIC PLAY URL: $url');
+      await audioPlayer.play(UrlSource(url));
+    } catch (e, stack) {
+      debugPrint('MUSIC PLAY ERROR: $e');
+      debugPrint('$stack');
+      isPlayingNotifier.value = false;
+    }
   }
 
   Future<void> pauseSong() async {
-    await audioPlayer.pause();
+    try {
+      await audioPlayer.pause();
+    } catch (e) {
+      debugPrint('MUSIC PAUSE ERROR: $e');
+    }
   }
 
   Future<void> resumeSong() async {
-    await audioPlayer.resume();
+    try {
+      await audioPlayer.resume();
+    } catch (e) {
+      debugPrint('MUSIC RESUME ERROR: $e');
+    }
   }
 
   Future<void> seek(Duration pos) async {
-    await audioPlayer.seek(pos);
+    try {
+      await audioPlayer.seek(pos);
+    } catch (e) {
+      debugPrint('MUSIC SEEK ERROR: $e');
+    }
   }
 
   Future<void> stop() async {
-    await audioPlayer.stop();
+    try {
+      await audioPlayer.stop();
+    } catch (e) {
+      debugPrint('MUSIC STOP ERROR: $e');
+    }
     currentSongNotifier.value = null;
+    isPlayingNotifier.value = false;
+    positionNotifier.value = Duration.zero;
+  }
+}
+
+// Separate player for Reel/Post attached music.
+// This intentionally does not replace or control the Music Hub player.
+class ReelAudioService {
+  static final ReelAudioService instance = ReelAudioService._internal();
+  ReelAudioService._internal();
+
+  final AudioPlayer player = AudioPlayer();
+
+  Future<void> playSong(SongModel song) async {
+    final url = song.url.trim();
+
+    if (url.isEmpty) {
+      debugPrint('REEL MUSIC ERROR: Empty audio URL');
+      return;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      debugPrint('REEL MUSIC ERROR: Invalid audio URL -> $url');
+      return;
+    }
+
+    try {
+      await player.stop();
+      await player.setPlayerMode(PlayerMode.mediaPlayer);
+      debugPrint('REEL MUSIC PLAY URL: $url');
+      await player.play(UrlSource(url));
+    } catch (e, stack) {
+      debugPrint('REEL MUSIC PLAY ERROR: $e');
+      debugPrint('$stack');
+    }
+  }
+
+  Future<void> stop() async {
+    try {
+      await player.stop();
+    } catch (e) {
+      debugPrint('REEL MUSIC STOP ERROR: $e');
+    }
   }
 }
 
@@ -139,7 +225,10 @@ class MusicRepository {
           return (data['songs'] as List).map((i) => SongModel.fromJson(i)).toList();
         }
       }
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('MUSIC API ERROR: $e');
+      debugPrint('$stack');
+    }
     return [];
   }
 }
@@ -1893,33 +1982,63 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
     final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/video/upload');
 
     try {
+      debugPrint('REEL UPLOAD: Starting ${file.path}');
+
       final req = http.MultipartRequest('POST', url)
         ..fields['upload_preset'] = uploadPreset
         ..files.add(await http.MultipartFile.fromPath('file', file.path));
 
-      final streamed = await req.send();
-      if (streamed.statusCode == 200) {
-        final res = await http.Response.fromStream(streamed);
-        final data = jsonDecode(res.body);
-        return data['secure_url'];
+      final streamed = await req.send().timeout(
+        const Duration(minutes: 3),
+        onTimeout: () => throw TimeoutException('Cloudinary upload timed out after 3 minutes.'),
+      );
+
+      final res = await http.Response.fromStream(streamed);
+      debugPrint('CLOUDINARY STATUS: ${res.statusCode}');
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final secureUrl = data['secure_url']?.toString();
+        if (secureUrl != null && secureUrl.isNotEmpty) {
+          debugPrint('CLOUDINARY SUCCESS: $secureUrl');
+          return secureUrl;
+        }
       }
-    } catch (_) {}
+
+      debugPrint('CLOUDINARY ERROR BODY: ${res.body}');
+    } on TimeoutException catch (e) {
+      debugPrint('CLOUDINARY TIMEOUT: $e');
+    } catch (e, stack) {
+      debugPrint('CLOUDINARY UPLOAD ERROR: $e');
+      debugPrint('$stack');
+    }
+
     return null;
   }
 
   Future<void> _publishReel() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      if (mounted) _showMessage(context, 'Please login first.');
+      return;
+    }
+
+    if (isUploading) return;
 
     setState(() => isUploading = true);
 
     try {
+      if (mounted) _showMessage(context, 'Uploading reel...');
+
       final videoUrl = await _uploadToCloudinary(currentVideo);
       if (videoUrl == null || videoUrl.isEmpty) {
-        if (mounted) _showMessage(context, 'Video upload failed. Check internet.');
-        setState(() => isUploading = false);
+        if (mounted) {
+          _showMessage(context, 'Video upload failed. Please check internet and try again.');
+        }
         return;
       }
+
+      debugPrint('FIRESTORE: Saving reel...');
 
       await FirebaseFirestore.instance.collection('feed_posts').add({
         'uid': user.uid,
@@ -1937,7 +2056,9 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
         _showMessage(context, 'Reel published successfully!');
         Navigator.pop(context);
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('PUBLISH REEL ERROR: $e');
+      debugPrint('$stack');
       if (mounted) _showMessage(context, 'Publish error: $e');
     } finally {
       if (mounted) setState(() => isUploading = false);
@@ -2057,6 +2178,40 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   int feedTab = 0; // 0 = Reels, 1 = Posts
   final ImagePicker _picker = ImagePicker();
+  int currentReelIndex = 0;
+  String? _lastReelAudioDocId;
+
+  Future<void> _playReelSongFromData(
+    Map<String, dynamic> data,
+    String docId,
+  ) async {
+    final rawSong = data['attachedSong'];
+
+    if (rawSong == null || rawSong is! Map) {
+      _lastReelAudioDocId = null;
+      await ReelAudioService.instance.stop();
+      return;
+    }
+
+    if (_lastReelAudioDocId == docId) return;
+
+    try {
+      final song = SongModel.fromJson(
+        Map<String, dynamic>.from(rawSong),
+      );
+      _lastReelAudioDocId = docId;
+      await ReelAudioService.instance.playSong(song);
+    } catch (e, stack) {
+      _lastReelAudioDocId = null;
+      debugPrint('REEL SONG PARSE ERROR: $e');
+      debugPrint('$stack');
+    }
+  }
+
+  Future<void> _stopReelAudio() async {
+    _lastReelAudioDocId = null;
+    await ReelAudioService.instance.stop();
+  }
 
   void _openShareModal(BuildContext context, Map<String, dynamic> postData) {
     showModalBottomSheet(
@@ -2126,6 +2281,12 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   @override
+  void dispose() {
+    ReelAudioService.instance.stop();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -2145,7 +2306,12 @@ class _FeedScreenState extends State<FeedScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               GestureDetector(
-                onTap: () => setState(() => feedTab = 0),
+                onTap: () async {
+                    if (feedTab != 0) {
+                      await _stopReelAudio();
+                    }
+                    if (mounted) setState(() => feedTab = 0);
+                  },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
                   decoration: BoxDecoration(
@@ -2156,7 +2322,10 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
               ),
               GestureDetector(
-                onTap: () => setState(() => feedTab = 1),
+                onTap: () async {
+                    await _stopReelAudio();
+                    if (mounted) setState(() => feedTab = 1);
+                  },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
                   decoration: BoxDecoration(
@@ -2206,9 +2375,25 @@ class _FeedScreenState extends State<FeedScreen> {
           }
 
           if (feedTab == 0) {
+            if (docs.isNotEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && feedTab == 0 && docs.isNotEmpty) {
+                  final firstData = docs[0].data() as Map<String, dynamic>;
+                  _playReelSongFromData(firstData, docs[0].id);
+                }
+              });
+            }
+
             return PageView.builder(
               scrollDirection: Axis.vertical,
               itemCount: docs.length,
+              onPageChanged: (index) async {
+                currentReelIndex = index;
+                if (index >= 0 && index < docs.length) {
+                  final changedData = docs[index].data() as Map<String, dynamic>;
+                  await _playReelSongFromData(changedData, docs[index].id);
+                }
+              },
               itemBuilder: (context, index) {
                 final data = docs[index].data() as Map<String, dynamic>;
                 final List<dynamic> likes = data['likes'] ?? [];
@@ -2786,11 +2971,14 @@ class _HomeScreenState extends State<HomeScreen> {
               currentIndex == 4 || pages[4] != null ? _pageAt(4) : const SizedBox.shrink(),
             ],
           ),
-          const Positioned(
+          Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
-            child: GlobalMiniPlayer(),
+            bottom: 70,
+            child: SafeArea(
+              top: false,
+              child: const GlobalMiniPlayer(),
+            ),
           ),
         ],
       ),
@@ -2816,7 +3004,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: currentIndex == 0 ? kPrimaryNeon : kDarkSurface,
                   size: 26,
                 ),
-                onPressed: () => setState(() => currentIndex = 0),
+                onPressed: () {
+                  setState(() => currentIndex = 0);
+                },
               ),
               IconButton(
                 icon: Icon(
@@ -2824,10 +3014,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: currentIndex == 1 ? kPrimaryNeon : kDarkSurface,
                   size: 26,
                 ),
-                onPressed: () => setState(() => currentIndex = 1),
+                onPressed: () {
+                  if (currentIndex == 0) {
+                    ReelAudioService.instance.stop();
+                  }
+                  setState(() => currentIndex = 1);
+                },
               ),
               GestureDetector(
-                onTap: () => setState(() => currentIndex = 2),
+                onTap: () {
+                  if (currentIndex == 0) {
+                    ReelAudioService.instance.stop();
+                  }
+                  setState(() => currentIndex = 2);
+                },
                 child: Container(
                   width: 48,
                   height: 48,
@@ -2869,7 +3069,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: currentIndex == 3 ? Colors.amber.shade700 : kDarkSurface,
                   size: 26,
                 ),
-                onPressed: () => setState(() => currentIndex = 3),
+                onPressed: () {
+                  if (currentIndex == 0) {
+                    ReelAudioService.instance.stop();
+                  }
+                  setState(() => currentIndex = 3);
+                },
               ),
               IconButton(
                 icon: Icon(
@@ -2877,7 +3082,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: currentIndex == 4 ? kPrimaryNeon : kDarkSurface,
                   size: 26,
                 ),
-                onPressed: () => setState(() => currentIndex = 4),
+                onPressed: () {
+                  if (currentIndex == 0) {
+                    ReelAudioService.instance.stop();
+                  }
+                  setState(() => currentIndex = 4);
+                },
               ),
             ],
           ),
