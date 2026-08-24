@@ -523,6 +523,7 @@ Future<void> ensureUserDoc(User user) async {
         'bio': 'Hey there! I am on Avatar.',
         'photoBase64': '',
         'connections': [],
+        'pinnedChats': [],
         'isPrivate': false,
         'isOnline': true,
         'lastSeen': FieldValue.serverTimestamp(),
@@ -957,6 +958,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'bio': 'Hey there! I am on Avatar.',
           'photoBase64': '',
           'connections': [],
+          'pinnedChats': [],
           'isPrivate': false,
           'isOnline': true,
           'lastSeen': FieldValue.serverTimestamp(),
@@ -1282,7 +1284,7 @@ class RewardsPlaceholderScreen extends StatelessWidget {
 }
 
 // ==================================================
-// HOME SCREEN (WITH SAFE BOTTOM BAR & NEW REELS ICON)
+// HOME SCREEN (5-TAB SYSTEM WITH SAFE BOTTOM BAR)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -1520,7 +1522,6 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              // Tab 0: Reels (New Unique Icon: slow_motion_video_rounded)
               IconButton(
                 icon: Icon(
                   currentIndex == 0 ? Icons.slow_motion_video_rounded : Icons.video_collection_outlined,
@@ -1529,7 +1530,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 onPressed: () => setState(() => currentIndex = 0),
               ),
-              // Tab 1: Music
               IconButton(
                 icon: Icon(
                   currentIndex == 1 ? Icons.music_note : Icons.music_note_outlined,
@@ -1538,7 +1538,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 onPressed: () => setState(() => currentIndex = 1),
               ),
-              // Tab 2: Floating Center Profile
               GestureDetector(
                 onTap: () => setState(() => currentIndex = 2),
                 child: Container(
@@ -1576,7 +1575,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              // Tab 3: Rewards
               IconButton(
                 icon: Icon(
                   currentIndex == 3 ? Icons.stars_rounded : Icons.stars_outlined,
@@ -1585,7 +1583,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 onPressed: () => setState(() => currentIndex = 3),
               ),
-              // Tab 4: Chats
               IconButton(
                 icon: Icon(
                   currentIndex == 4 ? Icons.chat_bubble : Icons.chat_bubble_outline_rounded,
@@ -1765,7 +1762,7 @@ class NotificationsScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT SCREEN (PUBLIC DIRECT OR MUTUAL PRIVATE)
+// CHAT SCREEN (WITH PINNING & DELETE FOR ME)
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -1778,6 +1775,82 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController searchController = TextEditingController();
   String searchQuery = '';
+
+  Future<void> _togglePinChat(String peerUid, bool isPinned) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid == null) return;
+
+    final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
+    if (isPinned) {
+      await userRef.update({
+        'pinnedChats': FieldValue.arrayRemove([peerUid]),
+      });
+      if (mounted) _showMessage(context, 'Chat unpinned.');
+    } else {
+      await userRef.update({
+        'pinnedChats': FieldValue.arrayUnion([peerUid]),
+      });
+      if (mounted) _showMessage(context, 'Chat pinned to top 📌');
+    }
+  }
+
+  Future<void> _deleteChatForMe(String peerUid) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid == null) return;
+
+    final roomId = getChatRoomId(currentUid, peerUid);
+    await FirebaseFirestore.instance.collection('chats').doc(roomId).set({
+      'deletedBy': FieldValue.arrayUnion([currentUid]),
+    }, SetOptions(merge: true));
+
+    if (mounted) _showMessage(context, 'Chat deleted for you.');
+  }
+
+  void _showChatTileOptions(BuildContext context, {
+    required String peerUid,
+    required String peerName,
+    required String peerUsername,
+    required String peerPhoto,
+    required String peerBio,
+    required bool isPinned,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, color: kPrimaryNeon),
+              title: Text(isPinned ? 'Unpin Chat' : 'Pin to Top', style: const TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _togglePinChat(peerUid, isPinned);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_outline_rounded, color: kDarkSurface),
+              title: const Text('View Profile', style: TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(ctx);
+                showUserAvatarPreview(context, photoBase64: peerPhoto, name: peerName, bio: peerBio, username: peerUsername);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+              title: const Text('Delete Chat for Me', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _deleteChatForMe(peerUid);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -1820,6 +1893,7 @@ class _ChatScreenState extends State<ChatScreen> {
         builder: (context, userSnap) {
           final myData = userSnap.data?.data() as Map<String, dynamic>?;
           final List<dynamic> myConnections = myData?['connections'] ?? [];
+          final List<dynamic> pinnedChats = myData?['pinnedChats'] ?? [];
 
           return StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('users').snapshots(),
@@ -1830,7 +1904,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
               final allDocs = allUsersSnap.data?.docs ?? [];
 
-              final activeChatUsers = allDocs.where((doc) {
+              var activeChatUsers = allDocs.where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 final uid = data['uid'] ?? doc.id;
                 final name = (data['name'] ?? '').toString().toLowerCase();
@@ -1855,6 +1929,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 return true;
               }).toList();
 
+              // Sort Pinned to top
+              activeChatUsers.sort((a, b) {
+                final aPinned = pinnedChats.contains(a.id);
+                final bPinned = pinnedChats.contains(b.id);
+                if (aPinned && !bPinned) return -1;
+                if (!aPinned && bPinned) return 1;
+                return 0;
+              });
+
               return ListView(
                 children: [
                   Padding(
@@ -1875,6 +1958,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
 
+                  // Avatar AI Companion
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     decoration: BoxDecoration(
@@ -1928,6 +2012,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       final bio = data['bio'] ?? '';
                       final photo = data['photoBase64'] ?? '';
                       final isOnline = data['isOnline'] == true;
+                      final isPinned = pinnedChats.contains(peerUid);
 
                       final displayName = name.isNotEmpty ? name : '@$username';
 
@@ -1936,11 +2021,21 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
+                          border: isPinned ? Border.all(color: kPrimaryNeon.withOpacity(0.6), width: 1.2) : null,
                           boxShadow: [
                             BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
                           ],
                         ),
                         child: ListTile(
+                          onLongPress: () => _showChatTileOptions(
+                            context,
+                            peerUid: peerUid,
+                            peerName: name,
+                            peerUsername: username,
+                            peerPhoto: photo,
+                            peerBio: bio,
+                            isPinned: isPinned,
+                          ),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                           leading: Stack(
                             children: [
@@ -1961,7 +2056,13 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                             ],
                           ),
-                          title: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+                          title: Row(
+                            children: [
+                              Expanded(child: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface))),
+                              if (isPinned)
+                                const Icon(Icons.push_pin_rounded, size: 16, color: kPrimaryNeon),
+                            ],
+                          ),
                           subtitle: Text(
                             isOnline ? 'Active now' : 'Offline',
                             style: TextStyle(color: isOnline ? Colors.green : kTextSubtle, fontSize: 13),
@@ -2604,7 +2705,7 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
 }
 
 // ==================================================
-// CHAT CONVERSATION SCREEN
+// CHAT CONVERSATION SCREEN (ADVANCED MESSAGE ACTIONS)
 // ==================================================
 
 class ChatConversationScreen extends StatefulWidget {
@@ -2793,6 +2894,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         'receiverId': widget.peerUid,
         'type': 'image',
         'imageData': base64String,
+        'deletedFor': [],
         'isRead': false,
         'reaction': '',
         'timestamp': FieldValue.serverTimestamp(),
@@ -2871,6 +2973,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             'receiverId': widget.peerUid,
             'type': 'audio',
             'audioData': base64Audio,
+            'deletedFor': [],
             'isRead': false,
             'reaction': '',
             'timestamp': FieldValue.serverTimestamp(),
@@ -2931,6 +3034,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           'receiverId': widget.peerUid,
           'type': 'text',
           'text': text,
+          'deletedFor': [],
           'isRead': false,
           'reaction': '',
           'timestamp': FieldValue.serverTimestamp(),
@@ -2956,6 +3060,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   void _showMessageOptions(DocumentSnapshot doc, Map<String, dynamic> data, bool isMe) {
+    final bool isRead = data['isRead'] == true;
+    final bool canUnsend = isMe && !isRead;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -2990,14 +3097,26 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   _showMessage(context, 'Text copied!');
                 },
               ),
-            if (isMe)
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: Colors.orangeAccent),
+              title: const Text('Delete for Me', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orangeAccent)),
+              onTap: () {
+                doc.reference.update({
+                  'deletedFor': FieldValue.arrayUnion([currentUid]),
+                });
+                Navigator.pop(ctx);
+                _showMessage(context, 'Deleted for you.');
+              },
+            ),
+            if (canUnsend)
               ListTile(
-                leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                title: const Text('Delete Message', style: TextStyle(color: Colors.redAccent)),
+                leading: const Icon(Icons.undo_rounded, color: Colors.redAccent),
+                title: const Text('Unsend (Delete for Everyone)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                subtitle: const Text('Receiver has not seen this message yet', style: TextStyle(fontSize: 11, color: kTextSubtle)),
                 onTap: () {
                   doc.reference.delete();
                   Navigator.pop(ctx);
-                  _showMessage(context, 'Message deleted.');
+                  _showMessage(context, 'Message unsent.');
                 },
               ),
           ],
@@ -3314,7 +3433,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           );
         }
 
-        final messages = snapshot.data!.docs;
+        final allMessages = snapshot.data!.docs;
+        // Filter out deleted messages for this user
+        final messages = allMessages.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final List<dynamic> deletedFor = data['deletedFor'] ?? [];
+          return !deletedFor.contains(currentUid);
+        }).toList();
 
         return ListView.builder(
           reverse: true,
@@ -3378,7 +3503,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         ],
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                         children: [
                           if (type == 'image')
                             GestureDetector(
