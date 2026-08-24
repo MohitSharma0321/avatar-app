@@ -3808,7 +3808,7 @@ class _CallScreenState extends State<CallScreen> {
         ),
         android: const AndroidParams(
           isCustomNotification: true,
-          isShowLogo: false,
+          isShowCallID: false,
           ringtonePath: 'system_ringtone_default',
         ),
       );
