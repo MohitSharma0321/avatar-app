@@ -1213,7 +1213,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// REELS & POSTS DUAL FEED SCREEN
+// REELS & POSTS DUAL FEED SCREEN (CLOUDINARY INTEGRATED)
 // ==================================================
 
 class FeedScreen extends StatefulWidget {
@@ -1226,6 +1226,28 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   int feedTab = 0; // 0 = Reels, 1 = Posts
   final ImagePicker _picker = ImagePicker();
+  bool isUploading = false;
+
+  Future<String?> _uploadVideoToCloudinary(File videoFile) async {
+    const String cloudName = 'a6flqxr8';
+    const String uploadPreset = 'avatar_preset';
+
+    final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/video/upload');
+
+    try {
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = uploadPreset
+        ..files.add(await http.MultipartFile.fromPath('file', videoFile.path));
+
+      final streamedResponse = await request.send();
+      if (streamedResponse.statusCode == 200) {
+        final response = await http.Response.fromStream(streamedResponse);
+        final data = jsonDecode(response.body);
+        return data['secure_url']; // Direct Video Streaming URL
+      }
+    } catch (_) {}
+    return null;
+  }
 
   void _openShareModal(BuildContext context, Map<String, dynamic> postData) {
     showModalBottomSheet(
@@ -1263,7 +1285,8 @@ class _FeedScreenState extends State<FeedScreen> {
               title: const Text('Share to WhatsApp / WhatsApp Status', style: TextStyle(fontWeight: FontWeight.bold)),
               onTap: () {
                 Navigator.pop(ctx);
-                Share.share('Check this out on Avatar App! 🔥\n${postData['caption'] ?? ''}');
+                final videoUrl = postData['videoUrl'] ?? '';
+                Share.share('Watch this on Avatar App! 🔥\n${postData['caption'] ?? ''}\n$videoUrl');
               },
             ),
             const SizedBox(height: 10),
@@ -1317,27 +1340,52 @@ class _FeedScreenState extends State<FeedScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: kPrimaryNeon, foregroundColor: Colors.white),
               onPressed: () async {
+                if (mediaFile == null) {
+                  _showMessage(context, 'Please select a file first.');
+                  return;
+                }
+
                 final user = FirebaseAuth.instance.currentUser;
                 if (user == null) return;
                 Navigator.pop(ctx);
 
-                String base64Data = '';
-                if (mediaFile != null && !isVideo) {
-                  final bytes = await mediaFile!.readAsBytes();
-                  base64Data = base64Encode(bytes);
+                setState(() => isUploading = true);
+
+                try {
+                  String videoUrl = '';
+                  String imageBase64 = '';
+
+                  if (isVideo) {
+                    final uploadedUrl = await _uploadVideoToCloudinary(File(mediaFile!.path));
+                    if (uploadedUrl != null) {
+                      videoUrl = uploadedUrl;
+                    } else {
+                      if (mounted) _showMessage(context, 'Video upload failed. Check internet.');
+                      setState(() => isUploading = false);
+                      return;
+                    }
+                  } else {
+                    final bytes = await mediaFile!.readAsBytes();
+                    imageBase64 = base64Encode(bytes);
+                  }
+
+                  await FirebaseFirestore.instance.collection('feed_posts').add({
+                    'uid': user.uid,
+                    'creatorName': user.displayName ?? 'User',
+                    'type': isVideo ? 'reel' : 'post',
+                    'caption': captionCtrl.text.trim(),
+                    'videoUrl': videoUrl,
+                    'mediaData': imageBase64,
+                    'likes': [],
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+
+                  if (mounted) _showMessage(context, 'Published successfully! 🎉');
+                } catch (e) {
+                  if (mounted) _showMessage(context, 'Publish error: $e');
+                } finally {
+                  if (mounted) setState(() => isUploading = false);
                 }
-
-                await FirebaseFirestore.instance.collection('feed_posts').add({
-                  'uid': user.uid,
-                  'creatorName': user.displayName ?? 'User',
-                  'type': isVideo ? 'reel' : 'post',
-                  'caption': captionCtrl.text.trim(),
-                  'mediaData': base64Data,
-                  'likes': [],
-                  'createdAt': FieldValue.serverTimestamp(),
-                });
-
-                if (mounted) _showMessage(context, 'Published successfully!');
               },
               child: const Text('Post'),
             ),
@@ -1374,7 +1422,7 @@ class _FeedScreenState extends State<FeedScreen> {
                     borderRadius: BorderRadius.circular(19),
                     gradient: feedTab == 0 ? const LinearGradient(colors: [kPrimaryNeon, kAccentPink]) : null,
                   ),
-                  child: Text('🎬 Reels', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: feedTab == 0 ? Colors.white : (feedTab == 0 ? Colors.white70 : kTextDark))),
+                  child: Text('🎬 Reels', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: feedTab == 0 ? Colors.white : kTextDark)),
                 ),
               ),
               GestureDetector(
@@ -1393,181 +1441,247 @@ class _FeedScreenState extends State<FeedScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: _uploadContentDialog,
+            onPressed: isUploading ? null : _uploadContentDialog,
             icon: Icon(Icons.add_circle_outline_rounded, color: feedTab == 0 ? Colors.white : kDarkSurface, size: 26),
           ),
           const SizedBox(width: 8),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('feed_posts')
-            .where('type', isEqualTo: feedTab == 0 ? 'reel' : 'post')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
-          }
+      body: Column(
+        children: [
+          if (isUploading) const LinearProgressIndicator(color: kPrimaryNeon),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('feed_posts')
+                  .where('type', isEqualTo: feedTab == 0 ? 'reel' : 'post')
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+                }
 
-          final docs = snapshot.data?.docs ?? [];
+                final docs = snapshot.data?.docs ?? [];
 
-          if (docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(feedTab == 0 ? Icons.movie_outlined : Icons.photo_library_outlined, size: 60, color: feedTab == 0 ? Colors.white38 : kTextSubtle),
-                  const SizedBox(height: 12),
-                  Text(feedTab == 0 ? 'No Reels uploaded yet.' : 'No Posts yet.', style: TextStyle(color: feedTab == 0 ? Colors.white70 : kDarkSurface, fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 6),
-                  Text('Tap + at top right to upload.', style: TextStyle(color: feedTab == 0 ? Colors.white38 : kTextSubtle, fontSize: 13)),
-                ],
-              ),
-            );
-          }
-
-          if (feedTab == 0) {
-            // Full Screen Vertical Reel View
-            return PageView.builder(
-              scrollDirection: Axis.vertical,
-              itemCount: docs.length,
-              itemBuilder: (context, index) {
-                final data = docs[index].data() as Map<String, dynamic>;
-                final List<dynamic> likes = data['likes'] ?? [];
-                final isLiked = likes.contains(currentUid);
-
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Container(
-                      color: Colors.black,
-                      child: const Center(
-                        child: Icon(Icons.play_circle_outline_rounded, size: 80, color: Colors.white38),
-                      ),
+                if (docs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(feedTab == 0 ? Icons.movie_outlined : Icons.photo_library_outlined, size: 60, color: feedTab == 0 ? Colors.white38 : kTextSubtle),
+                        const SizedBox(height: 12),
+                        Text(feedTab == 0 ? 'No Reels uploaded yet.' : 'No Posts yet.', style: TextStyle(color: feedTab == 0 ? Colors.white70 : kDarkSurface, fontWeight: FontWeight.bold, fontSize: 16)),
+                        const SizedBox(height: 6),
+                        Text('Tap + at top right to upload.', style: TextStyle(color: feedTab == 0 ? Colors.white38 : kTextSubtle, fontSize: 13)),
+                      ],
                     ),
-                    // Action Buttons Overlay
-                    Positioned(
-                      right: 16,
-                      bottom: 40,
-                      child: Column(
+                  );
+                }
+
+                if (feedTab == 0) {
+                  // Full Screen Vertical Reels Feed
+                  return PageView.builder(
+                    scrollDirection: Axis.vertical,
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data() as Map<String, dynamic>;
+                      final List<dynamic> likes = data['likes'] ?? [];
+                      final isLiked = likes.contains(currentUid);
+                      final String videoUrl = data['videoUrl'] ?? '';
+
+                      return Stack(
+                        fit: StackFit.expand,
                         children: [
-                          IconButton(
-                            icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : Colors.white, size: 32),
-                            onPressed: () {
-                              docs[index].reference.update({
-                                'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
-                              });
-                            },
+                          Container(
+                            color: Colors.black,
+                            child: videoUrl.isNotEmpty
+                                ? ReelVideoPlayerItem(videoUrl: videoUrl)
+                                : const Center(child: Icon(Icons.play_circle_outline_rounded, size: 80, color: Colors.white38)),
                           ),
-                          Text('${likes.length}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 16),
-                          IconButton(
-                            icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 28),
-                            onPressed: () {},
+                          Positioned(
+                            right: 16,
+                            bottom: 40,
+                            child: Column(
+                              children: [
+                                IconButton(
+                                  icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : Colors.white, size: 32),
+                                  onPressed: () {
+                                    docs[index].reference.update({
+                                      'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
+                                    });
+                                  },
+                                ),
+                                Text('${likes.length}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 16),
+                                IconButton(
+                                  icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 28),
+                                  onPressed: () {},
+                                ),
+                                const SizedBox(height: 16),
+                                IconButton(
+                                  icon: const Icon(Icons.share_rounded, color: Colors.white, size: 28),
+                                  onPressed: () => _openShareModal(context, data),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 16),
-                          IconButton(
-                            icon: const Icon(Icons.share_rounded, color: Colors.white, size: 28),
-                            onPressed: () => _openShareModal(context, data),
+                          Positioned(
+                            left: 16,
+                            bottom: 30,
+                            right: 80,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('@${data['creatorName'] ?? 'user'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                const SizedBox(height: 6),
+                                Text(data['caption'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                              ],
+                            ),
                           ),
                         ],
-                      ),
-                    ),
-                    // Caption & Profile info
-                    Positioned(
-                      left: 16,
-                      bottom: 30,
-                      right: 80,
+                      );
+                    },
+                  );
+                }
+
+                // Posts Feed
+                return ListView.builder(
+                  itemCount: docs.length,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data() as Map<String, dynamic>;
+                    final String mediaBase64 = data['mediaData'] ?? '';
+                    final List<dynamic> likes = data['likes'] ?? [];
+                    final isLiked = likes.contains(currentUid);
+
+                    Widget postImage;
+                    if (mediaBase64.isNotEmpty) {
+                      try {
+                        postImage = Image.memory(base64Decode(mediaBase64), fit: BoxFit.cover, width: double.infinity, height: 320);
+                      } catch (_) {
+                        postImage = Container(height: 200, color: Colors.grey.shade200, child: const Icon(Icons.broken_image));
+                      }
+                    } else {
+                      postImage = Container(height: 200, color: Colors.grey.shade200, child: const Center(child: Icon(Icons.photo_outlined, size: 48, color: Colors.grey)));
+                    }
+
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('@${data['creatorName'] ?? 'user'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                          const SizedBox(height: 6),
-                          Text(data['caption'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                          ListTile(
+                            leading: CircleAvatar(backgroundColor: kPrimaryNeon.withOpacity(0.2), child: Text(data['creatorName'] != null && data['creatorName'].isNotEmpty ? data['creatorName'][0].toUpperCase() : 'U')),
+                            title: Text(data['creatorName'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            trailing: IconButton(icon: const Icon(Icons.more_horiz_rounded), onPressed: () => _openShareModal(context, data)),
+                          ),
+                          ClipRRect(borderRadius: BorderRadius.circular(12), child: postImage),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : kDarkSurface, size: 26),
+                                  onPressed: () {
+                                    docs[index].reference.update({
+                                      'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
+                                    });
+                                  },
+                                ),
+                                const SizedBox(width: 8),
+                                Text('${likes.length} likes', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                const Spacer(),
+                                IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  icon: const Icon(Icons.share_outlined, size: 24),
+                                  onPressed: () => _openShareModal(context, data),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if ((data['caption'] ?? '').isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                              child: Text(data['caption'], style: const TextStyle(fontSize: 14)),
+                            ),
                         ],
                       ),
-                    ),
-                  ],
+                    );
+                  },
                 );
               },
-            );
-          }
-
-          // Posts Mode (Clean Vertical Feed)
-          return ListView.builder(
-            itemCount: docs.length,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
-              final String mediaBase64 = data['mediaData'] ?? '';
-              final List<dynamic> likes = data['likes'] ?? [];
-              final isLiked = likes.contains(currentUid);
-
-              Widget postImage;
-              if (mediaBase64.isNotEmpty) {
-                try {
-                  postImage = Image.memory(base64Decode(mediaBase64), fit: BoxFit.cover, width: double.infinity, height: 320);
-                } catch (_) {
-                  postImage = Container(height: 200, color: Colors.grey.shade200, child: const Icon(Icons.broken_image));
-                }
-              } else {
-                postImage = Container(height: 200, color: Colors.grey.shade200, child: const Center(child: Icon(Icons.photo_outlined, size: 48, color: Colors.grey)));
-              }
-
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ListTile(
-                      leading: CircleAvatar(backgroundColor: kPrimaryNeon.withOpacity(0.2), child: Text(data['creatorName'] != null && data['creatorName'].isNotEmpty ? data['creatorName'][0].toUpperCase() : 'U')),
-                      title: Text(data['creatorName'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      trailing: IconButton(icon: const Icon(Icons.more_horiz_rounded), onPressed: () => _openShareModal(context, data)),
-                    ),
-                    ClipRRect(borderRadius: BorderRadius.circular(12), child: postImage),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : kDarkSurface, size: 26),
-                            onPressed: () {
-                              docs[index].reference.update({
-                                'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
-                              });
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          Text('${likes.length} likes', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          const Spacer(),
-                          IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            icon: const Icon(Icons.share_outlined, size: 24),
-                            onPressed: () => _openShareModal(context, data),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if ((data['caption'] ?? '').isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
-                        child: Text(data['caption'], style: const TextStyle(fontSize: 14)),
-                      ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
+// ==================================================
+// REEL VIDEO PLAYER ITEM COMPONENT
+// ==================================================
+
+class ReelVideoPlayerItem extends StatefulWidget {
+  final String videoUrl;
+  const ReelVideoPlayerItem({Key? key, required this.videoUrl}) : super(key: key);
+
+  @override
+  State<ReelVideoPlayerItem> createState() => _ReelVideoPlayerItemState();
+}
+
+class _ReelVideoPlayerItemState extends State<ReelVideoPlayerItem> {
+  late VideoPlayerController _controller;
+  bool isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => isInitialized = true);
+          _controller.setLooping(true);
+          _controller.play();
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isInitialized) {
+      return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+    }
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _controller.value.isPlaying ? _controller.pause() : _controller.play();
+        });
+      },
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: _controller.value.aspectRatio,
+          child: VideoPlayer(_controller),
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// MUSIC & REWARDS PLACEHOLDERS
+// ==================================================
 
 class MusicPlaceholderScreen extends StatelessWidget {
   const MusicPlaceholderScreen({Key? key}) : super(key: key);
@@ -1584,7 +1698,7 @@ class MusicPlaceholderScreen extends StatelessWidget {
             SizedBox(height: 14),
             Text('Background Music & Call Sync', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SizedBox(height: 6),
-            Text('Coming in next step with audio streaming and live call sync', style: TextStyle(color: kTextSubtle)),
+            Text('Coming next with live streaming & call audio sync', style: TextStyle(color: kTextSubtle)),
           ],
         ),
       ),
@@ -3327,7 +3441,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  Future<void> sendMessage() async {
+  Future<sendMessage() async {
     final text = messageController.text.trim();
     if (text.isEmpty || isSendingMessage) return;
 
@@ -3832,7 +3946,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         ],
                       ),
                       child: Column(
-                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           if (type == 'image')
                             GestureDetector(
