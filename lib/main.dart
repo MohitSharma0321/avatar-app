@@ -3441,7 +3441,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  Future<sendMessage() async {
+  Future<void> sendMessage() async {
     final text = messageController.text.trim();
     if (text.isEmpty || isSendingMessage) return;
 
