@@ -35,7 +35,7 @@ const Color kTextDark = Color(0xFF1B1E28);
 const Color kTextSubtle = Color(0xFF7D8494);
 
 // ==================================================
-// GLOBAL MUSIC SERVICE & BACKGROUND MINI PLAYER
+// GLOBAL MUSIC SERVICE & LIVE CLOUDFLARE FETCHER
 // ==================================================
 
 class SongModel {
@@ -122,61 +122,25 @@ class GlobalMusicService {
   }
 }
 
-// Live Music API Fetcher
 class MusicRepository {
-  static final List<SongModel> featuredTracks = [
-    SongModel(
-      id: '1',
-      title: 'Midnight Lo-Fi Chill',
-      artist: 'Avatar Beats',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-      artwork: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300',
-      duration: '3:45',
-    ),
-    SongModel(
-      id: '2',
-      title: 'Neon Drift Cyberwave',
-      artist: 'Retro Synth',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-      artwork: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300',
-      duration: '4:12',
-    ),
-    SongModel(
-      id: '3',
-      title: 'Acoustic Sunset Melody',
-      artist: 'Acoustic Soul',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-      artwork: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300',
-      duration: '2:58',
-    ),
-    SongModel(
-      id: '4',
-      title: 'Urban Hip Hop Pulse',
-      artist: 'Street Rhythm',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-      artwork: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300',
-      duration: '3:20',
-    ),
-    SongModel(
-      id: '5',
-      title: 'Deep Focus Ambient',
-      artist: 'Atmospheric Cloud',
-      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
-      artwork: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300',
-      duration: '4:30',
-    ),
-  ];
+  static const String workerBaseUrl = 'https://avatar-music-engine.projectkhurafat.workers.dev/';
 
   static Future<List<SongModel>> searchTracks(String query) async {
-    if (query.trim().isEmpty) return featuredTracks;
-    final q = query.toLowerCase();
-    return featuredTracks
-        .where((s) => s.title.toLowerCase().contains(q) || s.artist.toLowerCase().contains(q))
-        .toList();
+    final q = query.trim().isEmpty ? 'trending hindi' : query.trim();
+    try {
+      final res = await http.get(Uri.parse('$workerBaseUrl?q=${Uri.encodeComponent(q)}'));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['success'] == true && data['songs'] != null) {
+          return (data['songs'] as List).map((i) => SongModel.fromJson(i)).toList();
+        }
+      }
+    } catch (_) {}
+    return [];
   }
 }
 
-// Background Mini Player Widget
+// Background Mini Player
 class GlobalMiniPlayer extends StatelessWidget {
   const GlobalMiniPlayer({Key? key}) : super(key: key);
 
@@ -244,7 +208,7 @@ class GlobalMiniPlayer extends StatelessWidget {
   }
 }
 
-// In-App Music Picker Modal (For Posts & Reels)
+// In-App Music Picker Modal
 class MusicPickerModal extends StatefulWidget {
   const MusicPickerModal({Key? key}) : super(key: key);
 
@@ -254,12 +218,38 @@ class MusicPickerModal extends StatefulWidget {
 
 class _MusicPickerModalState extends State<MusicPickerModal> {
   String searchQ = '';
-  List<SongModel> songs = MusicRepository.featuredTracks;
+  List<SongModel> songs = [];
+  bool isLoading = true;
+  Timer? debounce;
 
-  void _onSearch(String val) async {
-    setState(() => searchQ = val);
-    final results = await MusicRepository.searchTracks(val);
-    setState(() => songs = results);
+  @override
+  void initState() {
+    super.initState();
+    _fetchSongs('trending hindi');
+  }
+
+  void _fetchSongs(String q) async {
+    setState(() => isLoading = true);
+    final results = await MusicRepository.searchTracks(q);
+    if (mounted) {
+      setState(() {
+        songs = results;
+        isLoading = false;
+      });
+    }
+  }
+
+  void _onSearchChanged(String val) {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 500), () {
+      _fetchSongs(val);
+    });
+  }
+
+  @override
+  void dispose() {
+    debounce?.cancel();
+    super.dispose();
   }
 
   @override
@@ -278,7 +268,7 @@ class _MusicPickerModalState extends State<MusicPickerModal> {
           const Text('Select Music Track', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: kDarkSurface)),
           const SizedBox(height: 12),
           TextField(
-            onChanged: _onSearch,
+            onChanged: _onSearchChanged,
             decoration: InputDecoration(
               hintText: 'Search songs or artists...',
               prefixIcon: const Icon(Icons.search, color: kTextSubtle),
@@ -289,37 +279,41 @@ class _MusicPickerModalState extends State<MusicPickerModal> {
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: ListView.builder(
-              itemCount: songs.length,
-              itemBuilder: (context, idx) {
-                final song = songs[idx];
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      song.artwork,
-                      width: 48,
-                      height: 48,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(width: 48, height: 48, color: Colors.black12, child: const Icon(Icons.music_note)),
-                    ),
-                  ),
-                  title: Text(song.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: Text(song.artist, style: const TextStyle(color: kTextSubtle, fontSize: 12)),
-                  trailing: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kPrimaryNeon,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => Navigator.pop(context, song),
-                    child: const Text('Attach', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  ),
-                );
-              },
-            ),
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator(color: kPrimaryNeon))
+                : songs.isEmpty
+                    ? const Center(child: Text('No tracks found.', style: TextStyle(color: kTextSubtle)))
+                    : ListView.builder(
+                        itemCount: songs.length,
+                        itemBuilder: (context, idx) {
+                          final song = songs[idx];
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                song.artwork,
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(width: 48, height: 48, color: Colors.black12, child: const Icon(Icons.music_note)),
+                              ),
+                            ),
+                            title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            subtitle: Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle, fontSize: 12)),
+                            trailing: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kPrimaryNeon,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () => Navigator.pop(context, song),
+                              child: const Text('Attach', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
@@ -1555,7 +1549,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==================================================
-// INSTAGRAM-STYLE POST STUDIO (PHOTO EDITOR SCREEN)
+// POST STUDIO (PHOTO EDITOR SCREEN)
 // ==================================================
 
 class PostEditStudioScreen extends StatefulWidget {
@@ -1681,7 +1675,6 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Preview Box with Live Filter
             Container(
               width: double.infinity,
               height: 380,
@@ -1693,8 +1686,6 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
                 ),
               ),
             ),
-
-            // Filter Selector Carousel
             Container(
               height: 70,
               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1729,10 +1720,7 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
                 },
               ),
             ),
-
             const Divider(height: 1),
-
-            // Action Toolbar (Crop, Replace, Add Music)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               child: Row(
@@ -1771,7 +1759,6 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
                 ],
               ),
             ),
-
             if (selectedSong != null)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -1789,8 +1776,6 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
                   ],
                 ),
               ),
-
-            // Caption Box
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
@@ -1812,7 +1797,7 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
 }
 
 // ==================================================
-// INSTAGRAM-STYLE REEL STUDIO (VIDEO EDITOR SCREEN)
+// REEL STUDIO (VIDEO EDITOR SCREEN)
 // ==================================================
 
 class ReelEditStudioScreen extends StatefulWidget {
@@ -1970,7 +1955,6 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
           else
             const Center(child: CircularProgressIndicator(color: kPrimaryNeon)),
 
-          // Overlay Controls at Bottom
           Positioned(
             left: 0,
             right: 0,
@@ -2436,13 +2420,38 @@ class MusicHubScreen extends StatefulWidget {
 }
 
 class _MusicHubScreenState extends State<MusicHubScreen> {
-  String searchQ = '';
-  List<SongModel> songs = MusicRepository.featuredTracks;
+  List<SongModel> songs = [];
+  bool isLoading = true;
+  Timer? debounce;
 
-  void _onSearch(String val) async {
-    setState(() => searchQ = val);
-    final results = await MusicRepository.searchTracks(val);
-    setState(() => songs = results);
+  @override
+  void initState() {
+    super.initState();
+    _fetchTracks('trending hindi');
+  }
+
+  void _fetchTracks(String q) async {
+    setState(() => isLoading = true);
+    final results = await MusicRepository.searchTracks(q);
+    if (mounted) {
+      setState(() {
+        songs = results;
+        isLoading = false;
+      });
+    }
+  }
+
+  void _onSearchChanged(String val) {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 500), () {
+      _fetchTracks(val);
+    });
+  }
+
+  @override
+  void dispose() {
+    debounce?.cancel();
+    super.dispose();
   }
 
   @override
@@ -2454,7 +2463,7 @@ class _MusicHubScreenState extends State<MusicHubScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
-              onChanged: _onSearch,
+              onChanged: _onSearchChanged,
               decoration: InputDecoration(
                 hintText: 'Search any track or artist...',
                 prefixIcon: const Icon(Icons.search, color: kTextSubtle),
@@ -2465,36 +2474,40 @@ class _MusicHubScreenState extends State<MusicHubScreen> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: songs.length,
-              itemBuilder: (context, idx) {
-                final song = songs[idx];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        song.artwork,
-                        width: 50,
-                        height: 50,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(width: 50, height: 50, color: Colors.black12, child: const Icon(Icons.music_note)),
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator(color: kPrimaryNeon))
+                : songs.isEmpty
+                    ? const Center(child: Text('No tracks found.', style: TextStyle(color: kTextSubtle)))
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: songs.length,
+                        itemBuilder: (context, idx) {
+                          final song = songs[idx];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.network(
+                                  song.artwork,
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(width: 50, height: 50, color: Colors.black12, child: const Icon(Icons.music_note)),
+                                ),
+                              ),
+                              title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              subtitle: Text('${song.artist} • ${song.duration}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle, fontSize: 12)),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.play_circle_fill_rounded, color: kPrimaryNeon, size: 36),
+                                onPressed: () => GlobalMusicService.instance.playSong(song),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    ),
-                    title: Text(song.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    subtitle: Text('${song.artist} • ${song.duration}', style: const TextStyle(color: kTextSubtle, fontSize: 12)),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.play_circle_fill_rounded, color: kPrimaryNeon, size: 36),
-                      onPressed: () => GlobalMusicService.instance.playSong(song),
-                    ),
-                  ),
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -3790,7 +3803,7 @@ class _CallScreenState extends State<CallScreen> {
           syncedSong = song;
           await _syncMusicPlayer.stop();
           await _syncMusicPlayer.play(UrlSource(song.url));
-          await _syncMusicPlayer.setVolume(0.35); // Background volume during voice call
+          await _syncMusicPlayer.setVolume(0.35);
         }
 
         if (playing && !isSyncPlaying) {
@@ -5598,7 +5611,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 24),
 
-              // Clean Separate Reels & Posts Segment
               Container(
                 decoration: BoxDecoration(
                   color: kLightBg,
