@@ -140,7 +140,6 @@ class MusicRepository {
   }
 }
 
-// Background Mini Player
 class GlobalMiniPlayer extends StatelessWidget {
   const GlobalMiniPlayer({Key? key}) : super(key: key);
 
@@ -208,7 +207,6 @@ class GlobalMiniPlayer extends StatelessWidget {
   }
 }
 
-// In-App Music Picker Modal
 class MusicPickerModal extends StatefulWidget {
   const MusicPickerModal({Key? key}) : super(key: key);
 
@@ -2257,7 +2255,6 @@ class _FeedScreenState extends State<FeedScreen> {
             );
           }
 
-          // Posts Feed
           return ListView.builder(
             itemCount: docs.length,
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -4921,7 +4918,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     border: Border.all(color: isMissed ? Colors.redAccent.withOpacity(0.4) : Colors.green.withOpacity(0.4)),
                   ),
                   child: Row(
-                    mainAxisSize: MainBuildContext.min,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(isMissed ? Icons.phone_missed_rounded : Icons.phone_rounded, size: 16, color: isMissed ? Colors.redAccent : Colors.green),
                       const SizedBox(width: 8),
