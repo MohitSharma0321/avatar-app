@@ -57,12 +57,12 @@ class SongModel {
 
   factory SongModel.fromJson(Map<String, dynamic> json) {
     return SongModel(
-      id: json['id'] ?? '',
-      title: json['title'] ?? 'Unknown Track',
-      artist: json['artist'] ?? 'Unknown Artist',
-      url: json['url'] ?? '',
-      artwork: json['artwork'] ?? '',
-      duration: json['duration'] ?? '',
+      id: json['id']?.toString() ?? '',
+      title: json['title'] ?? json['name'] ?? 'Unknown Track',
+      artist: json['artist'] ?? json['artists'] ?? 'Unknown Artist',
+      url: json['url'] ?? json['audio_url'] ?? json['downloadUrl'] ?? '',
+      artwork: json['artwork'] ?? json['image'] ?? json['thumbnail'] ?? json['cover_url'] ?? '',
+      duration: json['duration']?.toString() ?? '',
     );
   }
 
@@ -99,9 +99,13 @@ class GlobalMusicService {
   }
 
   Future<void> playSong(SongModel song) async {
+    if (song.url.isEmpty) return;
     currentSongNotifier.value = song;
-    await audioPlayer.stop();
-    await audioPlayer.play(UrlSource(song.url));
+    try {
+      await audioPlayer.stop();
+      await audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
+      await audioPlayer.play(UrlSource(song.url));
+    } catch (_) {}
   }
 
   Future<void> pauseSong() async {
@@ -923,9 +927,8 @@ void showUserAvatarPreview(BuildContext context, {
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
 Widget buildUserAvatar({
   required BuildContext context,
@@ -1123,7 +1126,7 @@ class WelcomeScreen extends StatelessWidget {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(28),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: Center(child: Text('')).hashCode > 0 ? MainAxisAlignment.center : MainAxisAlignment.center,
               children: [
                 Container(
                   width: 120,
