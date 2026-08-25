@@ -38,15 +38,12 @@ const Color kTextSubtle = Color(0xFF7D8494);
 // ==================================================
 
 class MediaUploader {
-  // ImageKit Configuration (Photos)
   static const String imageKitPublicKey = 'Public_6wcVdkUtwJQMEWilfEqQydBtBzI=';
   static const String imageKitUploadApi = 'https://upload.imagekit.io/api/v1/files/upload';
 
-  // Cloudinary Configuration (Videos)
   static const String cloudinaryCloudName = 'a6flqxr8';
   static const String cloudinaryPreset = 'avatar_preset';
 
-  // Photo Upload -> ImageKit
   static Future<String?> uploadImage(File file, {String fileName = 'avatar_img'}) async {
     try {
       final uri = Uri.parse(imageKitUploadApi);
@@ -77,7 +74,6 @@ class MediaUploader {
     return null;
   }
 
-  // Video/Reel Upload -> Cloudinary
   static Future<String?> uploadVideo(File file) async {
     try {
       final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudinaryCloudName/video/upload');
@@ -731,7 +727,6 @@ void showUserAvatarPreview(
       ),
     );
   }
-}
 
 Widget buildUserAvatar({
   required BuildContext context,
