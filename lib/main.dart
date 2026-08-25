@@ -2395,19 +2395,21 @@ class _ReelVideoPlayerItemState extends State<ReelVideoPlayerItem> {
 }
 
 // ==================================================
-// INSTANT BUBBLE PROMPT BAR (TOP OF CHATS)
+// INSTANT BUBBLE PROMPT BAR (TOP OF CHATS) - FIXED
 // ==================================================
 
 class InstantBubbleBar extends StatelessWidget {
   const InstantBubbleBar({Key? key}) : super(key: key);
 
-  void _showAddNoteDialog(BuildContext context) {
-    final noteCtrl = TextEditingController();
+  void _showAddNoteDialog(BuildContext context, {String existingNote = ''}) {
+    final noteCtrl = TextEditingController(text: existingNote);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
@@ -2419,16 +2421,26 @@ class InstantBubbleBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Share an Instant Thought', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+            const Text(
+              'Share an Instant Thought',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: kDarkSurface,
+              ),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: noteCtrl,
               maxLength: 60,
               decoration: InputDecoration(
-                hintText: "What's on your mind? (e.g. In the gym 🎧)",
+                hintText: "What's on your mind? (e.g. Radhe Radhe 🙏)",
                 filled: true,
                 fillColor: kLightBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
             const SizedBox(height: 14),
@@ -2436,19 +2448,24 @@ class InstantBubbleBar extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: kDarkSurface,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: () async {
                 final text = noteCtrl.text.trim();
                 final user = FirebaseAuth.instance.currentUser;
                 if (text.isNotEmpty && user != null) {
-                  await FirebaseFirestore.instance.collection('instant_notes').doc(user.uid).set({
+                  await FirebaseFirestore.instance
+                      .collection('instant_notes')
+                      .doc(user.uid)
+                      .set({
                     'uid': user.uid,
                     'userName': user.displayName ?? 'User',
                     'note': text,
                     'createdAt': FieldValue.serverTimestamp(),
                   });
-                  Navigator.pop(ctx);
+                  if (ctx.mounted) Navigator.pop(ctx);
                 }
               },
               child: const Text('Post Note', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -2467,55 +2484,116 @@ class InstantBubbleBar extends StatelessWidget {
       stream: FirebaseFirestore.instance.collection('instant_notes').snapshots(),
       builder: (context, snap) {
         final docs = snap.data?.docs ?? [];
+        
+        // Find my current note
+        String myNoteText = '';
+        for (var doc in docs) {
+          final d = doc.data() as Map<String, dynamic>;
+          if (d['uid'] == myUid) {
+            myNoteText = d['note'] ?? '';
+            break;
+          }
+        }
+
         return SizedBox(
-          height: 104,
+          height: 110,
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             children: [
+              // --- Current User Note ("Your Note") ---
               GestureDetector(
-                onTap: () => _showAddNoteDialog(context),
+                onTap: () => _showAddNoteDialog(context, existingNote: myNoteText),
                 child: Container(
-                  width: 76,
+                  width: 80,
                   margin: const EdgeInsets.only(right: 12),
                   child: Column(
                     children: [
+                      const SizedBox(height: 12),
                       Stack(
                         clipBehavior: Clip.none,
+                        alignment: Alignment.topCenter,
                         children: [
                           const CircleAvatar(
                             radius: 28,
                             backgroundColor: kLightBg,
-                            child: Icon(Icons.person, color: kTextSubtle, size: 28),
+                            child: Icon(Icons.person, color: kDarkSurface, size: 30),
                           ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(color: kDarkSurface, shape: BoxShape.circle),
-                              child: const Icon(Icons.add, color: Colors.white, size: 14),
+                          // Bubble with active note or + button
+                          if (myNoteText.isNotEmpty)
+                            Positioned(
+                              top: -12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                constraints: const BoxConstraints(maxWidth: 76),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.12),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    )
+                                  ],
+                                ),
+                                child: Text(
+                                  myNoteText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: kDarkSurface,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: kDarkSurface,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.add, color: Colors.white, size: 14),
+                              ),
                             ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      const Text('Your Note', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kTextSubtle)),
+                      const Text(
+                        'Your Note',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: kTextSubtle,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-              ...docs.map((doc) {
+
+              // --- Other Users' Notes ---
+              ...docs.where((doc) {
+                final d = doc.data() as Map<String, dynamic>;
+                return d['uid'] != myUid;
+              }).map((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 final noteText = data['note'] ?? '';
                 final name = data['userName'] ?? 'User';
-                if (data['uid'] == myUid) return const SizedBox.shrink();
 
                 return Container(
                   width: 82,
                   margin: const EdgeInsets.only(right: 12),
                   child: Column(
                     children: [
+                      const SizedBox(height: 12),
                       Stack(
                         clipBehavior: Clip.none,
                         alignment: Alignment.topCenter,
@@ -2523,24 +2601,56 @@ class InstantBubbleBar extends StatelessWidget {
                           CircleAvatar(
                             radius: 28,
                             backgroundColor: kDarkSurface,
-                            child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'U', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ),
-                          Positioned(
-                            top: -12,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                              style: const TextStyle(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4)],
+                                fontWeight: FontWeight.bold,
                               ),
-                              child: Text(noteText, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: kDarkSurface)),
                             ),
                           ),
+                          if (noteText.toString().isNotEmpty)
+                            Positioned(
+                              top: -12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                constraints: const BoxConstraints(maxWidth: 78),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.08),
+                                      blurRadius: 4,
+                                    )
+                                  ],
+                                ),
+                                child: Text(
+                                  noteText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: kDarkSurface,
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kDarkSurface)),
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: kDarkSurface,
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -2552,6 +2662,7 @@ class InstantBubbleBar extends StatelessWidget {
     );
   }
 }
+                            
 
 // ==================================================
 // HOME SCREEN (4 MINIMAL TABS: POSTS -> REELS -> CHATS -> PROFILE)
