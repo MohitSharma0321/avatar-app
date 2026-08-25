@@ -726,7 +726,7 @@ void showUserAvatarPreview(
         ),
       ),
     );
-  }
+}
 
 Widget buildUserAvatar({
   required BuildContext context,
