@@ -170,8 +170,6 @@ class GlobalMusicService {
   }
 }
 
-// Separate player for Reel/Post attached music.
-// This intentionally does not replace or control the Music Hub player.
 class ReelAudioService {
   static final ReelAudioService instance = ReelAudioService._internal();
   ReelAudioService._internal();
@@ -1687,12 +1685,12 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
 
   final List<String> filterNames = ['Normal', 'Vivid', 'Warm', 'Mono', 'Vintage', 'Neon'];
   final List<List<double>> colorMatrices = [
-    [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0], // Normal
-    [1.2, 0, 0, 0, 0, 0, 1.2, 0, 0, 0, 0, 0, 1.2, 0, 0, 0, 0, 0, 1, 0], // Vivid
-    [1.2, 0, 0, 0, 20, 0, 1.1, 0, 0, 10, 0, 0, 0.9, 0, 0, 0, 0, 0, 1, 0], // Warm
-    [0.33, 0.33, 0.33, 0, 0, 0.33, 0.33, 0.33, 0, 0, 0.33, 0.33, 0.33, 0, 0, 0, 0, 0, 1, 0], // Mono
-    [0.393, 0.769, 0.189, 0, 0, 0.349, 0.686, 0.168, 0, 0, 0.272, 0.534, 0.131, 0, 0, 0, 0, 0, 1, 0], // Vintage
-    [0.8, 0, 0, 0, 0, 0, 1.3, 0, 0, 10, 0, 0, 1.5, 0, 30, 0, 0, 0, 1, 0], // Neon
+    [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0],
+    [1.2, 0, 0, 0, 0, 0, 1.2, 0, 0, 0, 0, 0, 1.2, 0, 0, 0, 0, 0, 1, 0],
+    [1.2, 0, 0, 0, 20, 0, 1.1, 0, 0, 10, 0, 0, 0.9, 0, 0, 0, 0, 0, 1, 0],
+    [0.33, 0.33, 0.33, 0, 0, 0.33, 0.33, 0.33, 0, 0, 0.33, 0.33, 0.33, 0, 0, 0, 0, 0, 1, 0],
+    [0.393, 0.769, 0.189, 0, 0, 0.349, 0.686, 0.168, 0, 0, 0.272, 0.534, 0.131, 0, 0, 0, 0, 0, 1, 0],
+    [0.8, 0, 0, 0, 0, 0, 1.3, 0, 0, 10, 0, 0, 1.5, 0, 30, 0, 0, 0, 1, 0],
   ];
 
   @override
@@ -2176,7 +2174,7 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  int feedTab = 0; // 0 = Reels, 1 = Posts
+  int feedTab = 0;
   final ImagePicker _picker = ImagePicker();
   int currentReelIndex = 0;
   String? _lastReelAudioDocId;
@@ -3889,7 +3887,7 @@ class SingleReelScreen extends StatelessWidget {
 }
 
 // ==================================================
-// 1-ON-1 ACTIVE CALLING SCREEN WITH LIVE AUDIO SYNC
+// 1-ON-1 ACTIVE CALLING SCREEN
 // ==================================================
 
 class CallScreen extends StatefulWidget {
@@ -3915,18 +3913,13 @@ class CallScreen extends StatefulWidget {
 class _CallScreenState extends State<CallScreen> {
   final WebRtcSignalingService _signaling = WebRtcSignalingService();
   final AudioPlayer _ringtonePlayer = AudioPlayer();
-  final AudioPlayer _syncMusicPlayer = AudioPlayer();
 
   bool isMuted = false;
   bool isSpeaker = false;
   bool isConnected = false;
   int callSeconds = 0;
   Timer? callTimer;
-
   String? activeCallId;
-  StreamSubscription? musicSyncSubscription;
-  SongModel? syncedSong;
-  bool isSyncPlaying = false;
 
   @override
   void initState() {
@@ -3952,7 +3945,6 @@ class _CallScreenState extends State<CallScreen> {
 
     if (widget.isIncoming && widget.callId != null) {
       activeCallId = widget.callId;
-      _listenToMusicSync(activeCallId!);
 
       await _signaling.answerCall(
         callId: widget.callId!,
@@ -3985,7 +3977,6 @@ class _CallScreenState extends State<CallScreen> {
         _stopOutgoingRingtone();
         if (activeCallId != null) {
           unawaited(FlutterCallkitIncoming.setCallConnected(activeCallId!));
-          _listenToMusicSync(activeCallId!);
         }
         _startTimer();
       },
@@ -4024,52 +4015,6 @@ class _CallScreenState extends State<CallScreen> {
       );
       await FlutterCallkitIncoming.startCall(outgoingParams);
     } catch (_) {}
-  }
-
-  void _listenToMusicSync(String callId) {
-    musicSyncSubscription = FirebaseFirestore.instance.collection('calls').doc(callId).snapshots().listen((snapshot) async {
-      final data = snapshot.data();
-      if (data != null && data['syncedMusic'] != null) {
-        final Map<String, dynamic> mData = data['syncedMusic'];
-        final song = SongModel.fromJson(mData['song']);
-        final playing = mData['isPlaying'] == true;
-
-        if (syncedSong?.url != song.url) {
-          syncedSong = song;
-          await _syncMusicPlayer.stop();
-          await _syncMusicPlayer.play(UrlSource(song.url));
-          await _syncMusicPlayer.setVolume(0.35);
-        }
-
-        if (playing && !isSyncPlaying) {
-          await _syncMusicPlayer.resume();
-          setState(() => isSyncPlaying = true);
-        } else if (!playing && isSyncPlaying) {
-          await _syncMusicPlayer.pause();
-          setState(() => isSyncPlaying = false);
-        }
-      }
-    });
-  }
-
-  Future<void> _pickSyncMusic() async {
-    if (activeCallId == null) return;
-    final SongModel? song = await showModalBottomSheet<SongModel>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const MusicPickerModal(),
-    );
-
-    if (song != null) {
-      await FirebaseFirestore.instance.collection('calls').doc(activeCallId).update({
-        'syncedMusic': {
-          'song': song.toJson(),
-          'isPlaying': true,
-          'timestamp': FieldValue.serverTimestamp(),
-        }
-      });
-    }
   }
 
   void _startTimer() {
@@ -4132,8 +4077,6 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     _stopOutgoingRingtone();
     _ringtonePlayer.dispose();
-    _syncMusicPlayer.dispose();
-    musicSyncSubscription?.cancel();
     callTimer?.cancel();
     _logCallHistory();
     unawaited(_signaling.hangUp());
@@ -4167,33 +4110,6 @@ class _CallScreenState extends State<CallScreen> {
               radius: 75,
               enablePreview: false,
             ),
-            if (syncedSong != null) ...[
-              const SizedBox(height: 20),
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 40),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white12,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: kPrimaryNeon.withOpacity(0.4)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.music_note_rounded, color: kPrimaryNeon, size: 18),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        'Synced: ${syncedSong!.title}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -4207,17 +4123,6 @@ class _CallScreenState extends State<CallScreen> {
                   ),
                   onPressed: _toggleMic,
                   icon: Icon(isMuted ? Icons.mic_off : Icons.mic),
-                ),
-                IconButton.filledTonal(
-                  iconSize: 26,
-                  style: IconButton.styleFrom(
-                    padding: const EdgeInsets.all(14),
-                    backgroundColor: kPrimaryNeon.withOpacity(0.2),
-                    foregroundColor: kPrimaryNeon,
-                  ),
-                  onPressed: _pickSyncMusic,
-                  icon: const Icon(Icons.music_note_rounded),
-                  tooltip: 'Listen Music Together',
                 ),
                 IconButton.filled(
                   iconSize: 32,
@@ -5455,7 +5360,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String displayBio = 'Hey there! I am on Avatar.';
   String photoBase64 = '';
   bool isPrivateAccount = false;
-  int profileTab = 0; // 0 = Reels, 1 = Posts
+  int profileTab = 0;
 
   @override
   void initState() {
@@ -6043,7 +5948,7 @@ class UserPublicProfileScreen extends StatefulWidget {
 }
 
 class _UserPublicProfileScreenState extends State<UserPublicProfileScreen> {
-  int tabIndex = 0; // 0 = Reels, 1 = Posts
+  int tabIndex = 0;
 
   @override
   Widget build(BuildContext context) {
