@@ -35,7 +35,7 @@ const Color kTextDark = Color(0xFF1B1E28);
 const Color kTextSubtle = Color(0xFF7D8494);
 
 // ==================================================
-// GLOBAL MUSIC SERVICE & LIVE CLOUDFLARE FETCHER
+// SONG MODEL & REEL AUDIO SERVICE
 // ==================================================
 
 class SongModel {
@@ -76,100 +76,6 @@ class SongModel {
   };
 }
 
-class GlobalMusicService {
-  static final GlobalMusicService instance = GlobalMusicService._internal();
-  GlobalMusicService._internal();
-
-  final AudioPlayer audioPlayer = AudioPlayer();
-  final ValueNotifier<SongModel?> currentSongNotifier = ValueNotifier<SongModel?>(null);
-  final ValueNotifier<bool> isPlayingNotifier = ValueNotifier<bool>(false);
-  final ValueNotifier<Duration> positionNotifier = ValueNotifier<Duration>(Duration.zero);
-  final ValueNotifier<Duration> durationNotifier = ValueNotifier<Duration>(Duration.zero);
-
-  bool _initialized = false;
-
-  void init() {
-    if (_initialized) return;
-    _initialized = true;
-
-    audioPlayer.onPlayerStateChanged.listen((state) {
-      isPlayingNotifier.value = state == PlayerState.playing;
-    });
-    audioPlayer.onPositionChanged.listen((pos) {
-      positionNotifier.value = pos;
-    });
-    audioPlayer.onDurationChanged.listen((dur) {
-      durationNotifier.value = dur;
-    });
-    audioPlayer.onPlayerComplete.listen((_) {
-      isPlayingNotifier.value = false;
-      positionNotifier.value = Duration.zero;
-    });
-  }
-
-  Future<void> playSong(SongModel song) async {
-    final url = song.url.trim();
-
-    if (url.isEmpty) {
-      debugPrint('MUSIC ERROR: Empty audio URL');
-      return;
-    }
-
-    final uri = Uri.tryParse(url);
-    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
-      debugPrint('MUSIC ERROR: Invalid audio URL -> $url');
-      return;
-    }
-
-    try {
-      currentSongNotifier.value = song;
-      await audioPlayer.stop();
-      await audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
-      debugPrint('MUSIC PLAY URL: $url');
-      await audioPlayer.play(UrlSource(url));
-    } catch (e, stack) {
-      debugPrint('MUSIC PLAY ERROR: $e');
-      debugPrint('$stack');
-      isPlayingNotifier.value = false;
-    }
-  }
-
-  Future<void> pauseSong() async {
-    try {
-      await audioPlayer.pause();
-    } catch (e) {
-      debugPrint('MUSIC PAUSE ERROR: $e');
-    }
-  }
-
-  Future<void> resumeSong() async {
-    try {
-      await audioPlayer.resume();
-    } catch (e) {
-      debugPrint('MUSIC RESUME ERROR: $e');
-    }
-  }
-
-  Future<void> seek(Duration pos) async {
-    try {
-      await audioPlayer.seek(pos);
-    } catch (e) {
-      debugPrint('MUSIC SEEK ERROR: $e');
-    }
-  }
-
-  Future<void> stop() async {
-    try {
-      await audioPlayer.stop();
-    } catch (e) {
-      debugPrint('MUSIC STOP ERROR: $e');
-    }
-    currentSongNotifier.value = null;
-    isPlayingNotifier.value = false;
-    positionNotifier.value = Duration.zero;
-  }
-}
-
 class ReelAudioService {
   static final ReelAudioService instance = ReelAudioService._internal();
   ReelAudioService._internal();
@@ -178,35 +84,22 @@ class ReelAudioService {
 
   Future<void> playSong(SongModel song) async {
     final url = song.url.trim();
-
-    if (url.isEmpty) {
-      debugPrint('REEL MUSIC ERROR: Empty audio URL');
-      return;
-    }
+    if (url.isEmpty) return;
 
     final uri = Uri.tryParse(url);
-    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
-      debugPrint('REEL MUSIC ERROR: Invalid audio URL -> $url');
-      return;
-    }
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
 
     try {
       await player.stop();
       await player.setPlayerMode(PlayerMode.mediaPlayer);
-      debugPrint('REEL MUSIC PLAY URL: $url');
       await player.play(UrlSource(url));
-    } catch (e, stack) {
-      debugPrint('REEL MUSIC PLAY ERROR: $e');
-      debugPrint('$stack');
-    }
+    } catch (_) {}
   }
 
   Future<void> stop() async {
     try {
       await player.stop();
-    } catch (e) {
-      debugPrint('REEL MUSIC STOP ERROR: $e');
-    }
+    } catch (_) {}
   }
 }
 
@@ -223,78 +116,8 @@ class MusicRepository {
           return (data['songs'] as List).map((i) => SongModel.fromJson(i)).toList();
         }
       }
-    } catch (e, stack) {
-      debugPrint('MUSIC API ERROR: $e');
-      debugPrint('$stack');
-    }
+    } catch (_) {}
     return [];
-  }
-}
-
-class GlobalMiniPlayer extends StatelessWidget {
-  const GlobalMiniPlayer({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<SongModel?>(
-      valueListenable: GlobalMusicService.instance.currentSongNotifier,
-      builder: (context, song, _) {
-        if (song == null) return const SizedBox.shrink();
-
-        return Container(
-          height: 60,
-          margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: kDarkSurface,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
-            ],
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  song.artwork,
-                  width: 42,
-                  height: 42,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(width: 42, height: 42, color: Colors.white24, child: const Icon(Icons.music_note, color: Colors.white)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                    Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 11)),
-                  ],
-                ),
-              ),
-              ValueListenableBuilder<bool>(
-                valueListenable: GlobalMusicService.instance.isPlayingNotifier,
-                builder: (context, isPlaying, _) {
-                  return IconButton(
-                    icon: Icon(isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 28),
-                    onPressed: () {
-                      isPlaying ? GlobalMusicService.instance.pauseSong() : GlobalMusicService.instance.resumeSong();
-                    },
-                  );
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white60, size: 20),
-                onPressed: () => GlobalMusicService.instance.stop(),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 }
 
@@ -459,7 +282,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  GlobalMusicService.instance.init();
 
   runApp(const AvatarApp());
 }
@@ -1980,8 +1802,6 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
     final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/video/upload');
 
     try {
-      debugPrint('REEL UPLOAD: Starting ${file.path}');
-
       final req = http.MultipartRequest('POST', url)
         ..fields['upload_preset'] = uploadPreset
         ..files.add(await http.MultipartFile.fromPath('file', file.path));
@@ -1992,24 +1812,14 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
       );
 
       final res = await http.Response.fromStream(streamed);
-      debugPrint('CLOUDINARY STATUS: ${res.statusCode}');
-
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final secureUrl = data['secure_url']?.toString();
         if (secureUrl != null && secureUrl.isNotEmpty) {
-          debugPrint('CLOUDINARY SUCCESS: $secureUrl');
           return secureUrl;
         }
       }
-
-      debugPrint('CLOUDINARY ERROR BODY: ${res.body}');
-    } on TimeoutException catch (e) {
-      debugPrint('CLOUDINARY TIMEOUT: $e');
-    } catch (e, stack) {
-      debugPrint('CLOUDINARY UPLOAD ERROR: $e');
-      debugPrint('$stack');
-    }
+    } catch (_) {}
 
     return null;
   }
@@ -2036,8 +1846,6 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
         return;
       }
 
-      debugPrint('FIRESTORE: Saving reel...');
-
       await FirebaseFirestore.instance.collection('feed_posts').add({
         'uid': user.uid,
         'creatorName': user.displayName ?? 'User',
@@ -2054,9 +1862,7 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
         _showMessage(context, 'Reel published successfully!');
         Navigator.pop(context);
       }
-    } catch (e, stack) {
-      debugPrint('PUBLISH REEL ERROR: $e');
-      debugPrint('$stack');
+    } catch (e) {
       if (mounted) _showMessage(context, 'Publish error: $e');
     } finally {
       if (mounted) setState(() => isUploading = false);
@@ -2199,10 +2005,8 @@ class _FeedScreenState extends State<FeedScreen> {
       );
       _lastReelAudioDocId = docId;
       await ReelAudioService.instance.playSong(song);
-    } catch (e, stack) {
+    } catch (_) {
       _lastReelAudioDocId = null;
-      debugPrint('REEL SONG PARSE ERROR: $e');
-      debugPrint('$stack');
     }
   }
 
@@ -2305,11 +2109,11 @@ class _FeedScreenState extends State<FeedScreen> {
             children: [
               GestureDetector(
                 onTap: () async {
-                    if (feedTab != 0) {
-                      await _stopReelAudio();
-                    }
-                    if (mounted) setState(() => feedTab = 0);
-                  },
+                  if (feedTab != 0) {
+                    await _stopReelAudio();
+                  }
+                  if (mounted) setState(() => feedTab = 0);
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
                   decoration: BoxDecoration(
@@ -2321,9 +2125,9 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
               GestureDetector(
                 onTap: () async {
-                    await _stopReelAudio();
-                    if (mounted) setState(() => feedTab = 1);
-                  },
+                  await _stopReelAudio();
+                  if (mounted) setState(() => feedTab = 1);
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
                   decoration: BoxDecoration(
@@ -2617,141 +2421,7 @@ class _ReelVideoPlayerItemState extends State<ReelVideoPlayerItem> {
 }
 
 // ==================================================
-// MUSIC HUB SCREEN (SOLO LISTENING & SEARCH)
-// ==================================================
-
-class MusicHubScreen extends StatefulWidget {
-  const MusicHubScreen({Key? key}) : super(key: key);
-
-  @override
-  State<MusicHubScreen> createState() => _MusicHubScreenState();
-}
-
-class _MusicHubScreenState extends State<MusicHubScreen> {
-  List<SongModel> songs = [];
-  bool isLoading = true;
-  Timer? debounce;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchTracks('trending hindi');
-  }
-
-  void _fetchTracks(String q) async {
-    setState(() => isLoading = true);
-    final results = await MusicRepository.searchTracks(q);
-    if (mounted) {
-      setState(() {
-        songs = results;
-        isLoading = false;
-      });
-    }
-  }
-
-  void _onSearchChanged(String val) {
-    debounce?.cancel();
-    debounce = Timer(const Duration(milliseconds: 500), () {
-      _fetchTracks(val);
-    });
-  }
-
-  @override
-  void dispose() {
-    debounce?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Music Hub', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22))),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Search any track or artist...',
-                prefixIcon: const Icon(Icons.search, color: kTextSubtle),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-              ),
-            ),
-          ),
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator(color: kPrimaryNeon))
-                : songs.isEmpty
-                    ? const Center(child: Text('No tracks found.', style: TextStyle(color: kTextSubtle)))
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: songs.length,
-                        itemBuilder: (context, idx) {
-                          final song = songs[idx];
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.network(
-                                  song.artwork,
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(width: 50, height: 50, color: Colors.black12, child: const Icon(Icons.music_note)),
-                                ),
-                              ),
-                              title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              subtitle: Text('${song.artist} • ${song.duration}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle, fontSize: 12)),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.play_circle_fill_rounded, color: kPrimaryNeon, size: 36),
-                                onPressed: () => GlobalMusicService.instance.playSong(song),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================================================
-// REWARDS SCREEN PLACEHOLDER
-// ==================================================
-
-class RewardsPlaceholderScreen extends StatelessWidget {
-  const RewardsPlaceholderScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Avatar Rewards', style: TextStyle(fontWeight: FontWeight.bold))),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.stars_rounded, size: 70, color: Colors.amber),
-            SizedBox(height: 14),
-            Text('Daily Streaks & Avatar Coins', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 6),
-            Text('Earn coins to unlock exclusive perks', style: TextStyle(color: kTextSubtle)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ==================================================
-// HOME SCREEN (5 TABS + FLOATING MINI PLAYER)
+// HOME SCREEN (3 CORE TABS)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -2762,18 +2432,16 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int currentIndex = 2;
+  int currentIndex = 1; // 0 = Feed, 1 = Profile, 2 = Chats
   StreamSubscription? callSubscription;
 
-  final List<Widget?> pages = [null, null, null, null, null];
+  final List<Widget?> pages = [null, null, null];
 
   Widget _pageAt(int index) {
     if (pages[index] == null) {
       pages[index] = switch (index) {
         0 => const FeedScreen(),
-        1 => const MusicHubScreen(),
-        2 => const ProfileScreen(),
-        3 => const RewardsPlaceholderScreen(),
+        1 => const ProfileScreen(),
         _ => const ChatScreen(),
       };
     }
@@ -2957,27 +2625,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
+      body: IndexedStack(
+        index: currentIndex,
         children: [
-          IndexedStack(
-            index: currentIndex,
-            children: [
-              currentIndex == 0 || pages[0] != null ? _pageAt(0) : const SizedBox.shrink(),
-              currentIndex == 1 || pages[1] != null ? _pageAt(1) : const SizedBox.shrink(),
-              currentIndex == 2 || pages[2] != null ? _pageAt(2) : const SizedBox.shrink(),
-              currentIndex == 3 || pages[3] != null ? _pageAt(3) : const SizedBox.shrink(),
-              currentIndex == 4 || pages[4] != null ? _pageAt(4) : const SizedBox.shrink(),
-            ],
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 70,
-            child: SafeArea(
-              top: false,
-              child: const GlobalMiniPlayer(),
-            ),
-          ),
+          currentIndex == 0 || pages[0] != null ? _pageAt(0) : const SizedBox.shrink(),
+          currentIndex == 1 || pages[1] != null ? _pageAt(1) : const SizedBox.shrink(),
+          currentIndex == 2 || pages[2] != null ? _pageAt(2) : const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -3006,25 +2659,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() => currentIndex = 0);
                 },
               ),
-              IconButton(
-                icon: Icon(
-                  currentIndex == 1 ? Icons.music_note : Icons.music_note_outlined,
-                  color: currentIndex == 1 ? kPrimaryNeon : kDarkSurface,
-                  size: 26,
-                ),
-                onPressed: () {
-                  if (currentIndex == 0) {
-                    ReelAudioService.instance.stop();
-                  }
-                  setState(() => currentIndex = 1);
-                },
-              ),
               GestureDetector(
                 onTap: () {
                   if (currentIndex == 0) {
                     ReelAudioService.instance.stop();
                   }
-                  setState(() => currentIndex = 2);
+                  setState(() => currentIndex = 1);
                 },
                 child: Container(
                   width: 48,
@@ -3038,7 +2678,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: kPrimaryNeon.withOpacity(currentIndex == 2 ? 0.45 : 0.2),
+                        color: kPrimaryNeon.withOpacity(currentIndex == 1 ? 0.45 : 0.2),
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       )
@@ -3054,7 +2694,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: Icon(
                         Icons.person_rounded,
-                        color: currentIndex == 2 ? kPrimaryNeon : kDarkSurface,
+                        color: currentIndex == 1 ? kPrimaryNeon : kDarkSurface,
                         size: 24,
                       ),
                     ),
@@ -3063,28 +2703,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               IconButton(
                 icon: Icon(
-                  currentIndex == 3 ? Icons.stars_rounded : Icons.stars_outlined,
-                  color: currentIndex == 3 ? Colors.amber.shade700 : kDarkSurface,
+                  currentIndex == 2 ? Icons.chat_bubble : Icons.chat_bubble_outline_rounded,
+                  color: currentIndex == 2 ? kPrimaryNeon : kDarkSurface,
                   size: 26,
                 ),
                 onPressed: () {
                   if (currentIndex == 0) {
                     ReelAudioService.instance.stop();
                   }
-                  setState(() => currentIndex = 3);
-                },
-              ),
-              IconButton(
-                icon: Icon(
-                  currentIndex == 4 ? Icons.chat_bubble : Icons.chat_bubble_outline_rounded,
-                  color: currentIndex == 4 ? kPrimaryNeon : kDarkSurface,
-                  size: 26,
-                ),
-                onPressed: () {
-                  if (currentIndex == 0) {
-                    ReelAudioService.instance.stop();
-                  }
-                  setState(() => currentIndex = 4);
+                  setState(() => currentIndex = 2);
                 },
               ),
             ],
@@ -3202,7 +2829,7 @@ class NotificationsScreen extends StatelessWidget {
                       final peerName = (uData['name'] ?? '').toString();
                       final peerUsername = (uData['username'] ?? 'user').toString();
                       final peerBio = uData['bio'] ?? '';
-                      final peerPhoto = uData['photoBase64'] ?? '';
+                      final photo = uData['photoBase64'] ?? '';
                       final isMutual = myConnections.contains(peerUid);
 
                       return Container(
@@ -5117,7 +4744,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           else
                             Text(
                               data['text'] ?? '',
-                              style: TextStyle(fontSize: 15, color: isMe ? Colors.white : kDarkSurface, fontWeight: isMe ? FontWeight.w500 : FontWeight.normal),
+                              style: TextStyle(fontSize: 15, color: isMe ? Colors.white : kDarkSurface, fontWeight: isUser ? FontWeight.w500 : FontWeight.normal),
                             ),
                           if (isMe) ...[
                             const SizedBox(height: 2),
