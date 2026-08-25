@@ -34,36 +34,50 @@ const Color kTextDark = Color(0xFF1B1E28);
 const Color kTextSubtle = Color(0xFF7D8494);
 
 // ==================================================
-// IMAGEKIT.IO & CLOUDINARY DIRECT UPLOADER
+// HYBRID DIRECT UPLOADER (IMAGEKIT + CLOUDINARY)
 // ==================================================
 
 class MediaUploader {
+  // ImageKit Configuration (Photos)
   static const String imageKitPublicKey = 'Public_6wcVdkUtwJQMEWilfEqQydBtBzI=';
-  static const String imageKitUrlEndpoint = 'https://ik.imagekit.io/a9q4elmfs';
   static const String imageKitUploadApi = 'https://upload.imagekit.io/api/v1/files/upload';
 
+  // Cloudinary Configuration (Videos)
   static const String cloudinaryCloudName = 'a6flqxr8';
   static const String cloudinaryPreset = 'avatar_preset';
 
+  // Photo Upload -> ImageKit
   static Future<String?> uploadImage(File file, {String fileName = 'avatar_img'}) async {
     try {
-      final request = http.MultipartRequest('POST', Uri.parse(imageKitUploadApi))
+      final uri = Uri.parse(imageKitUploadApi);
+      final request = http.MultipartRequest('POST', uri)
         ..fields['publicKey'] = imageKitPublicKey
         ..fields['fileName'] = '${fileName}_${DateTime.now().millisecondsSinceEpoch}.jpg'
         ..fields['useUniqueFileName'] = 'true'
-        ..files.add(await http.MultipartFile.fromPath('file', file.path));
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            await file.readAsBytes(),
+            filename: '$fileName.jpg',
+          ),
+        );
 
-      final streamed = await request.send().timeout(const Duration(seconds: 25));
+      final streamed = await request.send().timeout(const Duration(seconds: 90));
       final res = await http.Response.fromStream(streamed);
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         return data['url']?.toString();
+      } else {
+        debugPrint('ImageKit Upload Error: ${res.statusCode} -> ${res.body}');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Upload Image Exception: $e');
+    }
     return null;
   }
 
+  // Video/Reel Upload -> Cloudinary
   static Future<String?> uploadVideo(File file) async {
     try {
       final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudinaryCloudName/video/upload');
@@ -71,58 +85,20 @@ class MediaUploader {
         ..fields['upload_preset'] = cloudinaryPreset
         ..files.add(await http.MultipartFile.fromPath('file', file.path));
 
-      final streamed = await request.send().timeout(const Duration(seconds: 45));
+      final streamed = await request.send().timeout(const Duration(seconds: 120));
       final res = await http.Response.fromStream(streamed);
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         return data['secure_url']?.toString();
+      } else {
+        debugPrint('Cloudinary Video Error: ${res.statusCode} -> ${res.body}');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Upload Video Exception: $e');
+    }
     return null;
   }
-}
-
-// ==================================================
-// SONG MODEL & REEL AUDIO SERVICE
-// ==================================================
-
-class SongModel {
-  final String id;
-  final String title;
-  final String artist;
-  final String url;
-  final String artwork;
-  final String duration;
-
-  SongModel({
-    required this.id,
-    required this.title,
-    required this.artist,
-    required this.url,
-    required this.artwork,
-    this.duration = '',
-  });
-
-  factory SongModel.fromJson(Map<String, dynamic> json) {
-    return SongModel(
-      id: json['id']?.toString() ?? '',
-      title: json['title'] ?? json['name'] ?? 'Unknown Track',
-      artist: json['artist'] ?? json['artists'] ?? 'Unknown Artist',
-      url: json['url'] ?? json['audio_url'] ?? json['downloadUrl'] ?? '',
-      artwork: json['artwork'] ?? json['image'] ?? json['thumbnail'] ?? json['cover_url'] ?? '',
-      duration: json['duration']?.toString() ?? '',
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'artist': artist,
-    'url': url,
-    'artwork': artwork,
-    'duration': duration,
-  };
 }
 
 class ReelAudioService {
@@ -131,154 +107,10 @@ class ReelAudioService {
 
   final AudioPlayer player = AudioPlayer();
 
-  Future<void> playSong(SongModel song) async {
-    final url = song.url.trim();
-    if (url.isEmpty) return;
-
-    final uri = Uri.tryParse(url);
-    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
-
-    try {
-      await player.stop();
-      await player.setPlayerMode(PlayerMode.mediaPlayer);
-      await player.play(UrlSource(url));
-    } catch (_) {}
-  }
-
   Future<void> stop() async {
     try {
       await player.stop();
     } catch (_) {}
-  }
-}
-
-class MusicRepository {
-  static const String workerBaseUrl = 'https://avatar-music-engine.projectkhurafat.workers.dev/';
-
-  static Future<List<SongModel>> searchTracks(String query) async {
-    final q = query.trim().isEmpty ? 'trending hindi' : query.trim();
-    try {
-      final res = await http.get(Uri.parse('$workerBaseUrl?q=${Uri.encodeComponent(q)}'));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        if (data['success'] == true && data['songs'] != null) {
-          return (data['songs'] as List).map((i) => SongModel.fromJson(i)).toList();
-        }
-      }
-    } catch (_) {}
-    return [];
-  }
-}
-
-class MusicPickerModal extends StatefulWidget {
-  const MusicPickerModal({Key? key}) : super(key: key);
-
-  @override
-  State<MusicPickerModal> createState() => _MusicPickerModalState();
-}
-
-class _MusicPickerModalState extends State<MusicPickerModal> {
-  String searchQ = '';
-  List<SongModel> songs = [];
-  bool isLoading = true;
-  Timer? debounce;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchSongs('trending hindi');
-  }
-
-  void _fetchSongs(String q) async {
-    setState(() => isLoading = true);
-    final results = await MusicRepository.searchTracks(q);
-    if (mounted) {
-      setState(() {
-        songs = results;
-        isLoading = false;
-      });
-    }
-  }
-
-  void _onSearchChanged(String val) {
-    debounce?.cancel();
-    debounce = Timer(const Duration(milliseconds: 500), () {
-      _fetchSongs(val);
-    });
-  }
-
-  @override
-  void dispose() {
-    debounce?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 14),
-          const Text('Select Sound Track', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: kDarkSurface)),
-          const SizedBox(height: 12),
-          TextField(
-            onChanged: _onSearchChanged,
-            decoration: InputDecoration(
-              hintText: 'Search songs or artists...',
-              prefixIcon: const Icon(Icons.search, color: kTextSubtle),
-              filled: true,
-              fillColor: kLightBg,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator(color: kDarkSurface))
-                : songs.isEmpty
-                    ? const Center(child: Text('No tracks found.', style: TextStyle(color: kTextSubtle)))
-                    : ListView.builder(
-                        itemCount: songs.length,
-                        itemBuilder: (context, idx) {
-                          final song = songs[idx];
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                song.artwork,
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(width: 48, height: 48, color: Colors.black12, child: const Icon(Icons.music_note)),
-                              ),
-                            ),
-                            title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            subtitle: Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle, fontSize: 12)),
-                            trailing: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: kDarkSurface,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              onPressed: () => Navigator.pop(context, song),
-                              child: const Text('Attach', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                            ),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -897,8 +729,8 @@ void showUserAvatarPreview(
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 Widget buildUserAvatar({
@@ -1500,7 +1332,6 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
   final TextEditingController captionController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   
-  SongModel? selectedSong;
   int currentFilterIndex = 0;
   bool isPosting = false;
 
@@ -1546,18 +1377,6 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
     }
   }
 
-  Future<void> _pickMusic() async {
-    final SongModel? song = await showModalBottomSheet<SongModel>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const MusicPickerModal(),
-    );
-    if (song != null) {
-      setState(() => selectedSong = song);
-    }
-  }
-
   Future<void> _publishPost() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -1578,7 +1397,6 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
         'caption': captionController.text.trim(),
         'imageUrl': imageUrl,
         'videoUrl': '',
-        'attachedSong': selectedSong != null ? selectedSong!.toJson() : null,
         'likes': [],
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -1604,129 +1422,113 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
           TextButton(
             onPressed: isPosting ? null : _publishPost,
             child: isPosting
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kDarkSurface))
+                ? const Text('Posting...', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: kTextSubtle))
                 : const Text('Share', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kDarkSurface)),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              height: 380,
-              color: Colors.black,
-              child: Center(
-                child: ColorFiltered(
-                  colorFilter: ColorFilter.matrix(colorMatrices[currentFilterIndex]),
-                  child: Image.file(currentImage, fit: BoxFit.contain),
-                ),
-              ),
+      body: Column(
+        children: [
+          if (isPosting)
+            const LinearProgressIndicator(
+              minHeight: 4,
+              backgroundColor: kLightBg,
+              valueColor: AlwaysStoppedAnimation<Color>(kPrimaryNeon),
             ),
-            Container(
-              height: 60,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                itemCount: filterNames.length,
-                itemBuilder: (ctx, idx) {
-                  final isSelected = (currentFilterIndex == idx);
-                  return GestureDetector(
-                    onTap: () => setState(() => currentFilterIndex = idx),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isSelected ? kDarkSurface : kLightBg,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Center(
-                        child: Text(
-                          filterNames[idx],
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : kDarkSurface,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              child: Row(
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
                 children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      foregroundColor: kDarkSurface,
+                  Container(
+                    width: double.infinity,
+                    height: 380,
+                    color: Colors.black,
+                    child: Center(
+                      child: ColorFiltered(
+                        colorFilter: ColorFilter.matrix(colorMatrices[currentFilterIndex]),
+                        child: Image.file(currentImage, fit: BoxFit.contain),
+                      ),
                     ),
-                    onPressed: _cropImage,
-                    icon: const Icon(Icons.crop_rotate_rounded, size: 16),
-                    label: const Text('Crop'),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      foregroundColor: kDarkSurface,
+                  Container(
+                    height: 60,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      itemCount: filterNames.length,
+                      itemBuilder: (ctx, idx) {
+                        final isSelected = (currentFilterIndex == idx);
+                        return GestureDetector(
+                          onTap: () => setState(() => currentFilterIndex = idx),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isSelected ? kDarkSurface : kLightBg,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Center(
+                              child: Text(
+                                filterNames[idx],
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : kDarkSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    onPressed: _replaceImage,
-                    icon: const Icon(Icons.photo_library_outlined, size: 16),
-                    label: const Text('Replace'),
                   ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: selectedSong != null ? kDarkSurface : kLightBg,
-                      foregroundColor: selectedSong != null ? Colors.white : kDarkSurface,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    child: Row(
+                      children: [
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            foregroundColor: kDarkSurface,
+                          ),
+                          onPressed: isPosting ? null : _cropImage,
+                          icon: const Icon(Icons.crop_rotate_rounded, size: 16),
+                          label: const Text('Crop'),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            foregroundColor: kDarkSurface,
+                          ),
+                          onPressed: isPosting ? null : _replaceImage,
+                          icon: const Icon(Icons.photo_library_outlined, size: 16),
+                          label: const Text('Replace'),
+                        ),
+                      ],
                     ),
-                    onPressed: _pickMusic,
-                    icon: Icon(Icons.music_note_rounded, size: 16, color: selectedSong != null ? Colors.white : kDarkSurface),
-                    label: Text(selectedSong != null ? 'Sound Added' : 'Add Sound'),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      controller: captionController,
+                      enabled: !isPosting,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Write a caption...',
+                        filled: true,
+                        fillColor: kLightBg,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-            if (selectedSong != null)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(color: kLightBg, borderRadius: BorderRadius.circular(10)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.audiotrack, size: 18, color: kDarkSurface),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text('${selectedSong!.title} • ${selectedSong!.artist}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                    GestureDetector(
-                      onTap: () => setState(() => selectedSong = null),
-                      child: const Icon(Icons.close, size: 18, color: kTextSubtle),
-                    ),
-                  ],
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: captionController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Write a caption...',
-                  filled: true,
-                  fillColor: kLightBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1751,7 +1553,6 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
   final TextEditingController captionController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
 
-  SongModel? selectedSong;
   bool isUploading = false;
   bool isInitialized = false;
 
@@ -1785,18 +1586,6 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
     }
   }
 
-  Future<void> _pickMusic() async {
-    final SongModel? song = await showModalBottomSheet<SongModel>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const MusicPickerModal(),
-    );
-    if (song != null) {
-      setState(() => selectedSong = song);
-    }
-  }
-
   Future<void> _publishReel() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -1820,7 +1609,6 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
         'caption': captionController.text.trim(),
         'videoUrl': videoUrl,
         'imageUrl': '',
-        'attachedSong': selectedSong != null ? selectedSong!.toJson() : null,
         'likes': [],
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -1855,78 +1643,81 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
           TextButton(
             onPressed: isUploading ? null : _publishReel,
             child: isUploading
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const Text('Posting...', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white70))
                 : const Text('Share', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.white)),
           ),
         ],
       ),
-      body: Stack(
-        fit: StackFit.expand,
+      body: Column(
         children: [
-          if (isInitialized)
-            Center(
-              child: AspectRatio(
-                aspectRatio: _videoController.value.aspectRatio,
-                child: VideoPlayer(_videoController),
-              ),
-            )
-          else
-            const Center(child: CircularProgressIndicator(color: Colors.white)),
+          if (isUploading)
+            const LinearProgressIndicator(
+              minHeight: 4,
+              backgroundColor: Colors.white12,
+              valueColor: AlwaysStoppedAnimation<Color>(kPrimaryNeon),
+            ),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (isInitialized)
+                  Center(
+                    child: AspectRatio(
+                      aspectRatio: _videoController.value.aspectRatio,
+                      child: VideoPlayer(_videoController),
+                    ),
+                  )
+                else
+                  const Center(child: CircularProgressIndicator(color: Colors.white)),
 
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [Colors.black.withOpacity(0.9), Colors.transparent],
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white38),
-                        ),
-                        onPressed: _replaceVideo,
-                        icon: const Icon(Icons.video_library_outlined, size: 16),
-                        label: const Text('Replace'),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Colors.black.withOpacity(0.9), Colors.transparent],
                       ),
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedSong != null ? Colors.white : Colors.white24,
-                          foregroundColor: selectedSong != null ? Colors.black : Colors.white,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(color: Colors.white38),
+                              ),
+                              onPressed: isUploading ? null : _replaceVideo,
+                              icon: const Icon(Icons.video_library_outlined, size: 16),
+                              label: const Text('Replace Video'),
+                            ),
+                          ],
                         ),
-                        onPressed: _pickMusic,
-                        icon: const Icon(Icons.music_note_rounded, size: 16),
-                        label: Text(selectedSong != null ? 'Sound Added' : 'Add Sound'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: captionController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Write a reel caption...',
-                      hintStyle: const TextStyle(color: Colors.white60),
-                      filled: true,
-                      fillColor: Colors.white12,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: captionController,
+                          enabled: !isUploading,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Write a reel caption...',
+                            hintStyle: const TextStyle(color: Colors.white60),
+                            filled: true,
+                            fillColor: Colors.white12,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1948,26 +1739,6 @@ class ReelsFeedScreen extends StatefulWidget {
 
 class _ReelsFeedScreenState extends State<ReelsFeedScreen> {
   final ImagePicker _picker = ImagePicker();
-  String? _lastReelAudioDocId;
-
-  Future<void> _playReelSongFromData(Map<String, dynamic> data, String docId) async {
-    final rawSong = data['attachedSong'];
-    if (rawSong == null || rawSong is! Map) {
-      _lastReelAudioDocId = null;
-      await ReelAudioService.instance.stop();
-      return;
-    }
-
-    if (_lastReelAudioDocId == docId) return;
-
-    try {
-      final song = SongModel.fromJson(Map<String, dynamic>.from(rawSong));
-      _lastReelAudioDocId = docId;
-      await ReelAudioService.instance.playSong(song);
-    } catch (_) {
-      _lastReelAudioDocId = null;
-    }
-  }
 
   void _openShareModal(BuildContext context, Map<String, dynamic> postData) {
     showModalBottomSheet(
@@ -2063,28 +1834,14 @@ class _ReelsFeedScreenState extends State<ReelsFeedScreen> {
             );
           }
 
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && docs.isNotEmpty) {
-              final firstData = docs[0].data() as Map<String, dynamic>;
-              _playReelSongFromData(firstData, docs[0].id);
-            }
-          });
-
           return PageView.builder(
             scrollDirection: Axis.vertical,
             itemCount: docs.length,
-            onPageChanged: (index) async {
-              if (index >= 0 && index < docs.length) {
-                final changedData = docs[index].data() as Map<String, dynamic>;
-                await _playReelSongFromData(changedData, docs[index].id);
-              }
-            },
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
               final List<dynamic> likes = data['likes'] ?? [];
               final isLiked = likes.contains(currentUid);
               final String videoUrl = data['videoUrl'] ?? '';
-              final Map<String, dynamic>? songData = data['attachedSong'];
 
               return Stack(
                 fit: StackFit.expand,
@@ -2128,16 +1885,6 @@ class _ReelsFeedScreenState extends State<ReelsFeedScreen> {
                         if ((data['caption'] ?? '').isNotEmpty) ...[
                           const SizedBox(height: 6),
                           Text(data['caption'], maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                        ],
-                        if (songData != null) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(Icons.music_note, color: Colors.white70, size: 14),
-                              const SizedBox(width: 4),
-                              Text('${songData['title']} • ${songData['artist']}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                            ],
-                          ),
                         ],
                       ],
                     ),
@@ -2258,7 +2005,6 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
               final String imageUrl = data['imageUrl'] ?? '';
               final List<dynamic> likes = data['likes'] ?? [];
               final isLiked = likes.contains(currentUid);
-              final Map<String, dynamic>? songData = data['attachedSong'];
 
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -2272,7 +2018,6 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                         child: Text(data['creatorName'] != null && data['creatorName'].isNotEmpty ? data['creatorName'][0].toUpperCase() : 'U', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       ),
                       title: Text(data['creatorName'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: songData != null ? Text('🎵 ${songData['title']}', style: const TextStyle(fontSize: 11, color: kTextSubtle)) : null,
                       trailing: IconButton(icon: const Icon(Icons.more_horiz_rounded), onPressed: () => _openShareModal(context, data)),
                     ),
                     ClipRRect(
@@ -2434,7 +2179,7 @@ class InstantBubbleBar extends StatelessWidget {
               controller: noteCtrl,
               maxLength: 60,
               decoration: InputDecoration(
-                hintText: "What's on your mind? (e.g. Radhe Radhe 🙏)",
+                hintText: "What's on your mind?",
                 filled: true,
                 fillColor: kLightBg,
                 border: OutlineInputBorder(
@@ -2485,7 +2230,6 @@ class InstantBubbleBar extends StatelessWidget {
       builder: (context, snap) {
         final docs = snap.data?.docs ?? [];
         
-        // Find my current note
         String myNoteText = '';
         for (var doc in docs) {
           final d = doc.data() as Map<String, dynamic>;
@@ -2501,7 +2245,6 @@ class InstantBubbleBar extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             children: [
-              // --- Current User Note ("Your Note") ---
               GestureDetector(
                 onTap: () => _showAddNoteDialog(context, existingNote: myNoteText),
                 child: Container(
@@ -2519,7 +2262,6 @@ class InstantBubbleBar extends StatelessWidget {
                             backgroundColor: kLightBg,
                             child: Icon(Icons.person, color: kDarkSurface, size: 30),
                           ),
-                          // Bubble with active note or + button
                           if (myNoteText.isNotEmpty)
                             Positioned(
                               top: -12,
@@ -2578,8 +2320,6 @@ class InstantBubbleBar extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // --- Other Users' Notes ---
               ...docs.where((doc) {
                 final d = doc.data() as Map<String, dynamic>;
                 return d['uid'] != myUid;
@@ -2662,7 +2402,6 @@ class InstantBubbleBar extends StatelessWidget {
     );
   }
 }
-                            
 
 // ==================================================
 // HOME SCREEN (4 MINIMAL TABS: POSTS -> REELS -> CHATS -> PROFILE)
