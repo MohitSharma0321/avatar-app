@@ -177,7 +177,7 @@ class _MusicPickerModalState extends State<MusicPickerModal> {
         children: [
           Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 14),
-          const Text('Select Music Track', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: kDarkSurface)),
+          const Text('Select Sound Track', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: kDarkSurface)),
           const SizedBox(height: 12),
           TextField(
             onChanged: _onSearchChanged,
@@ -215,7 +215,7 @@ class _MusicPickerModalState extends State<MusicPickerModal> {
                             subtitle: Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle, fontSize: 12)),
                             trailing: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: kPrimaryNeon,
+                                backgroundColor: kDarkSurface,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -856,8 +856,7 @@ void showUserAvatarPreview(
           ),
         ),
       ),
-    ),
-  );
+    );
 }
 
 Widget buildUserAvatar({
@@ -878,35 +877,24 @@ Widget buildUserAvatar({
     } catch (_) {}
   }
 
-  final avatarWidget = Container(
-    padding: const EdgeInsets.all(2.5),
-    decoration: const BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: LinearGradient(
-        colors: [kPrimaryNeon, kAccentPink],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-    ),
-    child: CircleAvatar(
-      radius: radius,
-      backgroundColor: Colors.white,
-      backgroundImage: imageProvider,
-      child: imageProvider == null
-          ? Text(
-              name.isNotEmpty
-                  ? name[0].toUpperCase()
-                  : (username != null && username.isNotEmpty
-                      ? username[0].toUpperCase()
-                      : 'U'),
-              style: TextStyle(
-                fontSize: radius * 0.9,
-                fontWeight: FontWeight.bold,
-                color: kDarkSurface,
-              ),
-            )
-          : null,
-    ),
+  final avatarWidget = CircleAvatar(
+    radius: radius,
+    backgroundColor: kDarkSurface,
+    backgroundImage: imageProvider,
+    child: imageProvider == null
+        ? Text(
+            name.isNotEmpty
+                ? name[0].toUpperCase()
+                : (username != null && username.isNotEmpty
+                    ? username[0].toUpperCase()
+                    : 'U'),
+            style: TextStyle(
+              fontSize: radius * 0.9,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          )
+        : null,
   );
 
   if (!enablePreview) return avatarWidget;
@@ -935,17 +923,22 @@ Future<String> askAvatarFriend(String userMessage) async {
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'message': userMessage}),
+      body: jsonEncode({
+        'message': userMessage,
+        'systemPrompt': 'You are a warm, smart, and direct AI friend on Avatar social app. Do NOT refer to yourself or anything as 3D or 3D Avatar. Talk naturally and helpfully like a close buddy in Hindi/Hinglish/English.'
+      }),
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['reply'] ?? data['response'] ?? 'Koi response nahi mila.';
+      String text = data['reply'] ?? data['response'] ?? 'Main yahan hoon, batao kya haal hai!';
+      text = text.replaceAll(RegExp(r'3D|3d|Three-D', caseSensitive: false), 'AI');
+      return text;
     } else {
-      return 'Server error: ${response.statusCode}';
+      return 'Server busy hai, thodi der me message karein.';
     }
   } catch (e) {
-    return 'Connection error: Internet check karein.';
+    return 'Connection issue: Kripya internet check karein.';
   }
 }
 
@@ -994,7 +987,7 @@ class _AvatarAppState extends State<AvatarApp> with WidgetsBindingObserver {
         brightness: Brightness.light,
         scaffoldBackgroundColor: kLightBg,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: kPrimaryNeon,
+          seedColor: kDarkSurface,
           brightness: Brightness.light,
         ),
         appBarTheme: const AppBarTheme(
@@ -1005,7 +998,8 @@ class _AvatarAppState extends State<AvatarApp> with WidgetsBindingObserver {
           titleTextStyle: TextStyle(
             color: kDarkSurface,
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
           ),
         ),
         useMaterial3: true,
@@ -1029,7 +1023,7 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator(color: kPrimaryNeon)),
+            body: Center(child: CircularProgressIndicator(color: kDarkSurface)),
           );
         }
 
@@ -1063,30 +1057,14 @@ class WelcomeScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 120,
-                  height: 120,
-                  padding: const EdgeInsets.all(4),
+                  width: 100,
+                  height: 100,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [kPrimaryNeon, kAccentPink],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: kPrimaryNeon.withOpacity(0.35),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
+                    color: kDarkSurface,
+                    borderRadius: BorderRadius.circular(28),
                   ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/icon/app_icon.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.bolt, size: 60, color: Colors.white),
-                    ),
+                  child: const Center(
+                    child: Icon(Icons.grain_rounded, size: 54, color: Colors.white),
                   ),
                 ),
                 const SizedBox(height: 28),
@@ -1095,31 +1073,26 @@ class WelcomeScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
+                    letterSpacing: -0.8,
                     color: kDarkSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Clean, Ultra-fast Voice & Mutual Connections.',
+                  'Next-Gen Social, Reels & Clean Connection.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 15, color: kTextSubtle, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 44),
-                Container(
+                SizedBox(
                   width: double.infinity,
                   height: 52,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      colors: [kPrimaryNeon, kAccentPink],
-                    ),
-                  ),
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
+                      backgroundColor: kDarkSurface,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
                     ),
                     onPressed: () {
                       Navigator.push(
@@ -1127,7 +1100,7 @@ class WelcomeScreen extends StatelessWidget {
                         MaterialPageRoute(builder: (_) => const CreateAccountScreen()),
                       );
                     },
-                    child: const Text('Get Started', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    child: const Text('Get Started', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -1322,16 +1295,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              Container(
+              SizedBox(
                 height: 52,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
-                ),
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
+                    backgroundColor: kDarkSurface,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   onPressed: loading ? null : createAccount,
@@ -1457,16 +1426,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              Container(
+              SizedBox(
                 height: 52,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
-                ),
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
+                    backgroundColor: kDarkSurface,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   onPressed: loading ? null : login,
@@ -1531,7 +1496,7 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
           toolbarWidgetColor: Colors.white,
           initAspectRatio: CropAspectRatioPreset.original,
           lockAspectRatio: false,
-          activeControlsWidgetColor: kPrimaryNeon,
+          activeControlsWidgetColor: Colors.white,
         ),
       ],
     );
@@ -1541,7 +1506,7 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
   }
 
   Future<void> _replaceImage() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
     if (picked != null) {
       setState(() => currentImage = File(picked.path));
     }
@@ -1602,8 +1567,8 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
           TextButton(
             onPressed: isPosting ? null : _publishPost,
             child: isPosting
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryNeon))
-                : const Text('Share', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kPrimaryNeon)),
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kDarkSurface))
+                : const Text('Share', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kDarkSurface)),
           ),
         ],
       ),
@@ -1622,8 +1587,8 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
               ),
             ),
             Container(
-              height: 70,
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              height: 60,
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1633,12 +1598,11 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
                   return GestureDetector(
                     onTap: () => setState(() => currentFilterIndex = idx),
                     child: Container(
-                      margin: const EdgeInsets.only(right: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
                         color: isSelected ? kDarkSurface : kLightBg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: isSelected ? kPrimaryNeon : Colors.transparent, width: 1.5),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Center(
                         child: Text(
@@ -1646,7 +1610,7 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
                           style: TextStyle(
                             color: isSelected ? Colors.white : kDarkSurface,
                             fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                            fontSize: 12,
                           ),
                         ),
                       ),
@@ -1688,8 +1652,8 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: _pickMusic,
-                    icon: Icon(Icons.music_note_rounded, size: 16, color: selectedSong != null ? kPrimaryNeon : kDarkSurface),
-                    label: Text(selectedSong != null ? 'Music Added' : 'Add Music'),
+                    icon: Icon(Icons.music_note_rounded, size: 16, color: selectedSong != null ? Colors.white : kDarkSurface),
+                    label: Text(selectedSong != null ? 'Sound Added' : 'Add Sound'),
                   ),
                 ],
               ),
@@ -1701,7 +1665,7 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
                 decoration: BoxDecoration(color: kLightBg, borderRadius: BorderRadius.circular(10)),
                 child: Row(
                   children: [
-                    const Icon(Icons.audiotrack, size: 18, color: kPrimaryNeon),
+                    const Icon(Icons.audiotrack, size: 18, color: kDarkSurface),
                     const SizedBox(width: 8),
                     Expanded(child: Text('${selectedSong!.title} • ${selectedSong!.artist}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                     GestureDetector(
@@ -1807,17 +1771,14 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
         ..files.add(await http.MultipartFile.fromPath('file', file.path));
 
       final streamed = await req.send().timeout(
-        const Duration(minutes: 3),
-        onTimeout: () => throw TimeoutException('Cloudinary upload timed out after 3 minutes.'),
+        const Duration(seconds: 45),
+        onTimeout: () => throw TimeoutException('Upload timeout'),
       );
 
       final res = await http.Response.fromStream(streamed);
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final secureUrl = data['secure_url']?.toString();
-        if (secureUrl != null && secureUrl.isNotEmpty) {
-          return secureUrl;
-        }
+        return data['secure_url']?.toString();
       }
     } catch (_) {}
 
@@ -1826,13 +1787,9 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
 
   Future<void> _publishReel() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      if (mounted) _showMessage(context, 'Please login first.');
-      return;
-    }
+    if (user == null) return;
 
     if (isUploading) return;
-
     setState(() => isUploading = true);
 
     try {
@@ -1840,9 +1797,7 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
 
       final videoUrl = await _uploadToCloudinary(currentVideo);
       if (videoUrl == null || videoUrl.isEmpty) {
-        if (mounted) {
-          _showMessage(context, 'Video upload failed. Please check internet and try again.');
-        }
+        if (mounted) _showMessage(context, 'Reel upload failed. Check connection.');
         return;
       }
 
@@ -1888,8 +1843,8 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
           TextButton(
             onPressed: isUploading ? null : _publishReel,
             child: isUploading
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryNeon))
-                : const Text('Share', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: kPrimaryNeon)),
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Share', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.white)),
           ),
         ],
       ),
@@ -1904,7 +1859,7 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
               ),
             )
           else
-            const Center(child: CircularProgressIndicator(color: kPrimaryNeon)),
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
 
           Positioned(
             left: 0,
@@ -1937,12 +1892,12 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: selectedSong != null ? kPrimaryNeon : Colors.white24,
-                          foregroundColor: Colors.white,
+                          backgroundColor: selectedSong != null ? Colors.white : Colors.white24,
+                          foregroundColor: selectedSong != null ? Colors.black : Colors.white,
                         ),
                         onPressed: _pickMusic,
                         icon: const Icon(Icons.music_note_rounded, size: 16),
-                        label: Text(selectedSong != null ? 'Sound Attached' : 'Add Sound'),
+                        label: Text(selectedSong != null ? 'Sound Added' : 'Add Sound'),
                       ),
                     ],
                   ),
@@ -1969,28 +1924,22 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
 }
 
 // ==================================================
-// REELS & POSTS DUAL FEED SCREEN
+// REELS FEED SCREEN (STANDALONE TAB)
 // ==================================================
 
-class FeedScreen extends StatefulWidget {
-  const FeedScreen({Key? key}) : super(key: key);
+class ReelsFeedScreen extends StatefulWidget {
+  const ReelsFeedScreen({Key? key}) : super(key: key);
 
   @override
-  State<FeedScreen> createState() => _FeedScreenState();
+  State<ReelsFeedScreen> createState() => _ReelsFeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> {
-  int feedTab = 0;
+class _ReelsFeedScreenState extends State<ReelsFeedScreen> {
   final ImagePicker _picker = ImagePicker();
-  int currentReelIndex = 0;
   String? _lastReelAudioDocId;
 
-  Future<void> _playReelSongFromData(
-    Map<String, dynamic> data,
-    String docId,
-  ) async {
+  Future<void> _playReelSongFromData(Map<String, dynamic> data, String docId) async {
     final rawSong = data['attachedSong'];
-
     if (rawSong == null || rawSong is! Map) {
       _lastReelAudioDocId = null;
       await ReelAudioService.instance.stop();
@@ -2000,19 +1949,12 @@ class _FeedScreenState extends State<FeedScreen> {
     if (_lastReelAudioDocId == docId) return;
 
     try {
-      final song = SongModel.fromJson(
-        Map<String, dynamic>.from(rawSong),
-      );
+      final song = SongModel.fromJson(Map<String, dynamic>.from(rawSong));
       _lastReelAudioDocId = docId;
       await ReelAudioService.instance.playSong(song);
     } catch (_) {
       _lastReelAudioDocId = null;
     }
-  }
-
-  Future<void> _stopReelAudio() async {
-    _lastReelAudioDocId = null;
-    await ReelAudioService.instance.stop();
   }
 
   void _openShareModal(BuildContext context, Map<String, dynamic> postData) {
@@ -2031,28 +1973,12 @@ class _FeedScreenState extends State<FeedScreen> {
               child: Text('Share Content', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
             ),
             ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [kPrimaryNeon, kAccentPink])),
-                child: const Icon(Icons.history_toggle_off_rounded, color: Colors.white, size: 20),
-              ),
-              title: const Text('Add to Avatar Story (24h)', style: TextStyle(fontWeight: FontWeight.bold)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showMessage(context, 'Added to your Avatar Story!');
-              },
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.green.shade600),
-                child: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
-              ),
-              title: const Text('Share to WhatsApp', style: TextStyle(fontWeight: FontWeight.bold)),
+              leading: const Icon(Icons.share_rounded, color: kDarkSurface, size: 22),
+              title: const Text('Share Link', style: TextStyle(fontWeight: FontWeight.bold)),
               onTap: () {
                 Navigator.pop(ctx);
                 final videoUrl = postData['videoUrl'] ?? '';
-                Share.share('Watch this on Avatar App!\n${postData['caption'] ?? ''}\n$videoUrl');
+                Share.share('Watch this on Avatar!\n${postData['caption'] ?? ''}\n$videoUrl');
               },
             ),
             const SizedBox(height: 10),
@@ -2062,23 +1988,13 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Future<void> _startCreationFlow() async {
-    if (feedTab == 0) {
-      final picked = await _picker.pickVideo(source: ImageSource.gallery);
-      if (picked != null && mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => ReelEditStudioScreen(initialVideoFile: File(picked.path))),
-        );
-      }
-    } else {
-      final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
-      if (picked != null && mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => PostEditStudioScreen(initialImageFile: File(picked.path))),
-        );
-      }
+  Future<void> _startReelUpload() async {
+    final picked = await _picker.pickVideo(source: ImageSource.gallery);
+    if (picked != null && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ReelEditStudioScreen(initialVideoFile: File(picked.path))),
+      );
     }
   }
 
@@ -2093,57 +2009,16 @@ class _FeedScreenState extends State<FeedScreen> {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
-      backgroundColor: feedTab == 0 ? Colors.black : kLightBg,
+      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: feedTab == 0 ? Colors.black : Colors.white,
-        titleSpacing: 0,
-        title: Container(
-          height: 38,
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: feedTab == 0 ? Colors.white12 : kLightBg,
-            borderRadius: BorderRadius.circular(19),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: () async {
-                  if (feedTab != 0) {
-                    await _stopReelAudio();
-                  }
-                  if (mounted) setState(() => feedTab = 0);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(19),
-                    color: feedTab == 0 ? kPrimaryNeon : Colors.transparent,
-                  ),
-                  child: Text('Reels', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: feedTab == 0 ? Colors.white : (feedTab == 0 ? Colors.white70 : kTextDark))),
-                ),
-              ),
-              GestureDetector(
-                onTap: () async {
-                  await _stopReelAudio();
-                  if (mounted) setState(() => feedTab = 1);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(19),
-                    color: feedTab == 1 ? kPrimaryNeon : Colors.transparent,
-                  ),
-                  child: Text('Posts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: feedTab == 1 ? Colors.white : (feedTab == 0 ? Colors.white70 : kTextDark))),
-                ),
-              ),
-            ],
-          ),
-        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('Reels', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
         actions: [
           IconButton(
-            onPressed: _startCreationFlow,
-            icon: Icon(Icons.add_box_outlined, color: feedTab == 0 ? Colors.white : kDarkSurface, size: 26),
+            onPressed: _startReelUpload,
+            icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white, size: 28),
           ),
           const SizedBox(width: 8),
         ],
@@ -2151,12 +2026,12 @@ class _FeedScreenState extends State<FeedScreen> {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('feed_posts')
-            .where('type', isEqualTo: feedTab == 0 ? 'reel' : 'post')
+            .where('type', isEqualTo: 'reel')
             .orderBy('createdAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+            return const Center(child: CircularProgressIndicator(color: Colors.white));
           }
 
           final docs = snapshot.data?.docs ?? [];
@@ -2166,107 +2041,200 @@ class _FeedScreenState extends State<FeedScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(feedTab == 0 ? Icons.movie_outlined : Icons.photo_library_outlined, size: 60, color: feedTab == 0 ? Colors.white38 : kTextSubtle),
+                  const Icon(Icons.play_circle_outline_rounded, size: 64, color: Colors.white38),
                   const SizedBox(height: 12),
-                  Text(feedTab == 0 ? 'No Reels uploaded yet.' : 'No Posts yet.', style: TextStyle(color: feedTab == 0 ? Colors.white70 : kDarkSurface, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('No Reels Yet', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 6),
-                  Text('Tap + at top right to create.', style: TextStyle(color: feedTab == 0 ? Colors.white38 : kTextSubtle, fontSize: 13)),
+                  const Text('Tap + above to upload a reel.', style: TextStyle(color: Colors.white38, fontSize: 13)),
                 ],
               ),
             );
           }
 
-          if (feedTab == 0) {
-            if (docs.isNotEmpty) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted && feedTab == 0 && docs.isNotEmpty) {
-                  final firstData = docs[0].data() as Map<String, dynamic>;
-                  _playReelSongFromData(firstData, docs[0].id);
-                }
-              });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && docs.isNotEmpty) {
+              final firstData = docs[0].data() as Map<String, dynamic>;
+              _playReelSongFromData(firstData, docs[0].id);
             }
+          });
 
-            return PageView.builder(
-              scrollDirection: Axis.vertical,
-              itemCount: docs.length,
-              onPageChanged: (index) async {
-                currentReelIndex = index;
-                if (index >= 0 && index < docs.length) {
-                  final changedData = docs[index].data() as Map<String, dynamic>;
-                  await _playReelSongFromData(changedData, docs[index].id);
-                }
-              },
-              itemBuilder: (context, index) {
-                final data = docs[index].data() as Map<String, dynamic>;
-                final List<dynamic> likes = data['likes'] ?? [];
-                final isLiked = likes.contains(currentUid);
-                final String videoUrl = data['videoUrl'] ?? '';
-                final Map<String, dynamic>? songData = data['attachedSong'];
+          return PageView.builder(
+            scrollDirection: Axis.vertical,
+            itemCount: docs.length,
+            onPageChanged: (index) async {
+              if (index >= 0 && index < docs.length) {
+                final changedData = docs[index].data() as Map<String, dynamic>;
+                await _playReelSongFromData(changedData, docs[index].id);
+              }
+            },
+            itemBuilder: (context, index) {
+              final data = docs[index].data() as Map<String, dynamic>;
+              final List<dynamic> likes = data['likes'] ?? [];
+              final isLiked = likes.contains(currentUid);
+              final String videoUrl = data['videoUrl'] ?? '';
+              final Map<String, dynamic>? songData = data['attachedSong'];
 
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Container(
-                      color: Colors.black,
-                      child: videoUrl.isNotEmpty
-                          ? ReelVideoPlayerItem(videoUrl: videoUrl)
-                          : const Center(child: Icon(Icons.play_circle_outline_rounded, size: 80, color: Colors.white38)),
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    color: Colors.black,
+                    child: videoUrl.isNotEmpty
+                        ? ReelVideoPlayerItem(videoUrl: videoUrl)
+                        : const Center(child: Icon(Icons.play_circle_outline_rounded, size: 80, color: Colors.white38)),
+                  ),
+                  Positioned(
+                    right: 16,
+                    bottom: 40,
+                    child: Column(
+                      children: [
+                        IconButton(
+                          icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : Colors.white, size: 30),
+                          onPressed: () {
+                            docs[index].reference.update({
+                              'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
+                            });
+                          },
+                        ),
+                        Text('${likes.length}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
+                        IconButton(
+                          icon: const Icon(Icons.share_outlined, color: Colors.white, size: 26),
+                          onPressed: () => _openShareModal(context, data),
+                        ),
+                      ],
                     ),
-                    Positioned(
-                      right: 16,
-                      bottom: 40,
-                      child: Column(
-                        children: [
-                          IconButton(
-                            icon: Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? Colors.redAccent : Colors.white, size: 30),
-                            onPressed: () {
-                              docs[index].reference.update({
-                                'likes': isLiked ? FieldValue.arrayRemove([currentUid]) : FieldValue.arrayUnion([currentUid]),
-                              });
-                            },
-                          ),
-                          Text('${likes.length}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 16),
-                          IconButton(
-                            icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 26),
-                            onPressed: () {},
-                          ),
-                          const SizedBox(height: 16),
-                          IconButton(
-                            icon: const Icon(Icons.share_outlined, color: Colors.white, size: 26),
-                            onPressed: () => _openShareModal(context, data),
+                  ),
+                  Positioned(
+                    left: 16,
+                    bottom: 30,
+                    right: 80,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('@${data['creatorName'] ?? 'user'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                        if ((data['caption'] ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(data['caption'], maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                        ],
+                        if (songData != null) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.music_note, color: Colors.white70, size: 14),
+                              const SizedBox(width: 4),
+                              Text('${songData['title']} • ${songData['artist']}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                            ],
                           ),
                         ],
-                      ),
+                      ],
                     ),
-                    Positioned(
-                      left: 16,
-                      bottom: 30,
-                      right: 80,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('@${data['creatorName'] ?? 'user'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                          if ((data['caption'] ?? '').isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(data['caption'], maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                          ],
-                          if (songData != null) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Icon(Icons.music_note, color: Colors.white70, size: 14),
-                                const SizedBox(width: 4),
-                                Text('${songData['title']} • ${songData['artist']}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                );
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ==================================================
+// POSTS FEED SCREEN (STANDALONE TAB)
+// ==================================================
+
+class PostsFeedScreen extends StatefulWidget {
+  const PostsFeedScreen({Key? key}) : super(key: key);
+
+  @override
+  State<PostsFeedScreen> createState() => _PostsFeedScreenState();
+}
+
+class _PostsFeedScreenState extends State<PostsFeedScreen> {
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _startPostUpload() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked != null && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => PostEditStudioScreen(initialImageFile: File(picked.path))),
+      );
+    }
+  }
+
+  void _openShareModal(BuildContext context, Map<String, dynamic> postData) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 14),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Text('Share Post', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.share_rounded, color: kDarkSurface),
+              title: const Text('Share to Others', style: TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () {
+                Navigator.pop(ctx);
+                Share.share('Check this post on Avatar: ${postData['caption'] ?? ''}');
               },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return Scaffold(
+      backgroundColor: kLightBg,
+      appBar: AppBar(
+        title: const Text('Avatar Feed', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: kDarkSurface)),
+        actions: [
+          IconButton(
+            onPressed: _startPostUpload,
+            icon: const Icon(Icons.add_box_outlined, color: kDarkSurface, size: 28),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('feed_posts')
+            .where('type', isEqualTo: 'post')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: kDarkSurface));
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+
+          if (docs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.photo_library_outlined, size: 60, color: kTextSubtle),
+                  SizedBox(height: 12),
+                  Text('No Posts Yet', style: TextStyle(color: kDarkSurface, fontWeight: FontWeight.bold, fontSize: 16)),
+                  SizedBox(height: 6),
+                  Text('Tap + at top to share your first photo post.', style: TextStyle(color: kTextSubtle, fontSize: 13)),
+                ],
+              ),
             );
           }
 
@@ -2298,9 +2266,12 @@ class _FeedScreenState extends State<FeedScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     ListTile(
-                      leading: CircleAvatar(backgroundColor: kPrimaryNeon.withOpacity(0.2), child: Text(data['creatorName'] != null && data['creatorName'].isNotEmpty ? data['creatorName'][0].toUpperCase() : 'U')),
+                      leading: CircleAvatar(
+                        backgroundColor: kDarkSurface,
+                        child: Text(data['creatorName'] != null && data['creatorName'].isNotEmpty ? data['creatorName'][0].toUpperCase() : 'U', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
                       title: Text(data['creatorName'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: songData != null ? Text('🎵 ${songData['title']}', style: const TextStyle(fontSize: 11, color: kPrimaryNeon)) : null,
+                      subtitle: songData != null ? Text('🎵 ${songData['title']}', style: const TextStyle(fontSize: 11, color: kTextSubtle)) : null,
                       trailing: IconButton(icon: const Icon(Icons.more_horiz_rounded), onPressed: () => _openShareModal(context, data)),
                     ),
                     ClipRRect(
@@ -2401,7 +2372,7 @@ class _ReelVideoPlayerItemState extends State<ReelVideoPlayerItem> {
       return const Center(child: Icon(Icons.error_outline_rounded, size: 50, color: Colors.white38));
     }
     if (!isInitialized) {
-      return const Center(child: CircularProgressIndicator(color: kPrimaryNeon, strokeWidth: 2));
+      return const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
     }
 
     return GestureDetector(
@@ -2421,7 +2392,7 @@ class _ReelVideoPlayerItemState extends State<ReelVideoPlayerItem> {
 }
 
 // ==================================================
-// HOME SCREEN (3 CORE TABS)
+// HOME SCREEN (4 MINIMAL TABS: POSTS -> REELS -> CHATS -> PROFILE)
 // ==================================================
 
 class HomeScreen extends StatefulWidget {
@@ -2432,17 +2403,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int currentIndex = 1; // 0 = Feed, 1 = Profile, 2 = Chats
+  int currentIndex = 0; // 0 = Posts, 1 = Reels, 2 = Chats, 3 = Profile
   StreamSubscription? callSubscription;
 
-  final List<Widget?> pages = [null, null, null];
+  final List<Widget?> pages = [null, null, null, null];
 
   Widget _pageAt(int index) {
     if (pages[index] == null) {
       pages[index] = switch (index) {
-        0 => const FeedScreen(),
-        1 => const ProfileScreen(),
-        _ => const ChatScreen(),
+        0 => const PostsFeedScreen(),
+        1 => const ReelsFeedScreen(),
+        2 => const ChatScreen(),
+        _ => const ProfileScreen(),
       };
     }
     return pages[index]!;
@@ -2631,88 +2603,69 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex == 0 || pages[0] != null ? _pageAt(0) : const SizedBox.shrink(),
           currentIndex == 1 || pages[1] != null ? _pageAt(1) : const SizedBox.shrink(),
           currentIndex == 2 || pages[2] != null ? _pageAt(2) : const SizedBox.shrink(),
+          currentIndex == 3 || pages[3] != null ? _pageAt(3) : const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: SafeArea(
         child: Container(
-          height: 64,
+          height: 60,
           decoration: BoxDecoration(
             color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 15,
-                offset: const Offset(0, -4),
-              ),
-            ],
+            border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
+              // 1. Posts Tab (Left)
               IconButton(
                 icon: Icon(
-                  currentIndex == 0 ? Icons.play_circle_filled_rounded : Icons.play_circle_outline_rounded,
-                  color: currentIndex == 0 ? kPrimaryNeon : kDarkSurface,
-                  size: 26,
+                  currentIndex == 0 ? Icons.view_day_rounded : Icons.view_day_outlined,
+                  color: currentIndex == 0 ? kDarkSurface : kTextSubtle,
+                  size: 24,
                 ),
                 onPressed: () {
+                  if (currentIndex == 1) ReelAudioService.instance.stop();
                   setState(() => currentIndex = 0);
                 },
+                tooltip: 'Posts',
               ),
-              GestureDetector(
-                onTap: () {
-                  if (currentIndex == 0) {
-                    ReelAudioService.instance.stop();
-                  }
-                  setState(() => currentIndex = 1);
-                },
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [kPrimaryNeon, kAccentPink],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: kPrimaryNeon.withOpacity(currentIndex == 1 ? 0.45 : 0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      )
-                    ],
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                      ),
-                      child: Icon(
-                        Icons.person_rounded,
-                        color: currentIndex == 1 ? kPrimaryNeon : kDarkSurface,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              // 2. Reels Tab
               IconButton(
                 icon: Icon(
-                  currentIndex == 2 ? Icons.chat_bubble : Icons.chat_bubble_outline_rounded,
-                  color: currentIndex == 2 ? kPrimaryNeon : kDarkSurface,
-                  size: 26,
+                  currentIndex == 1 ? Icons.play_arrow_rounded : Icons.play_arrow_outlined,
+                  color: currentIndex == 1 ? kDarkSurface : kTextSubtle,
+                  size: 28,
                 ),
                 onPressed: () {
-                  if (currentIndex == 0) {
-                    ReelAudioService.instance.stop();
-                  }
+                  setState(() => currentIndex = 1);
+                },
+                tooltip: 'Reels',
+              ),
+              // 3. Chats Tab
+              IconButton(
+                icon: Icon(
+                  currentIndex == 2 ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
+                  color: currentIndex == 2 ? kDarkSurface : kTextSubtle,
+                  size: 24,
+                ),
+                onPressed: () {
+                  if (currentIndex == 1) ReelAudioService.instance.stop();
                   setState(() => currentIndex = 2);
                 },
+                tooltip: 'Chats',
+              ),
+              // 4. Profile Tab (Right Corner)
+              IconButton(
+                icon: Icon(
+                  currentIndex == 3 ? Icons.person_rounded : Icons.person_outline_rounded,
+                  color: currentIndex == 3 ? kDarkSurface : kTextSubtle,
+                  size: 25,
+                ),
+                onPressed: () {
+                  if (currentIndex == 1) ReelAudioService.instance.stop();
+                  setState(() => currentIndex = 3);
+                },
+                tooltip: 'Profile',
               ),
             ],
           ),
@@ -2774,14 +2727,14 @@ class NotificationsScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: kPrimaryNeon.withOpacity(0.4)),
+                            border: Border.all(color: Colors.grey.shade300),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const CircleAvatar(
                                 radius: 18,
-                                backgroundColor: kPrimaryNeon,
+                                backgroundColor: kDarkSurface,
                                 child: Icon(Icons.campaign, color: Colors.white, size: 20),
                               ),
                               const SizedBox(width: 12),
@@ -2810,7 +2763,7 @@ class NotificationsScreen extends StatelessWidget {
                 stream: FirebaseFirestore.instance.collection('users').where('connections', arrayContains: currentUid).snapshots(),
                 builder: (context, reqSnap) {
                   if (reqSnap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+                    return const Center(child: CircularProgressIndicator(color: kDarkSurface));
                   }
 
                   final usersWhoConnectedMe = reqSnap.data?.docs ?? [];
@@ -2829,7 +2782,7 @@ class NotificationsScreen extends StatelessWidget {
                       final peerName = (uData['name'] ?? '').toString();
                       final peerUsername = (uData['username'] ?? 'user').toString();
                       final peerBio = uData['bio'] ?? '';
-                      final photo = uData['photoBase64'] ?? '';
+                      final peerPhoto = uData['photoBase64'] ?? '';
                       final isMutual = myConnections.contains(peerUid);
 
                       return Container(
@@ -2876,7 +2829,7 @@ class NotificationsScreen extends StatelessWidget {
                             if (!isMutual)
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: kAccentPink,
+                                  backgroundColor: kDarkSurface,
                                   foregroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -2961,7 +2914,7 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, color: kPrimaryNeon),
+              leading: Icon(isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, color: kDarkSurface),
               title: Text(isPinned ? 'Unpin Chat' : 'Pin to Top', style: const TextStyle(fontWeight: FontWeight.bold)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -3048,7 +3001,7 @@ class _ChatScreenState extends State<ChatScreen> {
             stream: FirebaseFirestore.instance.collection('users').snapshots(),
             builder: (context, allUsersSnap) {
               if (allUsersSnap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+                return const Center(child: CircularProgressIndicator(color: kDarkSurface));
               }
 
               final allDocs = allUsersSnap.data?.docs ?? [];
@@ -3121,12 +3074,12 @@ class _ChatScreenState extends State<ChatScreen> {
                         padding: const EdgeInsets.all(2.5),
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
+                          color: kDarkSurface,
                         ),
                         child: const CircleAvatar(
                           radius: 20,
                           backgroundColor: Colors.white,
-                          child: Icon(Icons.auto_awesome, color: kAccentPink, size: 20),
+                          child: Icon(Icons.auto_awesome, color: kDarkSurface, size: 20),
                         ),
                       ),
                       title: const Text('Avatar Friend', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
@@ -3134,10 +3087,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       trailing: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: kPrimaryNeon.withOpacity(0.12),
+                          color: kDarkSurface.withOpacity(0.08),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text('AI', style: TextStyle(color: kPrimaryNeon, fontSize: 11, fontWeight: FontWeight.bold)),
+                        child: const Text('AI', style: TextStyle(color: kDarkSurface, fontSize: 11, fontWeight: FontWeight.bold)),
                       ),
                       onTap: () {
                         Navigator.push(
@@ -3168,7 +3121,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: isPinned ? Border.all(color: kPrimaryNeon.withOpacity(0.6), width: 1.2) : null,
+                          border: isPinned ? Border.all(color: kDarkSurface.withOpacity(0.6), width: 1.2) : null,
                           boxShadow: [
                             BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))
                           ],
@@ -3215,7 +3168,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             children: [
                               Expanded(child: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface))),
                               if (isPinned)
-                                const Icon(Icons.push_pin_rounded, size: 16, color: kPrimaryNeon),
+                                const Icon(Icons.push_pin_rounded, size: 16, color: kDarkSurface),
                             ],
                           ),
                           subtitle: Text(
@@ -3340,7 +3293,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   stream: FirebaseFirestore.instance.collection('users').snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+                      return const Center(child: CircularProgressIndicator(color: kDarkSurface));
                     }
 
                     final users = (snapshot.data?.docs ?? []).where((doc) {
@@ -3726,7 +3679,7 @@ class _CallScreenState extends State<CallScreen> {
             const SizedBox(height: 8),
             Text(
               isConnected ? 'Connected • ${_formatTime(callSeconds)}' : 'Calling...',
-              style: TextStyle(fontSize: 16, color: isConnected ? kPrimaryNeon : Colors.white60),
+              style: TextStyle(fontSize: 16, color: Colors.white60),
             ),
             const Spacer(),
             buildUserAvatar(
@@ -3872,7 +3825,7 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
           icon: Icon(
             isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
             size: 38,
-            color: widget.isMe ? Colors.white : kPrimaryNeon,
+            color: widget.isMe ? Colors.white : kDarkSurface,
           ),
         ),
         const SizedBox(width: 4),
@@ -3901,7 +3854,7 @@ class _VoiceNoteBubbleState extends State<VoiceNoteBubble> {
                       height: 28 * barHeights[idx],
                       decoration: BoxDecoration(
                         color: isPassed
-                            ? (widget.isMe ? Colors.white : kPrimaryNeon)
+                            ? (widget.isMe ? Colors.white : kDarkSurface)
                             : (widget.isMe ? Colors.white38 : Colors.black12),
                         borderRadius: BorderRadius.circular(2),
                       ),
@@ -4371,12 +4324,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     padding: const EdgeInsets.all(2),
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
+                      color: kDarkSurface,
                     ),
                     child: const CircleAvatar(
                       radius: 17,
                       backgroundColor: Colors.white,
-                      child: Icon(Icons.auto_awesome, size: 18, color: kAccentPink),
+                      child: Icon(Icons.auto_awesome, size: 18, color: kDarkSurface),
                     ),
                   )
                 : buildUserAvatar(
@@ -4409,7 +4362,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             Text(
                               isPeerTyping ? 'typing...' : 'Online',
                               style: TextStyle(
-                                color: isPeerTyping ? kAccentPink : Colors.green,
+                                color: isPeerTyping ? Colors.pinkAccent : Colors.green,
                                 fontSize: 12,
                                 fontWeight: isPeerTyping ? FontWeight.bold : FontWeight.normal,
                               ),
@@ -4434,7 +4387,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               },
               icon: Icon(
                 isVoiceEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                color: isVoiceEnabled ? kPrimaryNeon : kTextSubtle,
+                color: isVoiceEnabled ? kDarkSurface : kTextSubtle,
               ),
             ),
             IconButton(
@@ -4456,7 +4409,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   ),
                 );
               },
-              icon: const Icon(Icons.call_rounded, color: kPrimaryNeon),
+              icon: const Icon(Icons.call_rounded, color: kDarkSurface),
               tooltip: 'Voice Call',
             ),
           ],
@@ -4464,7 +4417,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       ),
       body: Column(
         children: [
-          if (isUploadingMedia) const LinearProgressIndicator(minHeight: 3, color: kPrimaryNeon),
+          if (isUploadingMedia) const LinearProgressIndicator(minHeight: 3, color: kDarkSurface),
           Expanded(
             child: isAvatarFriend ? _buildAiChat() : _buildRealUserChat(),
           ),
@@ -4538,7 +4491,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         Container(
                           decoration: const BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
+                            color: kDarkSurface,
                           ),
                           child: IconButton(
                             onPressed: sendMessage,
@@ -4560,11 +4513,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: const [
-            Icon(Icons.auto_awesome, size: 60, color: kAccentPink),
+            Icon(Icons.auto_awesome, size: 60, color: kDarkSurface),
             SizedBox(height: 14),
             Text('Say hello to Avatar Friend!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
             SizedBox(height: 4),
-            Text('Your personal voice AI companion', style: TextStyle(fontSize: 13, color: kTextSubtle)),
+            Text('Your personal smart AI companion', style: TextStyle(fontSize: 13, color: kTextSubtle)),
           ],
         ),
       );
@@ -4582,7 +4535,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-              child: const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryNeon)),
+              child: const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kDarkSurface)),
             ),
           );
         }
@@ -4596,8 +4549,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: BoxDecoration(
-              gradient: isUser ? const LinearGradient(colors: [kPrimaryNeon, kAccentPink]) : null,
-              color: isUser ? null : Colors.white,
+              color: isUser ? kDarkSurface : Colors.white,
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2))
@@ -4616,7 +4568,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () => _speak(msg['text'] ?? ''),
-                    child: const Icon(Icons.volume_up_rounded, size: 18, color: kPrimaryNeon),
+                    child: const Icon(Icons.volume_up_rounded, size: 18, color: kDarkSurface),
                   ),
                 ],
               ],
@@ -4637,7 +4589,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+          return const Center(child: CircularProgressIndicator(color: kDarkSurface));
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -4714,8 +4666,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
                               : const EdgeInsets.symmetric(horizontal: 16, vertical: 11)),
                       decoration: BoxDecoration(
-                        gradient: isMe ? const LinearGradient(colors: [kPrimaryNeon, kAccentPink]) : null,
-                        color: isMe ? null : Colors.white,
+                        color: isMe ? kDarkSurface : Colors.white,
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2))
@@ -4744,7 +4695,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           else
                             Text(
                               data['text'] ?? '',
-                              style: TextStyle(fontSize: 15, color: isMe ? Colors.white : kDarkSurface, fontWeight: isUser ? FontWeight.w500 : FontWeight.normal),
+                              style: TextStyle(fontSize: 15, color: isMe ? Colors.white : kDarkSurface, fontWeight: isMe ? FontWeight.w500 : FontWeight.normal),
                             ),
                           if (isMe) ...[
                             const SizedBox(height: 2),
@@ -4888,7 +4839,7 @@ class _ConnectionsListModalState extends State<ConnectionsListModal> {
                       : userQuery.where('connections', arrayContains: widget.myUid).snapshots(),
                   builder: (context, snap) {
                     if (snap.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
+                      return const Center(child: CircularProgressIndicator(color: kDarkSurface));
                     }
 
                     var docs = snap.data?.docs ?? [];
@@ -4944,7 +4895,7 @@ class _ConnectionsListModalState extends State<ConnectionsListModal> {
                           subtitle: Text('@$username', style: const TextStyle(color: kTextSubtle, fontSize: 13)),
                           trailing: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: isAlreadyConnectedByMe ? kLightBg : kPrimaryNeon,
+                              backgroundColor: isAlreadyConnectedByMe ? kLightBg : kDarkSurface,
                               foregroundColor: isAlreadyConnectedByMe ? kTextDark : Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -5038,7 +4989,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             toolbarWidgetColor: Colors.white,
             initAspectRatio: CropAspectRatioPreset.square,
             lockAspectRatio: true,
-            activeControlsWidgetColor: kPrimaryNeon,
+            activeControlsWidgetColor: Colors.white,
           ),
         ],
       );
@@ -5120,16 +5071,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              Container(
+              SizedBox(
                 height: 50,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(colors: [kPrimaryNeon, kAccentPink]),
-                ),
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
+                    backgroundColor: kDarkSurface,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: () async {
                     final newUsername = usernameCtrl.text.trim().toLowerCase();
@@ -5229,7 +5177,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     username: username,
                     bio: displayBio,
                     targetUid: myUid,
-                    radius: 60,
+                    radius: 54,
                   ),
                   Positioned(
                     bottom: 0,
@@ -5243,7 +5191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: kDarkSurface,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: const Icon(Icons.camera_alt_rounded, size: 18, color: Colors.white),
+                        child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
                       ),
                     ),
                   ),
@@ -5286,7 +5234,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   children: [
                                     Text(
                                       '${connectedList.length}',
-                                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kPrimaryNeon),
+                                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kDarkSurface),
                                     ),
                                     const SizedBox(height: 4),
                                     const Text('Connected', style: TextStyle(color: kTextSubtle, fontSize: 13, fontWeight: FontWeight.w600)),
@@ -5312,7 +5260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   children: [
                                     Text(
                                       '$connectorCount',
-                                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kAccentPink),
+                                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kDarkSurface),
                                     ),
                                     const SizedBox(height: 4),
                                     const Text('Connectors', style: TextStyle(color: kTextSubtle, fontSize: 13, fontWeight: FontWeight.w600)),
@@ -5340,7 +5288,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: SwitchListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                  activeColor: kPrimaryNeon,
+                  activeColor: kDarkSurface,
                   secondary: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
@@ -5449,7 +5397,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     .snapshots(),
                 builder: (context, gridSnap) {
                   if (gridSnap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: kPrimaryNeon)));
+                    return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: kDarkSurface)));
                   }
 
                   final myPosts = gridSnap.data?.docs ?? [];
@@ -5674,7 +5622,7 @@ class _UserPublicProfileScreenState extends State<UserPublicProfileScreen> {
                   .snapshots(),
               builder: (context, gridSnap) {
                 if (gridSnap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: kPrimaryNeon)));
+                  return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: kDarkSurface)));
                 }
 
                 final userPosts = gridSnap.data?.docs ?? [];
