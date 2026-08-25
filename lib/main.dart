@@ -34,7 +34,7 @@ const Color kTextDark = Color(0xFF1B1E28);
 const Color kTextSubtle = Color(0xFF7D8494);
 
 // ==================================================
-// HYBRID DIRECT UPLOADER (IMAGEKIT + CLOUDINARY)
+// HYBRID DIRECT UPLOADER WITH AUTO-FALLBACK
 // ==================================================
 
 class MediaUploader {
@@ -44,36 +44,50 @@ class MediaUploader {
   static const String cloudinaryCloudName = 'a6flqxr8';
   static const String cloudinaryPreset = 'avatar_preset';
 
+  // Photo Upload (ImageKit Primary + Cloudinary Fallback)
   static Future<String?> uploadImage(File file, {String fileName = 'avatar_img'}) async {
+    // 1. Try ImageKit via Base64 Payload
     try {
-      final uri = Uri.parse(imageKitUploadApi);
-      final request = http.MultipartRequest('POST', uri)
-        ..fields['publicKey'] = imageKitPublicKey
-        ..fields['fileName'] = '${fileName}_${DateTime.now().millisecondsSinceEpoch}.jpg'
-        ..fields['useUniqueFileName'] = 'true'
-        ..files.add(
-          http.MultipartFile.fromBytes(
-            'file',
-            await file.readAsBytes(),
-            filename: '$fileName.jpg',
-          ),
-        );
+      final bytes = await file.readAsBytes();
+      final base64Image = base64Encode(bytes);
 
-      final streamed = await request.send().timeout(const Duration(seconds: 90));
+      final res = await http.post(
+        Uri.parse(imageKitUploadApi),
+        body: {
+          'file': base64Image,
+          'fileName': '${fileName}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          'publicKey': imageKitPublicKey,
+          'useUniqueFileName': 'true',
+        },
+      ).timeout(const Duration(seconds: 40));
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final url = data['url']?.toString();
+        if (url != null && url.isNotEmpty) return url;
+      }
+    } catch (_) {}
+
+    // 2. Fallback to Cloudinary (Guaranteed delivery)
+    try {
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudinaryCloudName/image/upload');
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = cloudinaryPreset
+        ..files.add(await http.MultipartFile.fromPath('file', file.path));
+
+      final streamed = await request.send().timeout(const Duration(seconds: 60));
       final res = await http.Response.fromStream(streamed);
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        return data['url']?.toString();
-      } else {
-        debugPrint('ImageKit Upload Error: ${res.statusCode} -> ${res.body}');
+        return data['secure_url']?.toString();
       }
-    } catch (e) {
-      debugPrint('Upload Image Exception: $e');
-    }
+    } catch (_) {}
+
     return null;
   }
 
+  // Video / Reel Upload (Cloudinary Direct)
   static Future<String?> uploadVideo(File file) async {
     try {
       final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudinaryCloudName/video/upload');
@@ -87,12 +101,8 @@ class MediaUploader {
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         return data['secure_url']?.toString();
-      } else {
-        debugPrint('Cloudinary Video Error: ${res.statusCode} -> ${res.body}');
       }
-    } catch (e) {
-      debugPrint('Upload Video Exception: $e');
-    }
+    } catch (_) {}
     return null;
   }
 }
@@ -4350,38 +4360,54 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     radius: 17,
                   ),
             const SizedBox(width: 10),
-            Expanded(
-              child: isAvatarFriend
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kDarkSurface)),
-                        const Text('AI Companion', style: TextStyle(color: Colors.green, fontSize: 12)),
-                      ],
-                    )
-                  : StreamBuilder<DocumentSnapshot>(
-                      stream: FirebaseFirestore.instance.collection('chats').doc(chatRoomId).snapshots(),
-                      builder: (context, chatDocSnap) {
-                        final chatData = chatDocSnap.data?.data() as Map<String, dynamic>?;
-                        final isPeerTyping = chatData?['typing_${widget.peerUid}'] == true;
+        Expanded(
+  child: isAvatarFriend
+      ? Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kDarkSurface)),
+            const Text('AI Companion', style: TextStyle(color: Colors.green, fontSize: 12)),
+          ],
+        )
+      : StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance.collection('users').doc(widget.peerUid).snapshots(),
+          builder: (context, userDocSnap) {
+            final uData = userDocSnap.data?.data() as Map<String, dynamic>?;
+            final isPeerOnline = uData?['isOnline'] == true;
 
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kDarkSurface)),
-                            Text(
-                              isPeerTyping ? 'typing...' : 'Online',
-                              style: TextStyle(
-                                color: isPeerTyping ? Colors.pinkAccent : Colors.green,
-                                fontSize: 12,
-                                fontWeight: isPeerTyping ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
-                          ],
-                        );
-                      },
+            return StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('chats').doc(chatRoomId).snapshots(),
+              builder: (context, chatDocSnap) {
+                final chatData = chatDocSnap.data?.data() as Map<String, dynamic>?;
+                final isPeerTyping = chatData?['typing_${widget.peerUid}'] == true;
+
+                String statusText = isPeerOnline ? 'Online' : 'Offline';
+                Color statusColor = isPeerOnline ? Colors.green : kTextSubtle;
+
+                if (isPeerTyping) {
+                  statusText = 'typing...';
+                  statusColor = Colors.pinkAccent;
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: kDarkSurface)),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: isPeerTyping ? FontWeight.bold : FontWeight.normal,
+                      ),
                     ),
-            ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+)
           ],
         ),
         actions: [
