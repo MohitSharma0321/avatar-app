@@ -4731,7 +4731,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 Flexible(
                   child: Text(
                     msg['text'] ?? '',
-                    style: TextStyle(fontSize: 15, color: isUser ? Colors.white : kDarkSurface, fontWeight: isUser ? FontWeight.w500 : FontWeight.normal),
+                    style: TextStyle(fontSize: 15, color: isUser ? Colors.white : kDarkSurface, fontWeight: isMe ? FontWeight.w500 : FontWeight.normal),
                   ),
                 ),
                 if (!isUser) ...[
@@ -4869,7 +4869,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           else
                             Text(
                               data['text'] ?? '',
-                              style: TextStyle(fontSize: 15, color: isMe ? Colors.white : kDarkSurface, fontWeight: isUser ? FontWeight.w500 : FontWeight.normal),
+                              style: TextStyle(fontSize: 15, color: isMe ? Colors.white : kDarkSurface, fontWeight: isMe ? FontWeight.w500 : FontWeight.normal),
                             ),
                           if (isMe) ...[
                             const SizedBox(height: 2),
@@ -4911,27 +4911,34 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 }
 
 // ==================================================
-// DISCOVER & SEARCH PEOPLE SCREEN
+// INTERACTIVE CONNECTED & CONNECTORS POPUP SHEET
 // ==================================================
 
-class DiscoverScreen extends StatefulWidget {
-  const DiscoverScreen({Key? key}) : super(key: key);
+class ConnectionsListModal extends StatefulWidget {
+  final String title;
+  final bool isConnectedMode;
+  final String myUid;
+  final List<dynamic> myConnections;
+
+  const ConnectionsListModal({
+    Key? key,
+    required this.title,
+    required this.isConnectedMode,
+    required this.myUid,
+    required this.myConnections,
+  }) : super(key: key);
 
   @override
-  State<DiscoverScreen> createState() => _DiscoverScreenState();
+  State<ConnectionsListModal> createState() => _ConnectionsListModalState();
 }
 
-class _DiscoverScreenState extends State<DiscoverScreen> {
-  final TextEditingController searchController = TextEditingController();
-  String searchQuery = '';
+class _ConnectionsListModalState extends State<ConnectionsListModal> {
+  final TextEditingController searchCtrl = TextEditingController();
+  String query = '';
 
-  Future<void> toggleConnection(String peerUid, bool isConnected) async {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUid == null) return;
-
-    final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
-
-    if (isConnected) {
+  Future<void> _toggleConnection(String peerUid, bool currentlyConnected) async {
+    final userRef = FirebaseFirestore.instance.collection('users').doc(widget.myUid);
+    if (currentlyConnected) {
       await userRef.set({
         'connections': FieldValue.arrayRemove([peerUid])
       }, SetOptions(merge: true));
@@ -4940,134 +4947,149 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       await userRef.set({
         'connections': FieldValue.arrayUnion([peerUid])
       }, SetOptions(merge: true));
-      if (mounted) _showMessage(context, 'Connected successfully!');
+      if (mounted) _showMessage(context, 'Connected back!');
     }
   }
 
   @override
   void dispose() {
-    searchController.dispose();
+    searchCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Discover People', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22))),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
-        builder: (context, userSnap) {
-          final myData = userSnap.data?.data() as Map<String, dynamic>?;
-          final List<dynamic> myConnections = myData?['connections'] ?? [];
-
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: searchController,
-                  onChanged: (val) => setState(() => searchQuery = val.trim().toLowerCase()),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or @username...',
-                    prefixIcon: const Icon(Icons.search, color: kTextSubtle),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, size: 22)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: searchCtrl,
+              onChanged: (v) => setState(() => query = v.trim().toLowerCase()),
+              decoration: InputDecoration(
+                hintText: 'Search people...',
+                prefixIcon: const Icon(Icons.search, color: kTextSubtle),
+                filled: true,
+                fillColor: kLightBg,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
               ),
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance.collection('users').snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator(color: kDarkSurface));
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('users').doc(widget.myUid).snapshots(),
+              builder: (context, mySnap) {
+                final myLiveConnections =
+                    (mySnap.data?.data() as Map<String, dynamic>?)?['connections'] as List<dynamic>? ??
+                    widget.myConnections;
+
+                final userQuery = FirebaseFirestore.instance.collection('users');
+
+                if (widget.isConnectedMode && myLiveConnections.isEmpty) {
+                  return const Center(child: Text('No connected users yet.', style: TextStyle(color: kTextSubtle)));
+                }
+
+                return StreamBuilder<QuerySnapshot>(
+                  stream: widget.isConnectedMode
+                      ? userQuery.snapshots()
+                      : userQuery.where('connections', arrayContains: widget.myUid).snapshots(),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: kPrimaryNeon));
                     }
 
-                    final users = (snapshot.data?.docs ?? []).where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final uid = data['uid'] ?? doc.id;
-                      if (uid == currentUid) return false;
+                    var docs = snap.data?.docs ?? [];
+                    if (widget.isConnectedMode) {
+                      docs = docs.where((d) => myLiveConnections.contains(d.id) || myLiveConnections.contains((d.data() as Map<String, dynamic>)['uid'])).toList();
+                    }
 
-                      final name = (data['name'] ?? '').toString().toLowerCase();
-                      final username = (data['username'] ?? '').toString().toLowerCase();
-
-                      if (searchQuery.isEmpty) return true;
-                      return name.contains(searchQuery) || username.contains(searchQuery);
+                    final filtered = docs.where((doc) {
+                      final d = doc.data() as Map<String, dynamic>;
+                      final name = (d['name'] ?? '').toString().toLowerCase();
+                      final username = (d['username'] ?? '').toString().toLowerCase();
+                      if (query.isEmpty) return true;
+                      return name.contains(query) || username.contains(query);
                     }).toList();
 
-                    if (users.isEmpty) {
-                      return const Center(
-                        child: Text('No users found.', style: TextStyle(color: kTextSubtle)),
-                      );
+                    if (filtered.isEmpty) {
+                      return const Center(child: Text('No matching users found.', style: TextStyle(color: kTextSubtle)));
                     }
 
                     return ListView.builder(
-                      itemCount: users.length,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemBuilder: (context, index) {
-                        final userData = users[index].data() as Map<String, dynamic>;
-                        final userName = (userData['name'] ?? '').toString();
-                        final userUsername = (userData['username'] ?? 'user').toString();
-                        final userBio = userData['bio'] ?? 'Using Avatar';
-                        final peerUid = userData['uid'] ?? users[index].id;
-                        final photo = userData['photoUrl'] ?? '';
-                        final isConnected = myConnections.contains(peerUid);
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, idx) {
+                        final uData = filtered[idx].data() as Map<String, dynamic>;
+                        final peerUid = (uData['uid'] ?? filtered[idx].id).toString();
+                        final name = (uData['name'] ?? '').toString();
+                        final username = (uData['username'] ?? 'user').toString();
+                        final bio = (uData['bio'] ?? '').toString();
+                        final photo = (uData['photoUrl'] ?? '').toString();
+                        final isAlreadyConnectedByMe = myLiveConnections.contains(peerUid);
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                            leading: GestureDetector(
-                              onTap: () => showUserAvatarPreview(
-                                context,
-                                photoUrl: photo,
-                                name: userName,
-                                bio: userBio,
-                                username: userUsername,
-                                targetUid: peerUid,
-                              ),
-                              child: buildUserAvatar(
-                                context: context,
-                                photoUrl: photo,
-                                name: userName,
-                                username: userUsername,
-                                bio: userBio,
-                                targetUid: peerUid,
-                                radius: 22,
-                              ),
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: GestureDetector(
+                            onTap: () => showUserAvatarPreview(
+                              context,
+                              photoUrl: photo,
+                              name: name,
+                              username: username,
+                              bio: bio,
+                              targetUid: peerUid,
                             ),
-                            title: Text(userName.isNotEmpty ? userName : '@$userUsername', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
-                            subtitle: Text('@$userUsername • $userBio', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle)),
-                            trailing: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isConnected ? kLightBg : kDarkSurface,
-                                foregroundColor: isConnected ? kTextDark : Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              onPressed: () => toggleConnection(peerUid, isConnected),
-                              child: Text(isConnected ? 'Connected' : 'Connect', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            child: buildUserAvatar(
+                              context: context,
+                              photoUrl: photo,
+                              name: name,
+                              username: username,
+                              bio: bio,
+                              targetUid: peerUid,
+                              radius: 22,
+                            ),
+                          ),
+                          title: Text(name.isNotEmpty ? name : '@$username', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          subtitle: Text('@$username', style: const TextStyle(color: kTextSubtle, fontSize: 13)),
+                          trailing: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isAlreadyConnectedByMe ? kLightBg : kPrimaryNeon,
+                              foregroundColor: isAlreadyConnectedByMe ? kTextDark : Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: () => _toggleConnection(peerUid, isAlreadyConnectedByMe),
+                            child: Text(
+                              isAlreadyConnectedByMe ? 'Disconnect' : 'Connect Back',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                             ),
                           ),
                         );
                       },
                     );
                   },
-                ),
-              ),
-            ],
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
