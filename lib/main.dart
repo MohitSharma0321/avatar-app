@@ -651,7 +651,18 @@ void showUserAvatarPreview(
               ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child: photoUrl.isNotEmpty
-                    ? Image.network(photoUrl, width: 268, height: 268, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: 268, height: 268, color: kLightBg, child: const Icon(Icons.person, size: 80)))
+                    ? Image.network(
+                        photoUrl,
+                        width: 268,
+                        height: 268,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 268,
+                          height: 268,
+                          color: kLightBg,
+                          child: const Icon(Icons.person, size: 80),
+                        ),
+                      )
                     : Container(
                         width: 268,
                         height: 268,
@@ -725,7 +736,8 @@ void showUserAvatarPreview(
           ),
         ),
       ),
-    );
+    ),
+  );
 }
 
 Widget buildUserAvatar({
