@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -33,6 +32,58 @@ const Color kDarkSurface = Color(0xFF141724);
 const Color kLightBg = Color(0xFFF8F9FD);
 const Color kTextDark = Color(0xFF1B1E28);
 const Color kTextSubtle = Color(0xFF7D8494);
+
+// ==================================================
+// IMAGEKIT.IO & CLOUDINARY DIRECT UPLOADER
+// ==================================================
+
+class MediaUploader {
+  static const String imageKitPublicKey = 'Public_6wcVdkUtwJQMEWilfEqQydBtBzI=';
+  static const String imageKitUrlEndpoint = 'https://ik.imagekit.io/a9q4elmfs';
+  static const String imageKitUploadApi = 'https://upload.imagekit.io/api/v1/files/upload';
+
+  static const String cloudinaryCloudName = 'a6flqxr8';
+  static const String cloudinaryPreset = 'avatar_preset';
+
+  // Fast direct photo upload to ImageKit
+  static Future<String?> uploadImage(File file, {String fileName = 'avatar_img'}) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse(imageKitUploadApi))
+        ..fields['publicKey'] = imageKitPublicKey
+        ..fields['fileName'] = '${fileName}_${DateTime.now().millisecondsSinceEpoch}.jpg'
+        ..fields['useUniqueFileName'] = 'true'
+        ..files.add(await http.MultipartFile.fromPath('file', file.path));
+
+      final streamed = await request.send().timeout(const Duration(seconds: 25));
+      final res = await http.Response.fromStream(streamed);
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        return data['url']?.toString();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Fast direct reel upload to Cloudinary
+  static Future<String?> uploadVideo(File file) async {
+    try {
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudinaryCloudName/video/upload');
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = cloudinaryPreset
+        ..files.add(await http.MultipartFile.fromPath('file', file.path));
+
+      final streamed = await request.send().timeout(const Duration(seconds: 45));
+      final res = await http.Response.fromStream(streamed);
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        return data['secure_url']?.toString();
+      }
+    } catch (_) {}
+    return null;
+  }
+}
 
 // ==================================================
 // SONG MODEL & REEL AUDIO SERVICE
@@ -192,7 +243,7 @@ class _MusicPickerModalState extends State<MusicPickerModal> {
           const SizedBox(height: 12),
           Expanded(
             child: isLoading
-                ? const Center(child: CircularProgressIndicator(color: kPrimaryNeon))
+                ? const Center(child: CircularProgressIndicator(color: kDarkSurface))
                 : songs.isEmpty
                     ? const Center(child: Text('No tracks found.', style: TextStyle(color: kTextSubtle)))
                     : ListView.builder(
@@ -726,7 +777,7 @@ Future<void> ensureUserDoc(User user) async {
         'name': '',
         'username': defaultUsername,
         'bio': 'Hey there! I am on Avatar.',
-        'photoBase64': '',
+        'photoUrl': '',
         'connections': [],
         'pinnedChats': [],
         'isPrivate': false,
@@ -742,20 +793,12 @@ Future<void> ensureUserDoc(User user) async {
 
 void showUserAvatarPreview(
   BuildContext context, {
-  required String photoBase64,
+  required String photoUrl,
   required String name,
   String? bio,
   String? username,
   String? targetUid,
 }) {
-  ImageProvider? provider;
-  if (photoBase64.isNotEmpty) {
-    try {
-      final clean = photoBase64.replaceFirst(RegExp(r'data:image\/[a-zA-Z]+;base64,'), '');
-      provider = MemoryImage(base64Decode(clean));
-    } catch (_) {}
-  }
-
   showDialog(
     context: context,
     builder: (ctx) => Dialog(
@@ -781,8 +824,8 @@ void showUserAvatarPreview(
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(18),
-                child: provider != null
-                    ? Image(image: provider, width: 268, height: 268, fit: BoxFit.cover)
+                child: photoUrl.isNotEmpty
+                    ? Image.network(photoUrl, width: 268, height: 268, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: 268, height: 268, color: kLightBg, child: const Icon(Icons.person, size: 80)))
                     : Container(
                         width: 268,
                         height: 268,
@@ -838,7 +881,7 @@ void showUserAvatarPreview(
                             targetUid: targetUid,
                             targetName: name,
                             targetUsername: username ?? 'user',
-                            targetPhoto: photoBase64,
+                            targetPhoto: photoUrl,
                             targetBio: bio ?? '',
                           ),
                         ),
@@ -856,12 +899,13 @@ void showUserAvatarPreview(
           ),
         ),
       ),
-    );
+    ),
+  );
 }
 
 Widget buildUserAvatar({
   required BuildContext context,
-  required String photoBase64,
+  required String photoUrl,
   required String name,
   String? bio,
   String? username,
@@ -869,19 +913,11 @@ Widget buildUserAvatar({
   double radius = 24,
   bool enablePreview = true,
 }) {
-  ImageProvider? imageProvider;
-  if (photoBase64.isNotEmpty) {
-    try {
-      final cleanData = photoBase64.replaceFirst(RegExp(r'data:image\/[a-zA-Z]+;base64,'), '');
-      imageProvider = MemoryImage(base64Decode(cleanData));
-    } catch (_) {}
-  }
-
   final avatarWidget = CircleAvatar(
     radius: radius,
     backgroundColor: kDarkSurface,
-    backgroundImage: imageProvider,
-    child: imageProvider == null
+    backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+    child: photoUrl.isEmpty
         ? Text(
             name.isNotEmpty
                 ? name[0].toUpperCase()
@@ -902,7 +938,7 @@ Widget buildUserAvatar({
   return GestureDetector(
     onLongPress: () => showUserAvatarPreview(
       context,
-      photoBase64: photoBase64,
+      photoUrl: photoUrl,
       name: name,
       bio: bio,
       username: username,
@@ -1202,7 +1238,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'name': '',
           'username': username,
           'bio': 'Hey there! I am on Avatar.',
-          'photoBase64': '',
+          'photoUrl': '',
           'connections': [],
           'pinnedChats': [],
           'isPrivate': false,
@@ -1531,15 +1567,18 @@ class _PostEditStudioScreenState extends State<PostEditStudioScreen> {
     setState(() => isPosting = true);
 
     try {
-      final bytes = await currentImage.readAsBytes();
-      final imageBase64 = base64Encode(bytes);
+      final imageUrl = await MediaUploader.uploadImage(currentImage, fileName: 'feed_post');
+      if (imageUrl == null || imageUrl.isEmpty) {
+        if (mounted) _showMessage(context, 'Image upload failed. Try again.');
+        return;
+      }
 
       await FirebaseFirestore.instance.collection('feed_posts').add({
         'uid': user.uid,
         'creatorName': user.displayName ?? 'User',
         'type': 'post',
         'caption': captionController.text.trim(),
-        'mediaData': imageBase64,
+        'imageUrl': imageUrl,
         'videoUrl': '',
         'attachedSong': selectedSong != null ? selectedSong!.toJson() : null,
         'likes': [],
@@ -1760,31 +1799,6 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
     }
   }
 
-  Future<String?> _uploadToCloudinary(File file) async {
-    const String cloudName = 'a6flqxr8';
-    const String uploadPreset = 'avatar_preset';
-    final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/video/upload');
-
-    try {
-      final req = http.MultipartRequest('POST', url)
-        ..fields['upload_preset'] = uploadPreset
-        ..files.add(await http.MultipartFile.fromPath('file', file.path));
-
-      final streamed = await req.send().timeout(
-        const Duration(seconds: 45),
-        onTimeout: () => throw TimeoutException('Upload timeout'),
-      );
-
-      final res = await http.Response.fromStream(streamed);
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        return data['secure_url']?.toString();
-      }
-    } catch (_) {}
-
-    return null;
-  }
-
   Future<void> _publishReel() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -1795,7 +1809,7 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
     try {
       if (mounted) _showMessage(context, 'Uploading reel...');
 
-      final videoUrl = await _uploadToCloudinary(currentVideo);
+      final videoUrl = await MediaUploader.uploadVideo(currentVideo);
       if (videoUrl == null || videoUrl.isEmpty) {
         if (mounted) _showMessage(context, 'Reel upload failed. Check connection.');
         return;
@@ -1807,7 +1821,7 @@ class _ReelEditStudioScreenState extends State<ReelEditStudioScreen> {
         'type': 'reel',
         'caption': captionController.text.trim(),
         'videoUrl': videoUrl,
-        'mediaData': '',
+        'imageUrl': '',
         'attachedSong': selectedSong != null ? selectedSong!.toJson() : null,
         'likes': [],
         'createdAt': FieldValue.serverTimestamp(),
@@ -2040,12 +2054,12 @@ class _ReelsFeedScreenState extends State<ReelsFeedScreen> {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.play_circle_outline_rounded, size: 64, color: Colors.white38),
-                  const SizedBox(height: 12),
-                  const Text('No Reels Yet', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 6),
-                  const Text('Tap + above to upload a reel.', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                children: const [
+                  Icon(Icons.play_circle_outline_rounded, size: 64, color: Colors.white38),
+                  SizedBox(height: 12),
+                  Text('No Reels Yet', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 16)),
+                  SizedBox(height: 6),
+                  Text('Tap + above to upload a reel.', style: TextStyle(color: Colors.white38, fontSize: 13)),
                 ],
               ),
             );
@@ -2243,21 +2257,10 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
             padding: const EdgeInsets.symmetric(vertical: 10),
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
-              final String mediaBase64 = data['mediaData'] ?? '';
+              final String imageUrl = data['imageUrl'] ?? '';
               final List<dynamic> likes = data['likes'] ?? [];
               final isLiked = likes.contains(currentUid);
               final Map<String, dynamic>? songData = data['attachedSong'];
-
-              Widget postImage;
-              if (mediaBase64.isNotEmpty) {
-                try {
-                  postImage = Image.memory(base64Decode(mediaBase64), fit: BoxFit.contain, width: double.infinity);
-                } catch (_) {
-                  postImage = Container(height: 250, color: Colors.grey.shade200, child: const Icon(Icons.broken_image));
-                }
-              } else {
-                postImage = Container(height: 250, color: Colors.grey.shade200, child: const Center(child: Icon(Icons.photo_outlined, size: 48, color: Colors.grey)));
-              }
 
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -2278,7 +2281,9 @@ class _PostsFeedScreenState extends State<PostsFeedScreen> {
                       borderRadius: BorderRadius.circular(12),
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 450),
-                        child: postImage,
+                        child: imageUrl.isNotEmpty
+                            ? Image.network(imageUrl, fit: BoxFit.contain, width: double.infinity, errorBuilder: (_, __, ___) => Container(height: 250, color: Colors.grey.shade200, child: const Icon(Icons.broken_image)))
+                            : Container(height: 250, color: Colors.grey.shade200, child: const Center(child: Icon(Icons.photo_outlined, size: 48, color: Colors.grey))),
                       ),
                     ),
                     Padding(
@@ -2392,6 +2397,168 @@ class _ReelVideoPlayerItemState extends State<ReelVideoPlayerItem> {
 }
 
 // ==================================================
+// INSTANT BUBBLE PROMPT BAR (TOP OF CHATS)
+// ==================================================
+
+class InstantBubbleBar extends StatelessWidget {
+  const InstantBubbleBar({Key? key}) : super(key: key);
+
+  void _showAddNoteDialog(BuildContext context) {
+    final noteCtrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          left: 20,
+          right: 20,
+          top: 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Share an Instant Thought', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteCtrl,
+              maxLength: 60,
+              decoration: InputDecoration(
+                hintText: "What's on your mind? (e.g. In the gym 🎧)",
+                filled: true,
+                fillColor: kLightBg,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 14),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kDarkSurface,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                final text = noteCtrl.text.trim();
+                final user = FirebaseAuth.instance.currentUser;
+                if (text.isNotEmpty && user != null) {
+                  await FirebaseFirestore.instance.collection('instant_notes').doc(user.uid).set({
+                    'uid': user.uid,
+                    'userName': user.displayName ?? 'User',
+                    'note': text,
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+                  Navigator.pop(ctx);
+                }
+              },
+              child: const Text('Post Note', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('instant_notes').snapshots(),
+      builder: (context, snap) {
+        final docs = snap.data?.docs ?? [];
+        return SizedBox(
+          height: 104,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            children: [
+              // Add Note (User's Bubble)
+              GestureDetector(
+                onTap: () => _showAddNoteDialog(context),
+                child: Container(
+                  width: 76,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: Column(
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const CircleAvatar(
+                            radius: 28,
+                            backgroundColor: kLightBg,
+                            child: Icon(Icons.person, color: kTextSubtle, size: 28),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(color: kDarkSurface, shape: BoxShape.circle),
+                              child: const Icon(Icons.add, color: Colors.white, size: 14),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text('Your Note', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kTextSubtle)),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Other Users' Instant Notes
+              ...docs.map((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final noteText = data['note'] ?? '';
+                final name = data['userName'] ?? 'User';
+                if (data['uid'] == myUid) return const SizedBox.shrink();
+
+                return Container(
+                  width: 82,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: Column(
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.topCenter,
+                        children: [
+                          CircleAvatar(
+                            radius: 28,
+                            backgroundColor: kDarkSurface,
+                            child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'U', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                          Positioned(
+                            top: -12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4)],
+                              ),
+                              child: Text(noteText, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: kDarkSurface)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kDarkSurface)),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ==================================================
 // HOME SCREEN (4 MINIMAL TABS: POSTS -> REELS -> CHATS -> PROFILE)
 // ==================================================
 
@@ -2403,7 +2570,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int currentIndex = 0; // 0 = Posts, 1 = Reels, 2 = Chats, 3 = Profile
+  int currentIndex = 0;
   StreamSubscription? callSubscription;
 
   final List<Widget?> pages = [null, null, null, null];
@@ -2782,7 +2949,7 @@ class NotificationsScreen extends StatelessWidget {
                       final peerName = (uData['name'] ?? '').toString();
                       final peerUsername = (uData['username'] ?? 'user').toString();
                       final peerBio = uData['bio'] ?? '';
-                      final peerPhoto = uData['photoBase64'] ?? '';
+                      final peerPhoto = uData['photoUrl'] ?? '';
                       final isMutual = myConnections.contains(peerUid);
 
                       return Container(
@@ -2800,7 +2967,7 @@ class NotificationsScreen extends StatelessWidget {
                             GestureDetector(
                               onTap: () => showUserAvatarPreview(
                                 context,
-                                photoBase64: peerPhoto,
+                                photoUrl: peerPhoto,
                                 name: peerName,
                                 bio: peerBio,
                                 username: peerUsername,
@@ -2808,7 +2975,7 @@ class NotificationsScreen extends StatelessWidget {
                               ),
                               child: buildUserAvatar(
                                 context: context,
-                                photoBase64: peerPhoto,
+                                photoUrl: peerPhoto,
                                 name: peerName,
                                 username: peerUsername,
                                 bio: peerBio,
@@ -2853,7 +3020,7 @@ class NotificationsScreen extends StatelessWidget {
 }
 
 // ==================================================
-// CHAT SCREEN
+// CHAT SCREEN (WITH INSTANT THOUGHT BUBBLE BAR)
 // ==================================================
 
 class ChatScreen extends StatefulWidget {
@@ -2914,7 +3081,7 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, color: kDarkSurface),
+              leading: const Icon(Icons.push_pin_outlined, color: kDarkSurface),
               title: Text(isPinned ? 'Unpin Chat' : 'Pin to Top', style: const TextStyle(fontWeight: FontWeight.bold)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -3041,8 +3208,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
               return ListView(
                 children: [
+                  // 1. Instant Bubble Thought Bar (Like Instagram)
+                  const SizedBox(height: 8),
+                  const InstantBubbleBar(),
+                  const Divider(height: 20),
+
+                  // 2. Search Bar
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                     child: TextField(
                       controller: searchController,
                       onChanged: (v) => setState(() => searchQuery = v.trim()),
@@ -3059,6 +3232,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
 
+                  // 3. Avatar AI Friend Bubble
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     decoration: BoxDecoration(
@@ -3103,6 +3277,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
                   const SizedBox(height: 8),
 
+                  // 4. Real User Chat List
                   if (activeChatUsers.isNotEmpty) ...[
                     ...activeChatUsers.map((doc) {
                       final data = doc.data() as Map<String, dynamic>;
@@ -3110,7 +3285,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       final name = (data['name'] ?? '').toString();
                       final username = (data['username'] ?? 'user').toString();
                       final bio = data['bio'] ?? '';
-                      final photo = data['photoBase64'] ?? '';
+                      final photo = data['photoUrl'] ?? '';
                       final isOnline = data['isOnline'] == true;
                       final isPinned = pinnedChats.contains(peerUid);
 
@@ -3141,7 +3316,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             children: [
                               buildUserAvatar(
                                 context: context,
-                                photoBase64: photo,
+                                photoUrl: photo,
                                 name: name,
                                 username: username,
                                 bio: bio,
@@ -3323,7 +3498,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                         final userUsername = (userData['username'] ?? 'user').toString();
                         final userBio = userData['bio'] ?? 'Using Avatar';
                         final peerUid = userData['uid'] ?? users[index].id;
-                        final photo = userData['photoBase64'] ?? '';
+                        final photo = userData['photoUrl'] ?? '';
                         final isConnected = myConnections.contains(peerUid);
 
                         return Container(
@@ -3337,7 +3512,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             leading: GestureDetector(
                               onTap: () => showUserAvatarPreview(
                                 context,
-                                photoBase64: photo,
+                                photoUrl: photo,
                                 name: userName,
                                 bio: userBio,
                                 username: userUsername,
@@ -3345,7 +3520,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                               ),
                               child: buildUserAvatar(
                                 context: context,
-                                photoBase64: photo,
+                                photoUrl: photo,
                                 name: userName,
                                 username: userUsername,
                                 bio: userBio,
@@ -3385,25 +3560,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 // ==================================================
 
 class FullImageViewScreen extends StatelessWidget {
-  final String imageData;
+  final String imageUrl;
 
-  const FullImageViewScreen({Key? key, required this.imageData}) : super(key: key);
+  const FullImageViewScreen({Key? key, required this.imageUrl}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    Widget imageWidget;
-    if (imageData.startsWith('http')) {
-      imageWidget = Image.network(imageData, fit: BoxFit.contain);
-    } else {
-      try {
-        final cleanData = imageData.replaceFirst(RegExp(r'data:image\/[a-zA-Z]+;base64,'), '');
-        final bytes = base64Decode(cleanData);
-        imageWidget = Image.memory(bytes, fit: BoxFit.contain);
-      } catch (_) {
-        imageWidget = const Icon(Icons.broken_image, size: 80, color: Colors.white54);
-      }
-    }
-
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -3411,7 +3573,13 @@ class FullImageViewScreen extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Center(
-        child: InteractiveViewer(child: imageWidget),
+        child: InteractiveViewer(
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 80, color: Colors.white54),
+          ),
+        ),
       ),
     );
   }
@@ -3679,12 +3847,12 @@ class _CallScreenState extends State<CallScreen> {
             const SizedBox(height: 8),
             Text(
               isConnected ? 'Connected • ${_formatTime(callSeconds)}' : 'Calling...',
-              style: TextStyle(fontSize: 16, color: Colors.white60),
+              style: const TextStyle(fontSize: 16, color: Colors.white60),
             ),
             const Spacer(),
             buildUserAvatar(
               context: context,
-              photoBase64: widget.peerPhoto,
+              photoUrl: widget.peerPhoto,
               name: widget.peerName,
               targetUid: widget.peerUid,
               radius: 75,
@@ -4045,8 +4213,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1080,
-        maxHeight: 1080,
         imageQuality: 85,
       );
 
@@ -4054,8 +4220,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
       setState(() => isUploadingMedia = true);
 
-      final Uint8List bytes = await pickedFile.readAsBytes();
-      final String base64String = base64Encode(bytes);
+      final String? photoUrl = await MediaUploader.uploadImage(File(pickedFile.path), fileName: 'chat_img');
+      if (photoUrl == null || photoUrl.isEmpty) {
+        if (mounted) _showMessage(context, 'Image upload failed.');
+        setState(() => isUploadingMedia = false);
+        return;
+      }
 
       await FirebaseFirestore.instance
           .collection('chats')
@@ -4065,7 +4235,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         'senderId': currentUid,
         'receiverId': widget.peerUid,
         'type': 'image',
-        'imageData': base64String,
+        'imageUrl': photoUrl,
         'deletedFor': [],
         'isRead': false,
         'reaction': '',
@@ -4334,7 +4504,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   )
                 : buildUserAvatar(
                     context: context,
-                    photoBase64: widget.peerPhoto ?? '',
+                    photoUrl: widget.peerPhoto ?? '',
                     name: widget.userName,
                     targetUid: widget.peerUid,
                     radius: 17,
@@ -4622,7 +4792,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             final data = doc.data() as Map<String, dynamic>;
             final isMe = data['senderId'] == currentUid;
             final type = data['type'] ?? 'text';
-            final imgPayload = data['imageData'] ?? data['imageUrl'] ?? '';
+            final imgUrl = data['imageUrl'] ?? '';
             final audioPayload = data['audioData'] ?? '';
             final isRead = data['isRead'] == true;
             final reaction = data['reaction'] ?? '';
@@ -4680,14 +4850,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               onTap: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => FullImageViewScreen(imageData: imgPayload)),
+                                  MaterialPageRoute(builder: (_) => FullImageViewScreen(imageUrl: imgUrl)),
                                 );
                               },
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(14),
-                                child: imgPayload.startsWith('http')
-                                    ? Image.network(imgPayload, width: 220, height: 220, fit: BoxFit.cover)
-                                    : Image.memory(base64Decode(imgPayload), width: 220, height: 220, fit: BoxFit.cover),
+                                child: Image.network(
+                                  imgUrl,
+                                  width: 220,
+                                  height: 220,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(width: 220, height: 220, color: Colors.grey.shade200, child: const Icon(Icons.broken_image)),
+                                ),
                               ),
                             )
                           else if (type == 'audio')
@@ -4695,7 +4869,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           else
                             Text(
                               data['text'] ?? '',
-                              style: TextStyle(fontSize: 15, color: isMe ? Colors.white : kDarkSurface, fontWeight: isMe ? FontWeight.w500 : FontWeight.normal),
+                              style: TextStyle(fontSize: 15, color: isMe ? Colors.white : kDarkSurface, fontWeight: isUser ? FontWeight.w500 : FontWeight.normal),
                             ),
                           if (isMe) ...[
                             const SizedBox(height: 2),
@@ -4737,34 +4911,27 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 }
 
 // ==================================================
-// INTERACTIVE CONNECTED & CONNECTORS POPUP SHEET
+// DISCOVER & SEARCH PEOPLE SCREEN
 // ==================================================
 
-class ConnectionsListModal extends StatefulWidget {
-  final String title;
-  final bool isConnectedMode;
-  final String myUid;
-  final List<dynamic> myConnections;
-
-  const ConnectionsListModal({
-    Key? key,
-    required this.title,
-    required this.isConnectedMode,
-    required this.myUid,
-    required this.myConnections,
-  }) : super(key: key);
+class DiscoverScreen extends StatefulWidget {
+  const DiscoverScreen({Key? key}) : super(key: key);
 
   @override
-  State<ConnectionsListModal> createState() => _ConnectionsListModalState();
+  State<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _ConnectionsListModalState extends State<ConnectionsListModal> {
-  final TextEditingController searchCtrl = TextEditingController();
-  String query = '';
+class _DiscoverScreenState extends State<DiscoverScreen> {
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = '';
 
-  Future<void> _toggleConnection(String peerUid, bool currentlyConnected) async {
-    final userRef = FirebaseFirestore.instance.collection('users').doc(widget.myUid);
-    if (currentlyConnected) {
+  Future<void> toggleConnection(String peerUid, bool isConnected) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid == null) return;
+
+    final userRef = FirebaseFirestore.instance.collection('users').doc(currentUid);
+
+    if (isConnected) {
       await userRef.set({
         'connections': FieldValue.arrayRemove([peerUid])
       }, SetOptions(merge: true));
@@ -4773,148 +4940,134 @@ class _ConnectionsListModalState extends State<ConnectionsListModal> {
       await userRef.set({
         'connections': FieldValue.arrayUnion([peerUid])
       }, SetOptions(merge: true));
-      if (mounted) _showMessage(context, 'Connected back!');
+      if (mounted) _showMessage(context, 'Connected successfully!');
     }
   }
 
   @override
   void dispose() {
-    searchCtrl.dispose();
+    searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kDarkSurface)),
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, size: 22)),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              controller: searchCtrl,
-              onChanged: (v) => setState(() => query = v.trim().toLowerCase()),
-              decoration: InputDecoration(
-                hintText: 'Search people...',
-                prefixIcon: const Icon(Icons.search, color: kTextSubtle),
-                filled: true,
-                fillColor: kLightBg,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Discover People', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22))),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(currentUid).snapshots(),
+        builder: (context, userSnap) {
+          final myData = userSnap.data?.data() as Map<String, dynamic>?;
+          final List<dynamic> myConnections = myData?['connections'] ?? [];
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: searchController,
+                  onChanged: (val) => setState(() => searchQuery = val.trim().toLowerCase()),
+                  decoration: InputDecoration(
+                    hintText: 'Search by name or @username...',
+                    prefixIcon: const Icon(Icons.search, color: kTextSubtle),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').doc(widget.myUid).snapshots(),
-              builder: (context, mySnap) {
-                final myLiveConnections = (mySnap.data?.data() as Map<String, dynamic>?)?['connections'] as List<dynamic>? ?? widget.myConnections;
-
-                Query userQuery = FirebaseFirestore.instance.collection('users');
-                if (widget.isConnectedMode) {
-                  if (myLiveConnections.isEmpty) {
-                    return const Center(child: Text('No connected users yet.', style: TextStyle(color: kTextSubtle)));
-                  }
-                }
-
-                return StreamBuilder<QuerySnapshot>(
-                  stream: widget.isConnectedMode
-                      ? userQuery.snapshots()
-                      : userQuery.where('connections', arrayContains: widget.myUid).snapshots(),
-                  builder: (context, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) {
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection('users').snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator(color: kDarkSurface));
                     }
 
-                    var docs = snap.data?.docs ?? [];
-                    if (widget.isConnectedMode) {
-                      docs = docs.where((d) => myLiveConnections.contains(d.id)).toList();
-                    }
+                    final users = (snapshot.data?.docs ?? []).where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final uid = data['uid'] ?? doc.id;
+                      if (uid == currentUid) return false;
 
-                    final filtered = docs.where((doc) {
-                      final d = doc.data() as Map<String, dynamic>;
-                      final name = (d['name'] ?? '').toString().toLowerCase();
-                      final username = (d['username'] ?? '').toString().toLowerCase();
-                      if (query.isEmpty) return true;
-                      return name.contains(query) || username.contains(query);
+                      final name = (data['name'] ?? '').toString().toLowerCase();
+                      final username = (data['username'] ?? '').toString().toLowerCase();
+
+                      if (searchQuery.isEmpty) return true;
+                      return name.contains(searchQuery) || username.contains(searchQuery);
                     }).toList();
 
-                    if (filtered.isEmpty) {
-                      return const Center(child: Text('No matching users found.', style: TextStyle(color: kTextSubtle)));
+                    if (users.isEmpty) {
+                      return const Center(
+                        child: Text('No users found.', style: TextStyle(color: kTextSubtle)),
+                      );
                     }
 
                     return ListView.builder(
-                      itemCount: filtered.length,
-                      itemBuilder: (ctx, idx) {
-                        final uData = filtered[idx].data() as Map<String, dynamic>;
-                        final peerUid = uData['uid'] ?? filtered[idx].id;
-                        final name = (uData['name'] ?? '').toString();
-                        final username = (uData['username'] ?? 'user').toString();
-                        final bio = uData['bio'] ?? '';
-                        final photo = uData['photoBase64'] ?? '';
-                        final isAlreadyConnectedByMe = myLiveConnections.contains(peerUid);
+                      itemCount: users.length,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemBuilder: (context, index) {
+                        final userData = users[index].data() as Map<String, dynamic>;
+                        final userName = (userData['name'] ?? '').toString();
+                        final userUsername = (userData['username'] ?? 'user').toString();
+                        final userBio = userData['bio'] ?? 'Using Avatar';
+                        final peerUid = userData['uid'] ?? users[index].id;
+                        final photo = userData['photoUrl'] ?? '';
+                        final isConnected = myConnections.contains(peerUid);
 
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          leading: GestureDetector(
-                            onTap: () => showUserAvatarPreview(
-                              context,
-                              photoBase64: photo,
-                              name: name,
-                              username: username,
-                              bio: bio,
-                              targetUid: peerUid,
-                            ),
-                            child: buildUserAvatar(
-                              context: context,
-                              photoBase64: photo,
-                              name: name,
-                              username: username,
-                              bio: bio,
-                              targetUid: peerUid,
-                              radius: 22,
-                            ),
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          title: Text(name.isNotEmpty ? name : '@$username', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          subtitle: Text('@$username', style: const TextStyle(color: kTextSubtle, fontSize: 13)),
-                          trailing: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isAlreadyConnectedByMe ? kLightBg : kDarkSurface,
-                              foregroundColor: isAlreadyConnectedByMe ? kTextDark : Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            leading: GestureDetector(
+                              onTap: () => showUserAvatarPreview(
+                                context,
+                                photoUrl: photo,
+                                name: userName,
+                                bio: userBio,
+                                username: userUsername,
+                                targetUid: peerUid,
+                              ),
+                              child: buildUserAvatar(
+                                context: context,
+                                photoUrl: photo,
+                                name: userName,
+                                username: userUsername,
+                                bio: userBio,
+                                targetUid: peerUid,
+                                radius: 22,
+                              ),
                             ),
-                            onPressed: () => _toggleConnection(peerUid, isAlreadyConnectedByMe),
-                            child: Text(
-                              isAlreadyConnectedByMe ? 'Disconnect' : 'Connect Back',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            title: Text(userName.isNotEmpty ? userName : '@$userUsername', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kDarkSurface)),
+                            subtitle: Text('@$userUsername • $userBio', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSubtle)),
+                            trailing: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isConnected ? kLightBg : kDarkSurface,
+                                foregroundColor: isConnected ? kTextDark : Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () => toggleConnection(peerUid, isConnected),
+                              child: Text(isConnected ? 'Connected' : 'Connect', style: const TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
                         );
                       },
                     );
                   },
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -4936,7 +5089,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String displayName = '';
   String username = '';
   String displayBio = 'Hey there! I am on Avatar.';
-  String photoBase64 = '';
+  String photoUrl = '';
   bool isPrivateAccount = false;
   int profileTab = 0;
 
@@ -4956,7 +5109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           displayName = data?['name'] ?? '';
           username = data?['username'] ?? '';
           displayBio = data?['bio'] ?? displayBio;
-          photoBase64 = data?['photoBase64'] ?? '';
+          photoUrl = data?['photoUrl'] ?? '';
           isPrivateAccount = data?['isPrivate'] ?? false;
         });
       }
@@ -4976,7 +5129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _updateProfilePhoto() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
       if (image == null) return;
 
       final CroppedFile? croppedFile = await ImageCropper().cropImage(
@@ -4996,15 +5149,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (croppedFile == null) return;
 
-      final bytes = await croppedFile.readAsBytes();
-      final base64String = base64Encode(bytes);
+      _showMessage(context, 'Uploading photo...');
+      final String? uploadedUrl = await MediaUploader.uploadImage(File(croppedFile.path), fileName: 'profile');
 
-      setState(() => photoBase64 = base64String);
+      if (uploadedUrl == null || uploadedUrl.isEmpty) {
+        if (mounted) _showMessage(context, 'Profile photo upload failed.');
+        return;
+      }
+
+      setState(() => photoUrl = uploadedUrl);
 
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'photoBase64': base64String,
+          'photoUrl': uploadedUrl,
         }, SetOptions(merge: true));
         if (mounted) _showMessage(context, 'Profile picture updated.');
       }
@@ -5172,7 +5330,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   buildUserAvatar(
                     context: context,
-                    photoBase64: photoBase64,
+                    photoUrl: photoUrl,
                     name: displayName,
                     username: username,
                     bio: displayBio,
@@ -5424,7 +5582,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     itemBuilder: (context, idx) {
                       final item = myPosts[idx].data() as Map<String, dynamic>;
                       final String videoUrl = item['videoUrl'] ?? '';
-                      final String mediaBase64 = item['mediaData'] ?? '';
+                      final String imageUrl = item['imageUrl'] ?? '';
                       final String caption = item['caption'] ?? '';
 
                       if (profileTab == 0) {
@@ -5471,17 +5629,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       return GestureDetector(
                         onTap: () {
-                          if (mediaBase64.isNotEmpty) {
+                          if (imageUrl.isNotEmpty) {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => FullImageViewScreen(imageData: mediaBase64)),
+                              MaterialPageRoute(builder: (_) => FullImageViewScreen(imageUrl: imageUrl)),
                             );
                           }
                         },
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: mediaBase64.isNotEmpty
-                              ? Image.memory(base64Decode(mediaBase64), fit: BoxFit.cover)
+                          child: imageUrl.isNotEmpty
+                              ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade200, child: const Icon(Icons.broken_image)))
                               : Container(color: Colors.grey.shade200, child: const Icon(Icons.broken_image)),
                         ),
                       );
@@ -5537,7 +5695,7 @@ class _UserPublicProfileScreenState extends State<UserPublicProfileScreen> {
           children: [
             buildUserAvatar(
               context: context,
-              photoBase64: widget.targetPhoto,
+              photoUrl: widget.targetPhoto,
               name: widget.targetName,
               username: widget.targetUsername,
               bio: widget.targetBio,
@@ -5649,7 +5807,7 @@ class _UserPublicProfileScreenState extends State<UserPublicProfileScreen> {
                   itemBuilder: (context, idx) {
                     final item = userPosts[idx].data() as Map<String, dynamic>;
                     final String videoUrl = item['videoUrl'] ?? '';
-                    final String mediaBase64 = item['mediaData'] ?? '';
+                    final String imageUrl = item['imageUrl'] ?? '';
                     final String caption = item['caption'] ?? '';
 
                     if (tabIndex == 0) {
@@ -5696,17 +5854,17 @@ class _UserPublicProfileScreenState extends State<UserPublicProfileScreen> {
 
                     return GestureDetector(
                       onTap: () {
-                        if (mediaBase64.isNotEmpty) {
+                        if (imageUrl.isNotEmpty) {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => FullImageViewScreen(imageData: mediaBase64)),
+                            MaterialPageRoute(builder: (_) => FullImageViewScreen(imageUrl: imageUrl)),
                           );
                         }
                       },
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
-                        child: mediaBase64.isNotEmpty
-                            ? Image.memory(base64Decode(mediaBase64), fit: BoxFit.cover)
+                        child: imageUrl.isNotEmpty
+                            ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade200, child: const Icon(Icons.broken_image)))
                             : Container(color: Colors.grey.shade200, child: const Icon(Icons.broken_image)),
                       ),
                     );
