@@ -9,6 +9,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:record/record.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 // ==================================================
 // NEXUS PALETTE & CORE THEMES
@@ -541,7 +545,7 @@ class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsB
 }
 
 // ==================================================
-// TAB 1: REALMS FEED SCREEN
+// TAB 1: REALMS FEED
 // ==================================================
 class RealmsFeedScreen extends StatelessWidget {
   final String selectedRealm;
@@ -670,12 +674,26 @@ class RealmsFeedScreen extends StatelessWidget {
 }
 
 // ==================================================
-// TRANSMISSION CARD (DECIPHER + SHARE + DELETE)
+// TRANSMISSION CARD (VOICE AUDIO MODULATION PLAYER)
 // ==================================================
-class TransmissionCard extends StatelessWidget {
+class TransmissionCard extends StatefulWidget {
   final String docId;
   final Map<String, dynamic> data;
   const TransmissionCard({super.key, required this.docId, required this.data});
+
+  @override
+  State<TransmissionCard> createState() => _TransmissionCardState();
+}
+
+class _TransmissionCardState extends State<TransmissionCard> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool isPlaying = false;
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
 
   Color _getDimensionColor(String dim) {
     switch (dim) {
@@ -684,6 +702,43 @@ class TransmissionCard extends StatelessWidget {
       case 'Cyber 3050': return kNeonCyan;
       case 'Dreams': return kMistyGreen;
       default: return kNeonPurple;
+    }
+  }
+
+  // Voice Transformation Settings based on realm
+  double _getPitchByDimension(String dim) {
+    switch (dim) {
+      case 'Horror': return 0.65; // Deep spooky demon pitch
+      case 'Cyber 3050': return 1.45; // High robot frequency pitch
+      case 'Ancient Gods': return 0.75; // Ancient deep resonant pitch
+      case 'Dreams': return 0.85; // Surreal misty pitch
+      default: return 1.0;
+    }
+  }
+
+  Future<void> _playModulatedAudio(String base64Audio, String dimension) async {
+    if (isPlaying) {
+      await _audioPlayer.stop();
+      if (mounted) setState(() => isPlaying = false);
+      return;
+    }
+
+    try {
+      final bytes = base64Decode(base64Audio);
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/temp_${widget.docId}.m4a');
+      await tempFile.writeAsBytes(bytes);
+
+      await _audioPlayer.setPlaybackRate(_getPitchByDimension(dimension));
+      await _audioPlayer.play(DeviceFileSource(tempFile.path));
+      if (mounted) setState(() => isPlaying = true);
+
+      _audioPlayer.onPlayerComplete.listen((_) {
+        if (mounted) setState(() => isPlaying = false);
+      });
+    } catch (e) {
+      debugPrint('Audio Playback Error: $e');
+      if (mounted) setState(() => isPlaying = false);
     }
   }
 
@@ -706,7 +761,7 @@ class TransmissionCard extends StatelessWidget {
                 leading: const Icon(Icons.delete_forever, color: kHorrorCrimson),
                 title: const Text('Purge Transmission (Within 24 Hours)', style: TextStyle(color: kHorrorCrimson, fontWeight: FontWeight.bold)),
                 onTap: () async {
-                  await FirebaseFirestore.instance.collection('transmissions').doc(docId).delete();
+                  await FirebaseFirestore.instance.collection('transmissions').doc(widget.docId).delete();
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
               ),
@@ -757,10 +812,10 @@ class TransmissionCard extends StatelessWidget {
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('transmissions')
-                      .doc(docId)
+                      .doc(widget.docId)
                       .collection('deciphers')
                       .orderBy('createdAt', descending: false)
-                  .snapshots(),
+                      .snapshots(),
                   builder: (context, snap) {
                     if (!snap.hasData) return Center(child: CircularProgressIndicator(color: dimColor));
                     final comments = snap.data!.docs;
@@ -827,14 +882,14 @@ class TransmissionCard extends StatelessWidget {
                       final text = commentCtrl.text.trim();
                       if (text.isEmpty) return;
 
-                      await FirebaseFirestore.instance.collection('transmissions').doc(docId).collection('deciphers').add({
+                      await FirebaseFirestore.instance.collection('transmissions').doc(widget.docId).collection('deciphers').add({
                         'uid': currentUid,
                         'userName': currentName,
                         'text': text,
                         'createdAt': DateTime.now().millisecondsSinceEpoch,
                       });
 
-                      await FirebaseFirestore.instance.collection('transmissions').doc(docId).update({
+                      await FirebaseFirestore.instance.collection('transmissions').doc(widget.docId).update({
                         'decipherCount': FieldValue.increment(1),
                       });
 
@@ -859,15 +914,16 @@ class TransmissionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dim = data['dimension'] ?? 'Nexus';
+    final dim = widget.data['dimension'] ?? 'Nexus';
     final dimColor = _getDimensionColor(dim);
-    final witnesses = List<String>.from(data['witnesses'] ?? []);
+    final witnesses = List<String>.from(widget.data['witnesses'] ?? []);
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final hasWitnessed = witnesses.contains(currentUid);
-    final isCreator = (data['uid'] == currentUid);
-    final createdAt = data['createdAt'] ?? 0;
-    final content = data['content'] ?? '';
-    final creatorName = data['creatorName'] ?? 'Explorer';
+    final isCreator = (widget.data['uid'] == currentUid);
+    final createdAt = widget.data['createdAt'] ?? 0;
+    final content = widget.data['content'] ?? '';
+    final creatorName = widget.data['creatorName'] ?? 'Explorer';
+    final audioBase64 = widget.data['audioBase64'] ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -898,7 +954,7 @@ class TransmissionCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(creatorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text(data['rank'] ?? 'Seeker', style: TextStyle(color: dimColor, fontSize: 11)),
+                      Text(widget.data['rank'] ?? 'Seeker', style: TextStyle(color: dimColor, fontSize: 11)),
                     ],
                   ),
                 ],
@@ -924,28 +980,38 @@ class TransmissionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Text(content, style: const TextStyle(fontSize: 14, color: Colors.white, height: 1.4)),
-          if (data['hasAudio'] == true) ...[
+          if (content.isNotEmpty)
+            Text(content, style: const TextStyle(fontSize: 14, color: Colors.white, height: 1.4)),
+          // 🔥 REAL LIVE VOICE ECHO PLAYER
+          if (widget.data['hasAudio'] == true && audioBase64.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.play_circle_fill_rounded, color: dimColor, size: 28),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Frequency: ${data['audioFilter'] ?? 'Voice Echo'}',
-                      style: const TextStyle(fontSize: 12, color: Colors.white70),
+            InkWell(
+              onTap: () => _playModulatedAudio(audioBase64, dim),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: isPlaying ? dimColor : Colors.white12, width: isPlaying ? 1.5 : 1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isPlaying ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded,
+                      color: dimColor,
+                      size: 28,
                     ),
-                  ),
-                  const Icon(Icons.graphic_eq_rounded, color: Colors.white38),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isPlaying ? 'Resonating ${dim} Voice...' : 'Frequency: Modulated ${dim} Echo',
+                        style: TextStyle(fontSize: 12, color: isPlaying ? dimColor : Colors.white70, fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal),
+                      ),
+                    ),
+                    Icon(Icons.graphic_eq_rounded, color: isPlaying ? dimColor : Colors.white38),
+                  ],
+                ),
               ),
             ),
           ],
@@ -957,11 +1023,11 @@ class TransmissionCard extends StatelessWidget {
                 onTap: () {
                   if (currentUid.isEmpty) return;
                   if (hasWitnessed) {
-                    FirebaseFirestore.instance.collection('transmissions').doc(docId).update({
+                    FirebaseFirestore.instance.collection('transmissions').doc(widget.docId).update({
                       'witnesses': FieldValue.arrayRemove([currentUid]),
                     });
                   } else {
-                    FirebaseFirestore.instance.collection('transmissions').doc(docId).update({
+                    FirebaseFirestore.instance.collection('transmissions').doc(widget.docId).update({
                       'witnesses': FieldValue.arrayUnion([currentUid]),
                     });
                   }
@@ -980,7 +1046,7 @@ class TransmissionCard extends StatelessWidget {
                   children: [
                     const Icon(Icons.comment_outlined, color: Colors.white38, size: 18),
                     const SizedBox(width: 6),
-                    Text('${data['decipherCount'] ?? 0} Deciphered', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                    Text('${widget.data['decipherCount'] ?? 0} Deciphered', style: const TextStyle(color: Colors.white54, fontSize: 12)),
                   ],
                 ),
               ),
@@ -1200,7 +1266,7 @@ class TimeSlipRadarScreen extends StatelessWidget {
 }
 
 // ==================================================
-// TAB 3: TRANSMISSION STUDIO SCREEN
+// TAB 3: TRANSMISSION STUDIO (MIC RECORDING + VOICE MODULATION)
 // ==================================================
 class TransmissionStudioScreen extends StatefulWidget {
   final Color accentColor;
@@ -1213,18 +1279,65 @@ class TransmissionStudioScreen extends StatefulWidget {
 
 class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
   final _contentController = TextEditingController();
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  
   String selectedDim = 'Horror';
-  String selectedFilter = 'EVP Ghost Static';
-  bool hasVoiceNote = false;
+  bool isRecording = false;
+  String? recordedAudioPath;
+  String? recordedAudioBase64;
   bool isTransmitting = false;
 
   final List<String> dimensions = ['Horror', 'Ancient Gods', 'Cyber 3050', 'Dreams'];
-  final List<String> filters = ['EVP Ghost Static', 'Divine Echo', 'Cyber Synth', 'Foggy Dream'];
+
+  @override
+  void dispose() {
+    _audioRecorder.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleRecording() async {
+    if (isRecording) {
+      final path = await _audioRecorder.stop();
+      setState(() => isRecording = false);
+      if (path != null) {
+        final bytes = await File(path).readAsBytes();
+        setState(() {
+          recordedAudioPath = path;
+          recordedAudioBase64 = base64Encode(bytes);
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Voice Frequency Captured! Auto-tuning to $selectedDim Realm.')),
+          );
+        }
+      }
+    } else {
+      final permission = await Permission.microphone.request();
+      if (permission.isGranted) {
+        final tempDir = await getTemporaryDirectory();
+        final filePath = '${tempDir.path}/rec_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        await _audioRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: filePath);
+        setState(() {
+          isRecording = true;
+          recordedAudioPath = null;
+          recordedAudioBase64 = null;
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Microphone permission required to transmit frequency.')),
+          );
+        }
+      }
+    }
+  }
 
   Future<void> _transmit() async {
     final text = _contentController.text.trim();
-    if (text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please describe your transmission.')));
+    if (text.isEmpty && recordedAudioBase64 == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a thought or record your voice frequency.')),
+      );
       return;
     }
 
@@ -1238,8 +1351,8 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
         'rank': 'Seeker',
         'dimension': selectedDim,
         'content': text,
-        'hasAudio': hasVoiceNote,
-        'audioFilter': hasVoiceNote ? selectedFilter : '',
+        'hasAudio': recordedAudioBase64 != null,
+        'audioBase64': recordedAudioBase64 ?? '',
         'witnesses': [],
         'decipherCount': 0,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
@@ -1252,7 +1365,10 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
       }
 
       _contentController.clear();
-      setState(() => hasVoiceNote = false);
+      setState(() {
+        recordedAudioPath = null;
+        recordedAudioBase64 = null;
+      });
       widget.onPostSuccess();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -1280,6 +1396,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
             const SizedBox(height: 12),
             Wrap(
               spacing: 10,
+              runSpacing: 10,
               children: dimensions.map((d) {
                 final isSel = selectedDim == d;
                 return ChoiceChip(
@@ -1294,7 +1411,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
             const SizedBox(height: 24),
             TextField(
               controller: _contentController,
-              maxLines: 5,
+              maxLines: 4,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 filled: true,
@@ -1305,35 +1422,57 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
               ),
             ),
             const SizedBox(height: 20),
+            
+            // 🔥 REAL MIC VOICE RECORDER BOX
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: kCardDark,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white12),
+                border: Border.all(color: isRecording ? kHorrorCrimson : Colors.white12),
               ),
               child: Column(
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Voice Frequency Echo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Switch(
-                        activeColor: widget.accentColor,
-                        value: hasVoiceNote,
-                        onChanged: (v) => setState(() => hasVoiceNote = v),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Voice Frequency Echo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          const SizedBox(height: 2),
+                          Text('Auto-modulates into $selectedDim Voice', style: TextStyle(color: widget.accentColor, fontSize: 11)),
+                        ],
+                      ),
+                      IconButton(
+                        onPressed: _toggleRecording,
+                        iconSize: 34,
+                        icon: Icon(
+                          isRecording ? Icons.stop_circle_rounded : Icons.mic_rounded,
+                          color: isRecording ? kHorrorCrimson : (recordedAudioBase64 != null ? kMistyGreen : Colors.white70),
+                        ),
                       ),
                     ],
                   ),
-                  if (hasVoiceNote) ...[
-                    const Divider(color: Colors.white12),
-                    DropdownButtonFormField<String>(
-                      value: selectedFilter,
-                      dropdownColor: kCardDark,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(border: InputBorder.none),
-                      items: filters.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
-                      onChanged: (v) => setState(() => selectedFilter = v!),
+                  if (isRecording) ...[
+                    const SizedBox(height: 8),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.fiber_manual_record, color: kHorrorCrimson, size: 14),
+                        SizedBox(width: 6),
+                        Text('Recording Frequency... Tap stop when done.', style: TextStyle(color: kHorrorCrimson, fontSize: 12)),
+                      ],
+                    ),
+                  ] else if (recordedAudioBase64 != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: kMistyGreen, size: 16),
+                        const SizedBox(width: 6),
+                        Text('Voice recorded & tuned to $selectedDim!', style: const TextStyle(color: kMistyGreen, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ],
                     ),
                   ],
                 ],
