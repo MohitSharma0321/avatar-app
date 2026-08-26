@@ -21,6 +21,9 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+   // MultiDex enable for AdMob + Firebase + WebRTC
+        multiDexEnabled = true
     }
 
     buildTypes {
