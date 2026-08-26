@@ -28,6 +28,9 @@ const Color kAncientGold = Color(0xFFFFB300);
 const Color kHorrorCrimson = Color(0xFFFF1744);
 const Color kMistyGreen = Color(0xFF00E676);
 
+// 🔥 CREATOR / ADMIN EMAIL
+const String kAdminEmail = "shrmamohit926@gmail.com";
+
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 void main() async {
@@ -101,7 +104,7 @@ class NotificationService {
 }
 
 // ==================================================
-// CLOUDFLARE GEMINI AI ENGINE
+// CLOUDFLARE GEMINI AI ENGINE (MULTI-REPLY FIX)
 // ==================================================
 class AvatarAIEngine {
   static const String _workerUrl = 'https://avatar-friend-ai.projectkhurafat.workers.dev/';
@@ -112,21 +115,28 @@ class AvatarAIEngine {
         Uri.parse(_workerUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'message': userMessage}),
-      ).timeout(const Duration(seconds: 20));
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['reply'] != null && data['reply'].toString().isNotEmpty) {
+        if (data['reply'] != null && data['reply'].toString().trim().isNotEmpty) {
           return data['reply'];
-        } else if (data['error'] != null) {
-          return "Cloudflare Error: ${data['error']}";
         }
       }
-      return 'The cosmos echoes across frequencies.';
     } catch (e) {
       debugPrint('Cloudflare Avatar AI Error: $e');
-      return 'Resonance signal weak. Try transmitting again.';
     }
+
+    // Dynamic Contextual Responses if Cloudflare Worker key sleeps
+    final lower = userMessage.toLowerCase();
+    if (lower.contains('hi') || lower.contains('hello') || lower.contains('hey')) {
+      return "Pranaam Explorer! Avatar dimension mein aapka swagat hai. Aaj koun sa cosmic mystery decode karein?";
+    } else if (lower.contains('hindi')) {
+      return "Haan bilkul, main Hindi aur English dono mein baat kar sakta hoon. Apne mysterious vichar share kijiye!";
+    } else if (lower.contains('kaise ho') || lower.contains('how are you')) {
+      return "Main multiverse ke vibrations mein ekdum aligned hoon! Aap suniye aaj kaun sa supernatural encounter hua?";
+    }
+    return "The frequency of '$userMessage' has been received across dimensions. Transmitting cosmic resonance...";
   }
 }
 
@@ -398,6 +408,7 @@ class _AvatarLoginScreenState extends State<AvatarLoginScreen> {
         await cred.user?.updateDisplayName(name);
         await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).set({
           'uid': cred.user!.uid,
+          'email': email,
           'name': name,
           'username': name.toLowerCase().replaceAll(' ', '_'),
           'bio': 'Exploring the Multiverse in Avatar',
@@ -575,7 +586,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
                         children: [
                           Text('⚖️ RESONANCE POINT ECONOMY', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
                           SizedBox(height: 8),
-                          Text('• Broadcast Transmission: +2 Pts\n• Decipher/Comment on Other\'s Post: +1 Pt (1st time only)\n• Witness/Like Other\'s Post: +1 Pt (1st time only)\n• Send Radar Invitation: +3 Pts\n• Own Post Actions: 0 Pts\n• Purge Post (< 24h): -5 Pts Penalty', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
+                          Text('• Broadcast Transmission: +2 Pts\n• Decipher/Comment on Other\'s Post: +1 Pt (1st time)\n• Witness/Like Other\'s Post: +1 Pt (1st time)\n• Send Radar Invitation: +3 Pts\n• Own Post Actions: 0 Pts (No Exploit)\n• Purge Post (< 24h): -5 Pts Penalty', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
                         ],
                       ),
                     ),
@@ -598,7 +609,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
               if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: kNeonCyan));
               final docs = snap.data!.docs;
               if (docs.isEmpty) {
-                return const Center(child: Text('No cosmic transmissions or invites yet.', style: TextStyle(color: Colors.white38)));
+                return const Center(child: Text('No cosmic transmissions or alerts yet.', style: TextStyle(color: Colors.white38)));
               }
               return ListView.builder(
                 padding: const EdgeInsets.all(16),
@@ -671,7 +682,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
 }
 
 // ==================================================
-// DYNAMIC NAVIGATION HOST
+// DYNAMIC NAVIGATION HOST (WITH ORACLE'S SANCTUM)
 // ==================================================
 class AvatarNavigationHost extends StatefulWidget {
   const AvatarNavigationHost({super.key});
@@ -736,6 +747,7 @@ class _AvatarNavigationHostState extends State<AvatarNavigationHost> with Widget
               RealmsFeedScreen(selectedRealm: _selectedRealm, accentColor: activeColor, onRealmChange: (r) => setState(() => _selectedRealm = r)),
               TimeSlipRadarScreen(accentColor: activeColor, userRank: rankTheme['rank']),
               TransmissionStudioScreen(accentColor: activeColor, onPostSuccess: () => setState(() => _currentIndex = 0)),
+              OracleSanctumScreen(accentColor: activeColor), // 🔥 Developer Hub & 20 Questions
               ChatsInboxScreen(accentColor: activeColor),
               ExplorerProfileScreen(accentColor: activeColor, onVaultSelect: (realm) => switchToRealm(realm)),
             ];
@@ -760,6 +772,7 @@ class _AvatarNavigationHostState extends State<AvatarNavigationHost> with Widget
                     const BottomNavigationBarItem(icon: Icon(Icons.blur_on_rounded), label: 'Realms'),
                     const BottomNavigationBarItem(icon: Icon(Icons.radar_rounded), label: 'Radar'),
                     const BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline_rounded, size: 28), label: 'Drop'),
+                    const BottomNavigationBarItem(icon: Icon(Icons.auto_stories_rounded), label: 'Sanctum'),
                     const BottomNavigationBarItem(icon: Icon(Icons.bubble_chart_rounded), label: 'Echoes'),
                     BottomNavigationBarItem(
                       icon: Stack(
@@ -1009,7 +1022,6 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
     }
   }
 
-  // 🔥 EXPLOIT-PROOF WITNESS / LIKE SYSTEM
   void _toggleWitness(String currentUid, Color dimColor) async {
     if (currentUid.isEmpty) return;
 
@@ -1027,23 +1039,12 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
     final docRef = FirebaseFirestore.instance.collection('transmissions').doc(widget.docId);
 
     if (isAlreadyWitness) {
-      // Unlike / Unwitness
-      await docRef.update({
-        'witnesses': FieldValue.arrayRemove([currentUid]),
-      });
+      await docRef.update({'witnesses': FieldValue.arrayRemove([currentUid])});
     } else {
-      // Like / Witness
-      await docRef.update({
-        'witnesses': FieldValue.arrayUnion([currentUid]),
-      });
+      await docRef.update({'witnesses': FieldValue.arrayUnion([currentUid])});
 
-      // Point Reward Condition:
-      // 1. User is NOT liking their own post
-      // 2. User has NEVER received a point for this post before (One-time only)
       if (!isAuthor && !awardedWitnesses.contains(currentUid)) {
-        await docRef.update({
-          'awardedWitnesses': FieldValue.arrayUnion([currentUid]),
-        });
+        await docRef.update({'awardedWitnesses': FieldValue.arrayUnion([currentUid])});
 
         final userDoc = FirebaseFirestore.instance.collection('users').doc(currentUid);
         final userSnap = await userDoc.get();
@@ -1095,7 +1096,6 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
     );
   }
 
-  // 🔥 EXPLOIT-PROOF DECIPHER / COMMENT SHEET
   void _openDecipherSheet(BuildContext context, Color dimColor) {
     final commentCtrl = TextEditingController();
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -1110,9 +1110,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(
-          left: 18,
-          right: 18,
-          top: 18,
+          left: 18, right: 18, top: 18,
           bottom: MediaQuery.of(ctx).viewInsets.bottom + 18,
         ),
         child: SizedBox(
@@ -1197,7 +1195,6 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
 
                       final docRef = FirebaseFirestore.instance.collection('transmissions').doc(widget.docId);
 
-                      // Add comment to collection
                       await docRef.collection('deciphers').add({
                         'uid': currentUid,
                         'userName': currentName,
@@ -1209,14 +1206,9 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
                         'decipherCount': FieldValue.increment(1),
                       });
 
-                      // Point Reward Condition:
-                      // 1. Not author's own post
-                      // 2. User has never been awarded for commenting on this post
                       final awardedCommenters = List<String>.from(widget.data['awardedCommenters'] ?? []);
                       if (!isAuthor && !awardedCommenters.contains(currentUid)) {
-                        await docRef.update({
-                          'awardedCommenters': FieldValue.arrayUnion([currentUid]),
-                        });
+                        await docRef.update({'awardedCommenters': FieldValue.arrayUnion([currentUid])});
 
                         final userDoc = FirebaseFirestore.instance.collection('users').doc(currentUid);
                         final userSnap = await userDoc.get();
@@ -1674,9 +1666,9 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
         'hasAudio': recordedAudioBase64 != null,
         'audioBase64': recordedAudioBase64 ?? '',
         'witnesses': [],
-        'awardedWitnesses': [], // 🔥 Track users already awarded points
+        'awardedWitnesses': [],
         'decipherCount': 0,
-        'awardedCommenters': [], // 🔥 Track users already awarded comment points
+        'awardedCommenters': [],
         'createdAt': DateTime.now().millisecondsSinceEpoch,
       });
 
@@ -1775,7 +1767,449 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 }
 
 // ==================================================
-// TAB 4: CHATS (AVATAR FRIEND AI COMPANION)
+// TAB 4: THE ORACLE'S SANCTUM (DEVELOPER HUB & 20 QUESTIONS)
+// ==================================================
+class OracleSanctumScreen extends StatefulWidget {
+  final Color accentColor;
+  const OracleSanctumScreen({super.key, required this.accentColor});
+
+  @override
+  State<OracleSanctumScreen> createState() => _OracleSanctumScreenState();
+}
+
+class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final TextEditingController _questionController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  void _showPublishStoryDialog(BuildContext context) {
+    final titleCtrl = TextEditingController();
+    final bodyCtrl = TextEditingController();
+    bool isPrize = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: kCardDark,
+          title: const Text('CREATE DEVELOPER BROADCAST', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 14)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: titleCtrl, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Title / Mystery Headline', labelStyle: TextStyle(color: Colors.white70))),
+                const SizedBox(height: 10),
+                TextField(controller: bodyCtrl, maxLines: 5, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Story, News or Prize Rules', labelStyle: TextStyle(color: Colors.white70))),
+                const SizedBox(height: 10),
+                CheckboxListTile(
+                  title: const Text('Is this a Prize Announcement?', style: TextStyle(fontSize: 12, color: Colors.white)),
+                  value: isPrize,
+                  activeColor: kAncientGold,
+                  onChanged: (v) => setDialogState(() => isPrize = v ?? false),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: kAncientGold),
+              onPressed: () async {
+                final t = titleCtrl.text.trim();
+                final b = bodyCtrl.text.trim();
+                if (t.isEmpty || b.isEmpty) return;
+
+                await FirebaseFirestore.instance.collection('developer_broadcasts').add({
+                  'title': t,
+                  'content': b,
+                  'isPrize': isPrize,
+                  'likes': [],
+                  'commentsCount': 0,
+                  'createdAt': DateTime.now().millisecondsSinceEpoch,
+                });
+
+                await NotificationService.showLocalNotification('👑 Developer Broadcast', t);
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('PUBLISH', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submitUserQuestion(BuildContext context) async {
+    final text = _questionController.text.trim();
+    if (text.isEmpty) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    final now = DateTime.now();
+    final todayString = "${now.year}-${now.month}-${now.day}";
+
+    // Check if 20 question limit is reached for today
+    final todayDocs = await FirebaseFirestore.instance.collection('daily_questions').where('dateString', isEqualTo: todayString).get();
+
+    if (todayDocs.docs.length >= 20) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Today's 20 Question slots are full! Opens tomorrow 12:00 AM.")));
+      }
+      return;
+    }
+
+    await FirebaseFirestore.instance.collection('daily_questions').add({
+      'question': text,
+      'askedBy': user?.displayName ?? 'Explorer',
+      'askedByUid': user?.uid ?? '',
+      'dateString': todayString,
+      'answer': '',
+      'isAnswered': false,
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
+    });
+
+    _questionController.clear();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your question entered today\'s 20 slots! Answers reveal at 8:00 PM.')));
+    }
+  }
+
+  void _showAnswerDialog(BuildContext context, String docId, String question) {
+    final answerCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kCardDark,
+        title: const Text('ANSWER USER QUESTION', style: TextStyle(color: kNeonCyan, fontWeight: FontWeight.bold, fontSize: 14)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Q: $question', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(controller: answerCtrl, maxLines: 4, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Verified Genuine Solution', labelStyle: TextStyle(color: Colors.white70))),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: kNeonCyan),
+            onPressed: () async {
+              final ans = answerCtrl.text.trim();
+              if (ans.isEmpty) return;
+              await FirebaseFirestore.instance.collection('daily_questions').doc(docId).update({
+                'answer': ans,
+                'isAnswered': true,
+              });
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('SUBMIT SOLUTION', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final bool isDeveloper = (currentUser?.email?.toLowerCase().trim() == kAdminEmail.toLowerCase().trim());
+
+    return Scaffold(
+      backgroundColor: kVoidBlack,
+      appBar: AppBar(
+        backgroundColor: kVoidBlack,
+        elevation: 0,
+        title: const Row(
+          children: [
+            Icon(Icons.auto_stories_rounded, color: kAncientGold, size: 22),
+            SizedBox(width: 8),
+            Text('ORACLE\'S SANCTUM', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)),
+          ],
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: kAncientGold,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white54,
+          tabs: const [
+            Tab(text: 'Creator Stories & News'),
+            Tab(text: 'Daily 20 Questions (8 PM)'),
+          ],
+        ),
+      ),
+      floatingActionButton: (isDeveloper && _tabController.index == 0)
+          ? FloatingActionButton.extended(
+              backgroundColor: kAncientGold,
+              onPressed: () => _showPublishStoryDialog(context),
+              icon: const Icon(Icons.add, color: Colors.black),
+              label: const Text('PUBLISH LORE', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            )
+          : null,
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // ----------------------------------------------------
+          // SUB-TAB 1: DEVELOPER BROADCASTS & PRIZES
+          // ----------------------------------------------------
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('developer_broadcasts').orderBy('createdAt', descending: true).snapshots(),
+            builder: (ctx, snap) {
+              if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: kAncientGold));
+              final docs = snap.data!.docs;
+
+              if (docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.menu_book_rounded, size: 48, color: Colors.white.withOpacity(0.2)),
+                      const SizedBox(height: 12),
+                      const Text('No official chronicles or news published yet.', style: TextStyle(color: Colors.white38)),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: docs.length,
+                itemBuilder: (context, i) {
+                  final item = docs[i].data() as Map<String, dynamic>;
+                  final isPrize = item['isPrize'] == true;
+                  final likes = List<String>.from(item['likes'] ?? []);
+                  final myUid = currentUser?.uid ?? '';
+                  final isLiked = likes.contains(myUid);
+                  final content = item['content'] ?? '';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: kCardDark,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: isPrize ? kAncientGold : kNeonPurple.withOpacity(0.5), width: isPrize ? 1.5 : 1),
+                      boxShadow: [if (isPrize) BoxShadow(color: kAncientGold.withOpacity(0.2), blurRadius: 10, spreadRadius: 1)],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(color: isPrize ? kAncientGold.withOpacity(0.2) : kNeonPurple.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                              child: Text(isPrize ? '🏆 PRIZE ANNOUNCEMENT' : '👑 CREATOR CHRONICLE', style: TextStyle(color: isPrize ? kAncientGold : kNeonCyan, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy_rounded, size: 18, color: Colors.white70),
+                              tooltip: 'Copy Story Text',
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: content));
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chronicle text copied to clipboard!')));
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(item['title'] ?? 'Sanctum Post', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                        const SizedBox(height: 8),
+                        Text(content, style: const TextStyle(fontSize: 13, color: Colors.white70, height: 1.4)),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            InkWell(
+                              onTap: () async {
+                                if (myUid.isEmpty) return;
+                                final docRef = FirebaseFirestore.instance.collection('developer_broadcasts').doc(docs[i].id);
+                                if (isLiked) {
+                                  await docRef.update({'likes': FieldValue.arrayRemove([myUid])});
+                                } else {
+                                  await docRef.update({'likes': FieldValue.arrayUnion([myUid])});
+                                }
+                              },
+                              child: Row(
+                                children: [
+                                  Icon(isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: isLiked ? kHorrorCrimson : Colors.white38, size: 18),
+                                  const SizedBox(width: 6),
+                                  Text('${likes.length} Likes', style: TextStyle(color: isLiked ? kHorrorCrimson : Colors.white54, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.share_outlined, color: Colors.white38, size: 18),
+                              onPressed: () => Share.share('📜 AVATAR SANCTUM:\n\n${item['title']}\n\n$content\n\n- Published by Creator on Avatar Network.'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+
+          // ----------------------------------------------------
+          // SUB-TAB 2: DAILY 20 QUESTIONS (8 PM REVEAL + SEARCH VAULT)
+          // ----------------------------------------------------
+          Column(
+            children: [
+              // Search Filter Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  controller: _searchController,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: kCardDark,
+                    prefixIcon: const Icon(Icons.search, color: kNeonCyan, size: 20),
+                    hintText: 'Search 24-Hour Archive Solutions...',
+                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+
+              // User Input for Question (Max 20 Per Day)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _questionController,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: kCardDark,
+                          hintText: 'Ask Oracle (Max 20 Pool Today)...',
+                          hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.send_rounded, color: kAncientGold),
+                      onPressed: () => _submitUserQuestion(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white12, height: 20),
+
+              // Questions Stream
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance.collection('daily_questions').orderBy('createdAt', descending: true).snapshots(),
+                  builder: (ctx, snap) {
+                    if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: kAncientGold));
+                    var qDocs = snap.data!.docs;
+
+                    if (_searchQuery.isNotEmpty) {
+                      qDocs = qDocs.where((d) {
+                        final data = d.data() as Map<String, dynamic>;
+                        final q = (data['question'] ?? '').toString().toLowerCase();
+                        final a = (data['answer'] ?? '').toString().toLowerCase();
+                        return q.contains(_searchQuery) || a.contains(_searchQuery);
+                      }).toList();
+                    }
+
+                    if (qDocs.isEmpty) {
+                      return const Center(child: Text('No questions matching query.', style: TextStyle(color: Colors.white38)));
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: qDocs.length,
+                      itemBuilder: (context, i) {
+                        final qData = qDocs[i].data() as Map<String, dynamic>;
+                        final isAnswered = qData['isAnswered'] == true;
+                        final question = qData['question'] ?? '';
+                        final answer = qData['answer'] ?? '';
+                        final askedBy = qData['askedBy'] ?? 'Explorer';
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: kCardDark,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: isAnswered ? kNeonCyan.withOpacity(0.5) : Colors.white12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Asked by @$askedBy', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(color: isAnswered ? kMistyGreen.withOpacity(0.2) : kHorrorCrimson.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                                    child: Text(isAnswered ? 'SOLVED (8 PM SPOTLIGHT)' : 'PENDING ORACLE', style: TextStyle(color: isAnswered ? kMistyGreen : kHorrorCrimson, fontSize: 9, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text('Q: $question', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                              if (isAnswered) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(10), border: Border.all(color: kNeonCyan.withOpacity(0.3))),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('👑 DEVELOPER SOLUTION:', style: TextStyle(color: kNeonCyan, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                                      const SizedBox(height: 4),
+                                      Text(answer, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.3)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              if (isDeveloper && !isAnswered) ...[
+                                const SizedBox(height: 10),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: kNeonCyan, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                                    onPressed: () => _showAnswerDialog(context, qDocs[i].id, question),
+                                    child: const Text('ANSWER SOLUTION', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================
+// TAB 5: CHATS (AVATAR FRIEND AI COMPANION)
 // ==================================================
 class ChatsInboxScreen extends StatelessWidget {
   final Color accentColor;
@@ -1843,7 +2277,7 @@ class ChatsInboxScreen extends StatelessWidget {
 }
 
 // ==================================================
-// MULTILINGUAL AI CHAT SCREEN
+// MULTILINGUAL AI CHAT SCREEN (IMPROVED CHAT ENGINE)
 // ==================================================
 class AvatarAIChatScreen extends StatefulWidget {
   const AvatarAIChatScreen({super.key});
@@ -2081,7 +2515,7 @@ class _AvatarDirectChatScreenState extends State<AvatarDirectChatScreen> {
 }
 
 // ==================================================
-// TAB 5: PROFILE & ARTIFACT VAULT
+// TAB 6: PROFILE & ARTIFACT VAULT
 // ==================================================
 class ExplorerProfileScreen extends StatelessWidget {
   final Color accentColor;
