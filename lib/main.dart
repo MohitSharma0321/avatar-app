@@ -131,9 +131,47 @@ class AvatarAIEngine {
 }
 
 // ==================================================
-// DYNAMIC RANK THEME & ECONOMY ENGINE
+// DYNAMIC RANK REWARDS & ECONOMY ENGINE
 // ==================================================
 class RankThemeEngine {
+  static const Map<String, Map<String, dynamic>> rankPerksData = {
+    'Seeker of the Void': {
+      'threshold': 0,
+      'rewardTitle': 'Void Transmitter Core',
+      'rewardDesc': 'Default anonymous frequency identity.',
+      'badgeIcon': Icons.explore_outlined,
+      'color': Colors.white70,
+    },
+    'Dimensional Walker': {
+      'threshold': 50,
+      'rewardTitle': 'Emerald Walker Aura & Demonic Filter',
+      'rewardDesc': 'Unlocked Emerald Glowing Frame + Demonic Voice Modulation.',
+      'badgeIcon': Icons.wifi_tethering_rounded,
+      'color': kMistyGreen,
+    },
+    'Astral Decipherer': {
+      'threshold': 200,
+      'rewardTitle': 'Neon Purple Frame & 2x Radar Speed',
+      'rewardDesc': 'Unlocked Cyber Purple Border + Fast Frequency Orbit scan.',
+      'badgeIcon': Icons.fingerprint_rounded,
+      'color': kNeonPurple,
+    },
+    'Subconscious Oracle': {
+      'threshold': 500,
+      'rewardTitle': 'Cyan Oracle Tag & Cyber Voice',
+      'rewardDesc': 'Unlocked Cyan Multiverse Aura + Cyber Bot Modulation Filter.',
+      'badgeIcon': Icons.remove_red_eye_rounded,
+      'color': kNeonCyan,
+    },
+    'Multiverse Prime': {
+      'threshold': 1200,
+      'rewardTitle': 'Grandmaster Golden Crown & Lore Master Status',
+      'rewardDesc': 'Unlocked Ancient Gold Crown + Exclusive Lore Master status.',
+      'badgeIcon': Icons.military_tech_rounded,
+      'color': kAncientGold,
+    },
+  };
+
   static Map<String, dynamic> getThemeByPoints(int points) {
     if (points >= 1200) {
       return {'rank': 'Multiverse Prime', 'primary': kAncientGold, 'secondary': const Color(0xFFFFD54F), 'glowColor': kAncientGold.withOpacity(0.35), 'next': 'MAX LEVEL', 'target': 1200, 'progress': 1.0};
@@ -148,17 +186,83 @@ class RankThemeEngine {
     }
   }
 
-  static Future<void> checkRankUpNotification(String uid, int oldPoints, int newPoints) async {
-    final oldRank = getThemeByPoints(oldPoints)['rank'];
-    final newRank = getThemeByPoints(newPoints)['rank'];
-    if (oldRank != newRank) {
-      await NotificationService.showLocalNotification('Rank Ascended!', 'Congratulations! You reached Rank: $newRank');
+  static Future<void> checkAndGrantRankRewards(BuildContext? context, String uid, int oldPoints, int newPoints) async {
+    final oldRank = getThemeByPoints(oldPoints)['rank'] as String;
+    final newRankTheme = getThemeByPoints(newPoints);
+    final newRank = newRankTheme['rank'] as String;
+
+    if (oldRank != newRank && newPoints > oldPoints) {
+      final perkData = rankPerksData[newRank] ?? {};
+      final rewardTitle = perkData['rewardTitle'] ?? 'New Rank Reward';
+      final rewardDesc = perkData['rewardDesc'] ?? 'You have unlocked new multiverse powers.';
+
+      await NotificationService.showLocalNotification(
+        '🏆 Rank Ascended: $newRank!',
+        'Reward Unlocked: $rewardTitle',
+      );
+
       await FirebaseFirestore.instance.collection('users').doc(uid).collection('notifications').add({
-        'title': 'Rank Ascended',
-        'desc': 'You have ascended to $newRank!',
+        'title': 'Rank Ascended: $newRank',
+        'desc': '🎁 Reward Claimed: $rewardTitle - $rewardDesc',
         'createdAt': DateTime.now().millisecondsSinceEpoch,
       });
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'rank': newRank,
+        'unlockedPerks': FieldValue.arrayUnion([rewardTitle]),
+      });
+
+      if (context != null && context.mounted) {
+        _showAscensionDialog(context, newRank, rewardTitle, rewardDesc, newRankTheme['primary'] as Color);
+      }
     }
+  }
+
+  static void _showAscensionDialog(BuildContext context, String rank, String reward, String desc, Color color) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kCardDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: color, width: 2)),
+        title: Column(
+          children: [
+            Icon(Icons.military_tech_rounded, size: 56, color: color),
+            const SizedBox(height: 8),
+            Text('RANK ASCENDED!', style: TextStyle(color: color, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('You are now a "$rank"', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white), textAlign: TextAlign.center),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: color.withOpacity(0.4))),
+              child: Column(
+                children: [
+                  Text('🎁 UNLOCKED REWARD:', style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                  const SizedBox(height: 6),
+                  Text(reward, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13), textAlign: TextAlign.center),
+                  const SizedBox(height: 4),
+                  Text(desc, style: const TextStyle(color: Colors.white70, fontSize: 11), textAlign: TextAlign.center),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: color, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CLAIM & EQUIP', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -300,6 +404,7 @@ class _AvatarLoginScreenState extends State<AvatarLoginScreen> {
           'profilePic': '',
           'rank': 'Seeker of the Void',
           'resonances': 0,
+          'unlockedPerks': ['Void Transmitter Core'],
           'isOnline': true,
           'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': DateTime.now().millisecondsSinceEpoch,
@@ -470,18 +575,18 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
                         children: [
                           Text('⚖️ RESONANCE POINT ECONOMY', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
                           SizedBox(height: 8),
-                          Text('• Broadcast Transmission: +2 Pts\n• Decipher/Comment: +1 Pt\n• Witness/Like (Double Tap): +1 Pt\n• Send Radar Invitation: +3 Pts\n• Purge Post (< 24h): -5 Pts Penalty', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
+                          Text('• Broadcast Transmission: +2 Pts\n• Decipher/Comment on Other\'s Post: +1 Pt (1st time only)\n• Witness/Like Other\'s Post: +1 Pt (1st time only)\n• Send Radar Invitation: +3 Pts\n• Own Post Actions: 0 Pts\n• Purge Post (< 24h): -5 Pts Penalty', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
                         ],
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text('LORE ACHIEVEMENTS (REWARD TIERS)', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+                    const Text('LORE ACHIEVEMENTS & PERKS', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
                     const SizedBox(height: 12),
-                    _buildAchievementItem('1. Seeker of the Void', 'Initialize neural transmitter in the multiverse.', points >= 0, Icons.explore_outlined, Colors.white70),
-                    _buildAchievementItem('2. Dimensional Walker', 'Broadcast verified mystery transmissions into realms.', points >= 50, Icons.wifi_tethering_rounded, kMistyGreen),
-                    _buildAchievementItem('3. Astral Decipherer', 'Decipher & analyze parallel dimension entries.', points >= 200, Icons.fingerprint_rounded, kNeonPurple),
-                    _buildAchievementItem('4. Subconscious Oracle', 'Establish anonymous links via Time-Slip Radar.', points >= 500, Icons.remove_red_eye_rounded, kNeonCyan),
-                    _buildAchievementItem('5. Multiverse Prime', 'Grandmaster: Accumulate 1200+ resonance points.', points >= 1200, Icons.military_tech_rounded, kAncientGold),
+                    _buildAchievementItem('1. Seeker of the Void', 'Reward: Void Transmitter Core (Basic Identity).', points >= 0, Icons.explore_outlined, Colors.white70),
+                    _buildAchievementItem('2. Dimensional Walker', 'Reward: Emerald Walker Aura & Demonic Modulation.', points >= 50, Icons.wifi_tethering_rounded, kMistyGreen),
+                    _buildAchievementItem('3. Astral Decipherer', 'Reward: Cyber Purple Frame & 2x Faster Orbit Matching.', points >= 200, Icons.fingerprint_rounded, kNeonPurple),
+                    _buildAchievementItem('4. Subconscious Oracle', 'Reward: Cyan Oracle Tag & Cyber Voice Filter.', points >= 500, Icons.remove_red_eye_rounded, kNeonCyan),
+                    _buildAchievementItem('5. Multiverse Prime', 'Reward: Grandmaster Golden Crown & Lore Status.', points >= 1200, Icons.military_tech_rounded, kAncientGold),
                   ],
                 ),
               );
@@ -824,7 +929,7 @@ class RealmsFeedScreen extends StatelessWidget {
 }
 
 // ==================================================
-// TRANSMISSION CARD (DOUBLE-TAP LIKE & NEON WAVEFORM)
+// TRANSMISSION CARD (EXPLOIT/BUG-FREE POINT SYSTEM)
 // ==================================================
 class TransmissionCard extends StatefulWidget {
   final String docId;
@@ -904,8 +1009,15 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
     }
   }
 
-  void _triggerDoubleTapLike(String currentUid, Color dimColor) async {
+  // 🔥 EXPLOIT-PROOF WITNESS / LIKE SYSTEM
+  void _toggleWitness(String currentUid, Color dimColor) async {
     if (currentUid.isEmpty) return;
+
+    final postAuthorUid = widget.data['uid'] ?? '';
+    final witnesses = List<String>.from(widget.data['witnesses'] ?? []);
+    final awardedWitnesses = List<String>.from(widget.data['awardedWitnesses'] ?? []);
+    final isAlreadyWitness = witnesses.contains(currentUid);
+    final isAuthor = (currentUid == postAuthorUid);
 
     setState(() => showCosmicHeart = true);
     _heartAnim.forward(from: 0.0).then((_) {
@@ -913,16 +1025,33 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
     });
 
     final docRef = FirebaseFirestore.instance.collection('transmissions').doc(widget.docId);
-    final witnesses = List<String>.from(widget.data['witnesses'] ?? []);
 
-    if (!witnesses.contains(currentUid)) {
-      await docRef.update({'witnesses': FieldValue.arrayUnion([currentUid])});
-      final userDoc = FirebaseFirestore.instance.collection('users').doc(currentUid);
-      final userSnap = await userDoc.get();
-      final oldPts = (userSnap.data()?['resonances'] ?? 0) as int;
-      final newPts = oldPts + 1;
-      await userDoc.update({'resonances': newPts});
-      await RankThemeEngine.checkRankUpNotification(currentUid, oldPts, newPts);
+    if (isAlreadyWitness) {
+      // Unlike / Unwitness
+      await docRef.update({
+        'witnesses': FieldValue.arrayRemove([currentUid]),
+      });
+    } else {
+      // Like / Witness
+      await docRef.update({
+        'witnesses': FieldValue.arrayUnion([currentUid]),
+      });
+
+      // Point Reward Condition:
+      // 1. User is NOT liking their own post
+      // 2. User has NEVER received a point for this post before (One-time only)
+      if (!isAuthor && !awardedWitnesses.contains(currentUid)) {
+        await docRef.update({
+          'awardedWitnesses': FieldValue.arrayUnion([currentUid]),
+        });
+
+        final userDoc = FirebaseFirestore.instance.collection('users').doc(currentUid);
+        final userSnap = await userDoc.get();
+        final oldPts = (userSnap.data()?['resonances'] ?? 0) as int;
+        final newPts = oldPts + 1;
+        await userDoc.update({'resonances': newPts});
+        await RankThemeEngine.checkAndGrantRankRewards(context, currentUid, oldPts, newPts);
+      }
     }
   }
 
@@ -966,10 +1095,13 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
     );
   }
 
+  // 🔥 EXPLOIT-PROOF DECIPHER / COMMENT SHEET
   void _openDecipherSheet(BuildContext context, Color dimColor) {
     final commentCtrl = TextEditingController();
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final currentName = FirebaseAuth.instance.currentUser?.displayName ?? 'Explorer';
+    final postAuthorUid = widget.data['uid'] ?? '';
+    final isAuthor = (currentUid == postAuthorUid);
 
     showModalBottomSheet(
       context: context,
@@ -1049,7 +1181,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: kVoidBlack,
-                        hintText: 'Add decipher thought (+1 Pt)...',
+                        hintText: isAuthor ? 'Comment on your lore (0 Pts)...' : 'Add decipher thought (+1 Pt 1st time)...',
                         hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
@@ -1063,23 +1195,36 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
                       final text = commentCtrl.text.trim();
                       if (text.isEmpty) return;
 
-                      await FirebaseFirestore.instance.collection('transmissions').doc(widget.docId).collection('deciphers').add({
+                      final docRef = FirebaseFirestore.instance.collection('transmissions').doc(widget.docId);
+
+                      // Add comment to collection
+                      await docRef.collection('deciphers').add({
                         'uid': currentUid,
                         'userName': currentName,
                         'text': text,
                         'createdAt': DateTime.now().millisecondsSinceEpoch,
                       });
 
-                      await FirebaseFirestore.instance.collection('transmissions').doc(widget.docId).update({
+                      await docRef.update({
                         'decipherCount': FieldValue.increment(1),
                       });
 
-                      final userDoc = FirebaseFirestore.instance.collection('users').doc(currentUid);
-                      final userSnap = await userDoc.get();
-                      final oldPts = (userSnap.data()?['resonances'] ?? 0) as int;
-                      final newPts = oldPts + 1;
-                      await userDoc.update({'resonances': newPts});
-                      await RankThemeEngine.checkRankUpNotification(currentUid, oldPts, newPts);
+                      // Point Reward Condition:
+                      // 1. Not author's own post
+                      // 2. User has never been awarded for commenting on this post
+                      final awardedCommenters = List<String>.from(widget.data['awardedCommenters'] ?? []);
+                      if (!isAuthor && !awardedCommenters.contains(currentUid)) {
+                        await docRef.update({
+                          'awardedCommenters': FieldValue.arrayUnion([currentUid]),
+                        });
+
+                        final userDoc = FirebaseFirestore.instance.collection('users').doc(currentUid);
+                        final userSnap = await userDoc.get();
+                        final oldPts = (userSnap.data()?['resonances'] ?? 0) as int;
+                        final newPts = oldPts + 1;
+                        await userDoc.update({'resonances': newPts});
+                        await RankThemeEngine.checkAndGrantRankRewards(context, currentUid, oldPts, newPts);
+                      }
 
                       commentCtrl.clear();
                     },
@@ -1113,7 +1258,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
     final audioBase64 = widget.data['audioBase64'] ?? '';
 
     return GestureDetector(
-      onDoubleTap: () => _triggerDoubleTapLike(currentUid, dimColor),
+      onDoubleTap: () => _toggleWitness(currentUid, dimColor),
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -1188,7 +1333,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     InkWell(
-                      onTap: () => _triggerDoubleTapLike(currentUid, dimColor),
+                      onTap: () => _toggleWitness(currentUid, dimColor),
                       child: Row(
                         children: [
                           Icon(hasWitnessed ? Icons.visibility_rounded : Icons.visibility_outlined, color: hasWitnessed ? dimColor : Colors.white38, size: 18),
@@ -1226,7 +1371,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
                     children: [
                       Icon(Icons.visibility_rounded, color: dimColor, size: 54),
                       const SizedBox(height: 4),
-                      Text('+1 Witness', style: TextStyle(color: dimColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(isCreator ? 'Self Witness' : '+1 Witness', style: TextStyle(color: dimColor, fontWeight: FontWeight.bold, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -1280,7 +1425,7 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
                 final oldPts = (snap.data()?['resonances'] ?? 0) as int;
                 final newPts = oldPts + 3;
                 await userDoc.update({'resonances': newPts});
-                await RankThemeEngine.checkRankUpNotification(myUid, oldPts, newPts);
+                await RankThemeEngine.checkAndGrantRankRewards(context, myUid, oldPts, newPts);
               }
 
               await NotificationService.showLocalNotification('Invitation Sent', 'Link transmitted to $peerName (+3 Pts Earned).');
@@ -1434,7 +1579,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
   final AudioPlayer _previewPlayer = AudioPlayer();
 
   String selectedDim = 'Horror';
-  String selectedVoiceFilter = 'normal'; // 'normal', 'demonic', 'robotic', 'ethereal'
+  String selectedVoiceFilter = 'normal';
   bool isRecording = false;
   bool isPreviewPlaying = false;
   String? recordedAudioPath;
@@ -1529,16 +1674,17 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
         'hasAudio': recordedAudioBase64 != null,
         'audioBase64': recordedAudioBase64 ?? '',
         'witnesses': [],
+        'awardedWitnesses': [], // 🔥 Track users already awarded points
         'decipherCount': 0,
+        'awardedCommenters': [], // 🔥 Track users already awarded comment points
         'createdAt': DateTime.now().millisecondsSinceEpoch,
       });
 
       if (user?.uid != null) {
         final oldPts = (userSnap.data()?['resonances'] ?? 0) as int;
         final newPts = oldPts + 2;
-        final newRank = RankThemeEngine.getThemeByPoints(newPts)['rank'];
-        await userDocRef.update({'resonances': newPts, 'rank': newRank});
-        await RankThemeEngine.checkRankUpNotification(user!.uid, oldPts, newPts);
+        await userDocRef.update({'resonances': newPts});
+        await RankThemeEngine.checkAndGrantRankRewards(context, user!.uid, oldPts, newPts);
       }
 
       _contentController.clear();
@@ -2017,6 +2163,7 @@ class ExplorerProfileScreen extends StatelessWidget {
           final bio = data['bio'] ?? 'Exploring the Multiverse';
           final points = (data['resonances'] ?? 0) as int;
           final rankTheme = RankThemeEngine.getThemeByPoints(points);
+          final perks = List<String>.from(data['unlockedPerks'] ?? ['Void Transmitter Core']);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -2061,7 +2208,33 @@ class ExplorerProfileScreen extends StatelessWidget {
                   decoration: BoxDecoration(color: (rankTheme['primary'] as Color).withOpacity(0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: rankTheme['primary'] as Color)),
                   child: Text('Rank: ${rankTheme['rank']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: kCardDark, borderRadius: BorderRadius.circular(16), border: Border.all(color: accentColor.withOpacity(0.3))),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.military_tech_rounded, color: accentColor, size: 20),
+                          const SizedBox(width: 8),
+                          Text('ACTIVE PERKS & ARTIFACTS (${perks.length})', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8, runSpacing: 8,
+                        children: perks.map((p) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white12)),
+                          child: Text('✦ $p', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                        )).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text('ARTIFACT VAULT (TAP REALM TO OPEN)', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
