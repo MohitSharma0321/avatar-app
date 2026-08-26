@@ -161,7 +161,7 @@ class NotificationService {
 }
 
 // ==================================================
-// CLOUDFLARE GEMINI AI ENGINE (MULTI-REPLY FIX)
+// CLOUDFLARE GEMINI AI ENGINE
 // ==================================================
 class AvatarAIEngine {
   static const String _workerUrl = 'https://avatar-friend-ai.projectkhurafat.workers.dev/';
@@ -1618,7 +1618,6 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
               return Center(child: CircularProgressIndicator(color: widget.accentColor));
             }
             final allDocs = snap.data?.docs ?? [];
-            // 🔥 ANY-RANK MATCHING: Matches any explorer on the radar
             final matchedUsers = allDocs.where((d) => d.id != myUid).toList();
 
             return SingleChildScrollView(
@@ -1716,7 +1715,7 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
 }
 
 // ==================================================
-// TAB 3: TRANSMISSION STUDIO (1-TAP VOICE FILTERS)
+// TAB 3: TRANSMISSION STUDIO + 24H AI SNAP CREATOR
 // ==================================================
 class TransmissionStudioScreen extends StatefulWidget {
   final Color accentColor;
@@ -1851,16 +1850,345 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
     }
   }
 
+  // -------------------------------------------------------------------
+  // 🌟 24-HOUR AI SNAP MODAL & BOTTOM RIGHT QUICK POST TRIGGER
+  // -------------------------------------------------------------------
+  void _open24hThoughtCreator(BuildContext context) async {
+    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final twentyFourHours = 24 * 60 * 60 * 1000;
+
+    // Check if user already posted in last 24h
+    final recentSnap = await FirebaseFirestore.instance
+        .collection('daily_snaps')
+        .where('uid', isEqualTo: myUid)
+        .where('expiresAt', isGreaterThan: now)
+        .get();
+
+    if (recentSnap.docs.isNotEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('⏳ You can only share 1 AI Snap every 24 Hours! Please wait for your previous snap to expire.')),
+        );
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    final thoughtCtrl = TextEditingController();
+    bool isGenerating = false;
+    String? generatedImageUrl;
+    bool isUploading = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.only(
+              left: 20, right: 20, top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            ),
+            decoration: BoxDecoration(
+              color: kCardDark,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border.all(color: widget.accentColor.withOpacity(0.5), width: 1.5),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.auto_awesome, color: widget.accentColor, size: 20),
+                          const SizedBox(width: 8),
+                          Text('24-HOUR AI SNAP CREATOR', style: TextStyle(color: widget.accentColor, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+                        ],
+                      ),
+                      IconButton(icon: const Icon(Icons.close, color: Colors.white54, size: 20), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const Divider(color: Colors.white12),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: thoughtCtrl,
+                    maxLines: 3,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: kVoidBlack,
+                      hintText: 'Type your deepest thought, mystery or quote...',
+                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Image Preview or Generator
+                  if (generatedImageUrl != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        height: 200,
+                        width: double.infinity,
+                        decoration: BoxDecoration(border: Border.all(color: widget.accentColor)),
+                        child: Image.network(
+                          generatedImageUrl!,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (c, child, p) => p == null ? child : const Center(child: CircularProgressIndicator(color: kNeonCyan)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  if (isGenerating)
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      alignment: Alignment.center,
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(color: widget.accentColor),
+                          const SizedBox(height: 10),
+                          const Text('AI is turning your thought into visual art (Under 60s)...', style: TextStyle(color: kNeonCyan, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+
+                  if (!isGenerating && generatedImageUrl == null)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: kNeonPurple, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                        onPressed: () async {
+                          final text = thoughtCtrl.text.trim();
+                          if (text.isEmpty) return;
+
+                          setModalState(() => isGenerating = true);
+
+                          // Generate prompt-based artistic AI image
+                          final cleanPrompt = Uri.encodeComponent("cinematic surreal multiverse mystic art of: $text, high quality, 8k render, glowing neon");
+                          final aiUrl = "https://image.pollinations.ai/prompt/$cleanPrompt?width=600&height=600&nologo=true";
+
+                          await Future.delayed(const Duration(seconds: 2));
+
+                          setModalState(() {
+                            generatedImageUrl = aiUrl;
+                            isGenerating = false;
+                          });
+                        },
+                        child: const Text('DONE (GENERATE AI PIC)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                      ),
+                    ),
+
+                  // AUTOMATIC UPLOAD BUTTON APPEARS AFTER PIC CONVERSION
+                  if (generatedImageUrl != null)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(backgroundColor: widget.accentColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                        onPressed: isUploading
+                            ? null
+                            : () async {
+                                setModalState(() => isUploading = true);
+                                final user = FirebaseAuth.instance.currentUser;
+                                final expireTime = DateTime.now().millisecondsSinceEpoch + (24 * 60 * 60 * 1000);
+
+                                await FirebaseFirestore.instance.collection('daily_snaps').add({
+                                  'uid': user?.uid ?? '',
+                                  'creatorName': user?.displayName ?? 'Explorer',
+                                  'thought': thoughtCtrl.text.trim(),
+                                  'imageUrl': generatedImageUrl,
+                                  'createdAt': DateTime.now().millisecondsSinceEpoch,
+                                  'expiresAt': expireTime,
+                                });
+
+                                if (ctx.mounted) Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('✨ AI Snap published for 24 Hours! Active in community feed.')),
+                                );
+                              },
+                        icon: isUploading ? const SizedBox.shrink() : const Icon(Icons.cloud_upload_rounded, color: Colors.black),
+                        label: isUploading
+                            ? const CircularProgressIndicator(color: Colors.black)
+                            : const Text('UPLOAD SNAP (LIVE FOR 24H)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showFullSnapView(BuildContext context, Map<String, dynamic> snapData) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            color: kCardDark,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  children: [
+                    Image.network(
+                      snapData['imageUrl'] ?? '',
+                      width: double.infinity,
+                      height: 320,
+                      fit: BoxFit.cover,
+                    ),
+                    Positioned(
+                      top: 12, left: 14,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(12)),
+                        child: Text(
+                          'By ${snapData['creatorName'] ?? 'Explorer'}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 12),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 6, right: 6,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('"${snapData['thought'] ?? ''}"', style: const TextStyle(fontSize: 14, color: Colors.white70, fontStyle: FontStyle.italic, height: 1.3)),
+                      const SizedBox(height: 10),
+                      const Row(
+                        children: [
+                          Icon(Icons.timer_outlined, size: 14, color: kNeonCyan),
+                          SizedBox(width: 4),
+                          Text('Expires automatically in 24h', style: TextStyle(color: kNeonCyan, fontSize: 11)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final nowMillis = DateTime.now().millisecondsSinceEpoch;
+
     return Scaffold(
       backgroundColor: kVoidBlack,
       appBar: AppBar(backgroundColor: kVoidBlack, elevation: 0, title: const Text('TRANSMISSION STUDIO', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)), centerTitle: true),
+      // 🌟 Bottom-Right Floating + Trigger (Identical to reference screenshot)
+      floatingActionButton: Container(
+        margin: const EdgeInsets.only(bottom: 6, right: 4),
+        child: FloatingActionButton(
+          backgroundColor: widget.accentColor,
+          elevation: 8,
+          onPressed: () => _open24hThoughtCreator(context),
+          child: const Icon(Icons.add, color: Colors.black, size: 30),
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 24H Community Live Snap Feed Strip
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('daily_snaps').where('expiresAt', isGreaterThan: nowMillis).snapshots(),
+              builder: (ctx, snap) {
+                if (!snap.hasData) return const SizedBox.shrink();
+                final docs = snap.data!.docs;
+                if (docs.isEmpty) return const SizedBox.shrink();
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.history_toggle_off_rounded, color: kNeonCyan, size: 16),
+                        const SizedBox(width: 6),
+                        const Text('24H AI SNAP EXPLORER FEED', style: TextStyle(color: kNeonCyan, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.2)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 110,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: docs.length,
+                        itemBuilder: (context, i) {
+                          final snapData = docs[i].data() as Map<String, dynamic>;
+                          final creator = snapData['creatorName'] ?? 'Explorer';
+
+                          return GestureDetector(
+                            onTap: () => _showFullSnapView(context, snapData),
+                            child: Container(
+                              width: 85,
+                              margin: const EdgeInsets.only(right: 12),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 70, height: 70,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: widget.accentColor, width: 2),
+                                      image: DecorationImage(
+                                        image: NetworkImage(snapData['imageUrl'] ?? ''),
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    creator,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const Divider(color: Colors.white12, height: 24),
+                  ],
+                );
+              },
+            ),
+
             Text('SELECT REALM DIMENSION', style: TextStyle(color: widget.accentColor, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
             const SizedBox(height: 12),
             Wrap(
@@ -2116,9 +2444,7 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
       body: TabBarView(
         controller: _tabController,
         children: [
-          // ----------------------------------------------------
-          // SUB-TAB 1: DEVELOPER BROADCASTS & PRIZES
-          // ----------------------------------------------------
+          // SUB-TAB 1: DEVELOPER BROADCASTS
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('developer_broadcasts').orderBy('createdAt', descending: true).snapshots(),
             builder: (ctx, snap) {
@@ -2219,9 +2545,7 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
             },
           ),
 
-          // ----------------------------------------------------
-          // SUB-TAB 2: DAILY 20 QUESTIONS (8 PM REVEAL + SEARCH VAULT)
-          // ----------------------------------------------------
+          // SUB-TAB 2: DAILY 20 QUESTIONS
           Column(
             children: [
               Padding(
@@ -2950,7 +3274,7 @@ class _AvatarDirectChatScreenState extends State<AvatarDirectChatScreen> {
 }
 
 // ==================================================
-// TAB 6: IDENTITY VAULT (EXPLORER PROFILE)
+// TAB 6: PROFILE & ARTIFACT VAULT
 // ==================================================
 class ExplorerProfileScreen extends StatelessWidget {
   final Color accentColor;
