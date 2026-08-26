@@ -7,10 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 
 // ==================================================
-// NEXUS CORE PALETTE & THEME CONFIG
+// NEXUS PALETTE & THEME
 // ==================================================
 const Color kVoidBlack = Color(0xFF0A0714);
 const Color kCardDark = Color(0xFF130E24);
@@ -58,7 +59,7 @@ class NexusApp extends StatelessWidget {
 }
 
 // ==================================================
-// AUTHENTICATION & GATEKEEPER
+// AUTHENTICATION
 // ==================================================
 class AuthGatekeeper extends StatelessWidget {
   const AuthGatekeeper({super.key});
@@ -119,10 +120,9 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
           'uid': cred.user!.uid,
           'name': name,
           'username': name.toLowerCase().replaceAll(' ', '_'),
-          'bio': 'Exploring Parallel Timelines',
-          'dimension': 'Ancient Lore',
+          'bio': 'Exploring the Multiverse in NEXUS',
+          'profilePic': '',
           'rank': 'Oracle',
-          'resonances': 108,
           'isOnline': true,
           'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': DateTime.now().millisecondsSinceEpoch,
@@ -139,7 +139,7 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Nexus Gateway Error: $e')),
+        SnackBar(content: Text('Gateway Error: $e')),
       );
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -162,7 +162,6 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
                     width: 76,
@@ -177,10 +176,7 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
                     child: const Icon(Icons.hub_rounded, color: Colors.white, size: 40),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    'N E X U S',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 8, color: Colors.white),
-                  ),
+                  const Text('N E X U S', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 8, color: Colors.white)),
                   const Text('The Multiverse Network', style: TextStyle(color: kNeonCyan, fontSize: 13, letterSpacing: 2)),
                   const SizedBox(height: 36),
                   if (isSignUp)
@@ -190,7 +186,7 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: kCardDark,
-                        hintText: 'Avatar Identity Name',
+                        hintText: 'Avatar Name',
                         hintStyle: const TextStyle(color: Colors.white38),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                         prefixIcon: const Icon(Icons.person_outline, color: kNeonPurple),
@@ -204,7 +200,7 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: kCardDark,
-                      hintText: 'Frequency Mail',
+                      hintText: 'Email Frequency',
                       hintStyle: const TextStyle(color: Colors.white38),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                       prefixIcon: const Icon(Icons.alternate_email, color: kNeonPurple),
@@ -218,7 +214,7 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: kCardDark,
-                      hintText: 'Access Key',
+                      hintText: 'Passkey',
                       hintStyle: const TextStyle(color: Colors.white38),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                       prefixIcon: const Icon(Icons.lock_outline, color: kNeonPurple),
@@ -232,7 +228,6 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kNeonPurple,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 8,
                       ),
                       onPressed: isLoading ? null : _handleAuth,
                       child: isLoading
@@ -244,7 +239,7 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
                   TextButton(
                     onPressed: () => setState(() => isSignUp = !isSignUp),
                     child: Text(
-                      isSignUp ? 'Already an Explorer? Access Dimension' : 'New Being? Generate Identity',
+                      isSignUp ? 'Already an Explorer? Access' : 'New Being? Create Identity',
                       style: const TextStyle(color: kNeonCyan),
                     ),
                   ),
@@ -259,28 +254,83 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
 }
 
 // ==================================================
-// NEXUS BOTTOM HOST & NAVIGATION
+// NOTIFICATION ACTIVITY PANEL
+// ==================================================
+class NotificationScreen extends StatelessWidget {
+  const NotificationScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: kVoidBlack,
+        title: const Text('COSMIC TRANSMISSIONS', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 15)),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildNotifyItem('Dimensional Sync', 'A new being resonated with your Ancient Lore transmission.', Icons.auto_awesome, kAncientGold),
+          _buildNotifyItem('Radar Frequency Alert', 'Midnight anomaly detected in your time-zone.', Icons.radar, kNeonCyan),
+          _buildNotifyItem('Oracle Promotion', 'Your frequency resonance reached Rank II.', Icons.shield, kNeonPurple),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotifyItem(String title, String desc, IconData icon, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kCardDark,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withOpacity(0.15), shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 4),
+                Text(desc, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================
+// MAIN NAVIGATION HOST
 // ==================================================
 class NexusNavigationHost extends StatefulWidget {
-  const NexusNavigationHost({super.key});
+  final int initialIndex;
+  final String initialRealm;
+  const NexusNavigationHost({super.key, this.initialIndex = 0, this.initialRealm = 'All'});
+
   @override
   State<NexusNavigationHost> createState() => _NexusNavigationHostState();
 }
 
 class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsBindingObserver {
-  int _currentIndex = 0;
-
-  final List<Widget> _screens = [
-    const RealmsFeedScreen(),
-    const TimeSlipRadarScreen(),
-    const TransmissionStudioScreen(),
-    const ChatsInboxScreen(),
-    const ExplorerProfileScreen(),
-  ];
+  late int _currentIndex;
+  late String _selectedRealm;
 
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
+    _selectedRealm = widget.initialRealm;
     WidgetsBinding.instance.addObserver(this);
     _setUserOnline(true);
   }
@@ -290,15 +340,6 @@ class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsB
     WidgetsBinding.instance.removeObserver(this);
     _setUserOnline(false);
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _setUserOnline(true);
-    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
-      _setUserOnline(false);
-    }
   }
 
   void _setUserOnline(bool online) {
@@ -311,10 +352,25 @@ class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsB
     }
   }
 
+  void switchToRealm(String realmName) {
+    setState(() {
+      _selectedRealm = realmName;
+      _currentIndex = 0;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      RealmsFeedScreen(selectedRealm: _selectedRealm, onRealmChange: (r) => setState(() => _selectedRealm = r)),
+      const TimeSlipRadarScreen(),
+      TransmissionStudioScreen(onPostSuccess: () => setState(() => _currentIndex = 0)),
+      const ChatsInboxScreen(),
+      ExplorerProfileScreen(onVaultSelect: (realm) => switchToRealm(realm)),
+    ];
+
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: screens[_currentIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: kCardDark,
@@ -327,12 +383,10 @@ class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsB
           backgroundColor: Colors.transparent,
           selectedItemColor: kNeonCyan,
           unselectedItemColor: Colors.white38,
-          showSelectedLabels: true,
-          showUnselectedLabels: false,
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.blur_on_rounded), label: 'Realms'),
             BottomNavigationBarItem(icon: Icon(Icons.radar_rounded), label: 'Radar'),
-            BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline_rounded, size: 30), label: 'Drop'),
+            BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline_rounded, size: 28), label: 'Drop'),
             BottomNavigationBarItem(icon: Icon(Icons.bubble_chart_rounded), label: 'Echoes'),
             BottomNavigationBarItem(icon: Icon(Icons.shield_rounded), label: 'Identity'),
           ],
@@ -343,17 +397,14 @@ class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsB
 }
 
 // ==================================================
-// TAB 1: REALMS FEED (HORROR, GODS, SCI-FI, DREAMS)
+// TAB 1: REALMS FEED
 // ==================================================
-class RealmsFeedScreen extends StatefulWidget {
-  const RealmsFeedScreen({super.key});
-  @override
-  State<RealmsFeedScreen> createState() => _RealmsFeedScreenState();
-}
+class RealmsFeedScreen extends StatelessWidget {
+  final String selectedRealm;
+  final Function(String) onRealmChange;
+  const RealmsFeedScreen({super.key, required this.selectedRealm, required this.onRealmChange});
 
-class _RealmsFeedScreenState extends State<RealmsFeedScreen> {
-  String selectedRealm = 'All';
-  final List<Map<String, dynamic>> realms = [
+  final List<Map<String, dynamic>> realms = const [
     {'name': 'All', 'icon': Icons.all_inclusive_rounded, 'color': kNeonPurple},
     {'name': 'Horror', 'icon': Icons.dark_mode_rounded, 'color': kHorrorCrimson},
     {'name': 'Ancient Gods', 'icon': Icons.temple_hindu_rounded, 'color': kAncientGold},
@@ -380,14 +431,15 @@ class _RealmsFeedScreenState extends State<RealmsFeedScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white70),
-            onPressed: () {},
+            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen()));
+            },
           ),
         ],
       ),
       body: Column(
         children: [
-          // Dimension Selector Carousel
           SizedBox(
             height: 94,
             child: ListView.builder(
@@ -398,7 +450,7 @@ class _RealmsFeedScreenState extends State<RealmsFeedScreen> {
                 final r = realms[i];
                 final isSel = selectedRealm == r['name'];
                 return GestureDetector(
-                  onTap: () => setState(() => selectedRealm = r['name'] as String),
+                  onTap: () => onRealmChange(r['name'] as String),
                   child: Container(
                     margin: const EdgeInsets.only(right: 12),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -430,19 +482,13 @@ class _RealmsFeedScreenState extends State<RealmsFeedScreen> {
               },
             ),
           ),
-          // Transmission Cards Stream
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: selectedRealm == 'All'
                   ? FirebaseFirestore.instance.collection('transmissions').orderBy('createdAt', descending: true).snapshots()
                   : FirebaseFirestore.instance.collection('transmissions').where('dimension', isEqualTo: selectedRealm).snapshots(),
               builder: (ctx, snap) {
-                if (snap.hasError) {
-                  return const Center(child: Text('Cosmic static interference.', style: TextStyle(color: Colors.white38)));
-                }
-                if (!snap.hasData) {
-                  return const Center(child: CircularProgressIndicator(color: kNeonCyan));
-                }
+                if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: kNeonCyan));
                 final docs = snap.data!.docs;
                 if (docs.isEmpty) {
                   return Center(
@@ -451,7 +497,7 @@ class _RealmsFeedScreenState extends State<RealmsFeedScreen> {
                       children: [
                         Icon(Icons.satellite_alt_rounded, size: 50, color: Colors.white.withOpacity(0.2)),
                         const SizedBox(height: 12),
-                        const Text('No transmissions in this dimension yet.', style: TextStyle(color: Colors.white38)),
+                        Text('No transmissions in $selectedRealm yet.', style: const TextStyle(color: Colors.white38)),
                       ],
                     ),
                   );
@@ -489,6 +535,42 @@ class TransmissionCard extends StatelessWidget {
     }
   }
 
+  void _showDeleteDialog(BuildContext context, int createdAt) {
+    final currentMillis = DateTime.now().millisecondsSinceEpoch;
+    final twentyFourHours = 24 * 60 * 60 * 1000;
+    final isWithin24Hours = (currentMillis - createdAt) <= twentyFourHours;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kCardDark,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isWithin24Hours) ...[
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: kHorrorCrimson),
+                title: const Text('Purge Transmission (Within 24 Hours)', style: TextStyle(color: kHorrorCrimson, fontWeight: FontWeight.bold)),
+                onTap: () async {
+                  await FirebaseFirestore.instance.collection('transmissions').doc(docId).delete();
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              ),
+            ] else ...[
+              const ListTile(
+                leading: Icon(Icons.lock_clock, color: Colors.white38),
+                title: Text('Locked in Lore Archive', style: TextStyle(color: Colors.white38)),
+                subtitle: Text('Transmissions older than 24 hours cannot be purged.'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dim = data['dimension'] ?? 'Nexus';
@@ -496,6 +578,8 @@ class TransmissionCard extends StatelessWidget {
     final witnesses = List<String>.from(data['witnesses'] ?? []);
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final hasWitnessed = witnesses.contains(currentUid);
+    final isCreator = (data['uid'] == currentUid);
+    final createdAt = data['createdAt'] ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -504,14 +588,10 @@ class TransmissionCard extends StatelessWidget {
         color: kCardDark,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: dimColor.withOpacity(0.3), width: 1),
-        boxShadow: [
-          BoxShadow(color: dimColor.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 4)),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Avatar & Realm Tag
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -530,29 +610,33 @@ class TransmissionCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(data['creatorName'] ?? 'Explorer', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text(data['rank'] ?? 'Seeker', style: TextStyle(color: dimColor, fontSize: 11)),
+                      Text(data['rank'] ?? 'Oracle', style: TextStyle(color: dimColor, fontSize: 11)),
                     ],
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: dimColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: dimColor, width: 0.8),
-                ),
-                child: Text(dim, style: TextStyle(color: dimColor, fontSize: 11, fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: dimColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: dimColor, width: 0.8),
+                    ),
+                    child: Text(dim, style: TextStyle(color: dimColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                  if (isCreator)
+                    IconButton(
+                      icon: const Icon(Icons.more_vert, size: 18, color: Colors.white54),
+                      onPressed: () => _showDeleteDialog(context, createdAt),
+                    ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 14),
-          // Content
-          Text(
-            data['content'] ?? '',
-            style: const TextStyle(fontSize: 14, color: Colors.white, height: 1.4),
-          ),
-          // Audio Echo Mock Waveform (Zero Storage Free Visualizer)
+          Text(data['content'] ?? '', style: const TextStyle(fontSize: 14, color: Colors.white, height: 1.4)),
           if (data['hasAudio'] == true) ...[
             const SizedBox(height: 12),
             Container(
@@ -568,7 +652,7 @@ class TransmissionCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Frequency: ${data['audioFilter'] ?? 'Ghost EVP Audio'} (0:14)',
+                      'Frequency: ${data['audioFilter'] ?? 'Voice Echo'}',
                       style: const TextStyle(fontSize: 12, color: Colors.white70),
                     ),
                   ),
@@ -578,7 +662,6 @@ class TransmissionCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
-          // Actions: Witness & Decipher
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -597,16 +680,9 @@ class TransmissionCard extends StatelessWidget {
                 },
                 child: Row(
                   children: [
-                    Icon(
-                      hasWitnessed ? Icons.visibility_rounded : Icons.visibility_outlined,
-                      color: hasWitnessed ? dimColor : Colors.white38,
-                      size: 18,
-                    ),
+                    Icon(hasWitnessed ? Icons.visibility_rounded : Icons.visibility_outlined, color: hasWitnessed ? dimColor : Colors.white38, size: 18),
                     const SizedBox(width: 6),
-                    Text(
-                      '${witnesses.length} Witnessed',
-                      style: TextStyle(color: hasWitnessed ? dimColor : Colors.white54, fontSize: 12),
-                    ),
+                    Text('${witnesses.length} Witnessed', style: TextStyle(color: hasWitnessed ? dimColor : Colors.white54, fontSize: 12)),
                   ],
                 ),
               ),
@@ -617,10 +693,7 @@ class TransmissionCard extends StatelessWidget {
                   Text('${data['decipherCount'] ?? 0} Deciphered', style: const TextStyle(color: Colors.white54, fontSize: 12)),
                 ],
               ),
-              IconButton(
-                icon: const Icon(Icons.share_outlined, color: Colors.white38, size: 18),
-                onPressed: () {},
-              ),
+              const Icon(Icons.share_outlined, color: Colors.white38, size: 18),
             ],
           ),
         ],
@@ -630,13 +703,15 @@ class TransmissionCard extends StatelessWidget {
 }
 
 // ==================================================
-// TAB 2: TIME-SLIP RADAR (REAL-TIME ORBIT DISCOVERY)
+// TAB 2: TIME-SLIP RADAR (LIVE ONLINE USERS ORBIT)
 // ==================================================
 class TimeSlipRadarScreen extends StatelessWidget {
   const TimeSlipRadarScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: kVoidBlack,
@@ -644,144 +719,138 @@ class TimeSlipRadarScreen extends StatelessWidget {
         title: const Text('TIME-SLIP RADAR', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16)),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 20),
-          const Text('Scan nearby thought frequencies & parallel beings', style: TextStyle(color: Colors.white54, fontSize: 12)),
-          const SizedBox(height: 30),
-          // 2D Vector Animated Radar Target
-          Center(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 280,
-                  height: 280,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: kNeonCyan.withOpacity(0.2), width: 1.5),
-                  ),
-                ),
-                Container(
-                  width: 190,
-                  height: 190,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: kNeonPurple.withOpacity(0.3), width: 1.5),
-                  ),
-                ),
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: kAncientGold.withOpacity(0.4), width: 1.5),
-                  ),
-                ),
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: kNeonCyan,
-                    boxShadow: [BoxShadow(color: kNeonCyan, blurRadius: 10, spreadRadius: 2)],
-                  ),
-                ),
-                // Floating Entity Orbits
-                Positioned(
-                  top: 30,
-                  left: 60,
-                  child: _buildRadarPin(context, 'Cyborg_09', kNeonCyan, 'Futuristic Anomaly'),
-                ),
-                Positioned(
-                  bottom: 40,
-                  right: 40,
-                  child: _buildRadarPin(context, 'Vedic_Sage', kAncientGold, 'Ancient Alignment'),
-                ),
-                Positioned(
-                  top: 70,
-                  right: 50,
-                  child: _buildRadarPin(context, 'Ghost_Hunter', kHorrorCrimson, 'EVP Audio 3AM'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
-          // Real-time Match Banner
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: kCardDark,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: kNeonPurple.withOpacity(0.5)),
-            ),
-            child: Column(
-              children: [
-                const Row(
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').snapshots(),
+        builder: (ctx, snap) {
+          if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: kNeonCyan));
+          final otherUsers = snap.data!.docs.where((d) => d.id != myUid).toList();
+
+          return Column(
+            children: [
+              const SizedBox(height: 10),
+              const Text('Live thought frequencies in real-time orbit', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              const SizedBox(height: 20),
+              Center(
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    Icon(Icons.auto_awesome, color: kNeonCyan, size: 20),
-                    SizedBox(width: 8),
-                    Text('PARALLEL RESONANCE FOUND', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kNeonCyan)),
+                    Container(
+                      width: 270,
+                      height: 270,
+                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: kNeonCyan.withOpacity(0.25))),
+                    ),
+                    Container(
+                      width: 180,
+                      height: 180,
+                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: kNeonPurple.withOpacity(0.3))),
+                    ),
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: const BoxDecoration(shape: BoxShape.circle, color: kNeonCyan),
+                    ),
+                    // Live Real User Pins Positioned Orbit
+                    for (int i = 0; i < otherUsers.length && i < 3; i++)
+                      _buildOrbitNode(context, otherUsers[i], i),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'User @Shadow_01 is experiencing the same Lucid Dream frequency as you right now.',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kNeonPurple,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Establishing Anonymous Subconscious Link...')),
-                      );
-                    },
-                    child: const Text('ENTER ANONYMOUS LINK', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+              const SizedBox(height: 30),
+              if (otherUsers.isNotEmpty) ...[
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: kCardDark,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: kNeonPurple.withOpacity(0.5)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.auto_awesome, color: kNeonCyan, size: 20),
+                          const SizedBox(width: 8),
+                          Text('SYNCHRONIZED: @${otherUsers.first['username'] ?? 'Explorer'}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kNeonCyan)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text('${otherUsers.first['name']} is currently tuned to the frequency.', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: kNeonPurple, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => NexusDirectChatScreen(peerUid: otherUsers.first.id, peerName: otherUsers.first['name'] ?? 'Explorer'),
+                              ),
+                            );
+                          },
+                          child: const Text('ENTER ANONYMOUS LINK', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ] else ...[
+                const Text('No other explorers on radar frequency.', style: TextStyle(color: Colors.white38)),
               ],
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildRadarPin(BuildContext context, String name, Color color, String vibe) {
-    return InkWell(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Inspecting frequency of $name: $vibe')));
-      },
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withOpacity(0.2),
-              border: Border.all(color: color, width: 1.5),
+  Widget _buildOrbitNode(BuildContext context, QueryDocumentSnapshot userDoc, int index) {
+    final data = userDoc.data() as Map<String, dynamic>;
+    final name = data['name'] ?? 'Explorer';
+    final offsets = [
+      const Offset(-70, -80),
+      const Offset(80, 50),
+      const Offset(-50, 70),
+    ];
+
+    return Transform.translate(
+      offset: offsets[index % offsets.length],
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => NexusDirectChatScreen(peerUid: userDoc.id, peerName: name),
             ),
-            child: Icon(Icons.person, size: 14, color: color),
-          ),
-          Text(name, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-        ],
+          );
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: kNeonPurple.withOpacity(0.3),
+                border: Border.all(color: kNeonCyan, width: 1.5),
+              ),
+              child: const Icon(Icons.person, size: 14, color: Colors.white),
+            ),
+            Text(name, style: const TextStyle(color: kNeonCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }
 }
 
 // ==================================================
-// TAB 3: TRANSMISSION STUDIO (DROP / POST MODAL)
+// TAB 3: TRANSMISSION STUDIO (POST CREATION FIX)
 // ==================================================
 class TransmissionStudioScreen extends StatefulWidget {
-  const TransmissionStudioScreen({super.key});
+  final VoidCallback onPostSuccess;
+  const TransmissionStudioScreen({super.key, required this.onPostSuccess});
   @override
   State<TransmissionStudioScreen> createState() => _TransmissionStudioScreenState();
 }
@@ -799,9 +868,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
   Future<void> _transmit() async {
     final text = _contentController.text.trim();
     if (text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please describe your transmission.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please describe your transmission.')));
       return;
     }
 
@@ -811,29 +878,22 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
     try {
       await FirebaseFirestore.instance.collection('transmissions').add({
         'uid': user?.uid ?? 'anon',
-        'creatorName': user?.displayName ?? 'Oracle Explorer',
+        'creatorName': user?.displayName ?? 'Explorer',
         'rank': 'Oracle',
-        'dimension': selectedDim,
+        'dimension': selectedDim, // 🔥 Guaranteed selected dimension
         'content': text,
         'hasAudio': hasVoiceNote,
-        'audioFilter': selectedFilter,
+        'audioFilter': hasVoiceNote ? selectedFilter : '',
         'witnesses': [],
         'decipherCount': 0,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
-        'serverTimestamp': FieldValue.serverTimestamp(),
       });
 
       _contentController.clear();
       setState(() => hasVoiceNote = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Transmission Broadcasted to $selectedDim Realm!')),
-        );
-      }
+      widget.onPostSuccess();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Signal Interrupted: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => isTransmitting = false);
     }
@@ -876,13 +936,12 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
               decoration: InputDecoration(
                 filled: true,
                 fillColor: kCardDark,
-                hintText: 'Describe your dream, supernatural anomaly, or ancient prophecy...',
+                hintText: 'Share your supernatural encounter, dream, or myth...',
                 hintStyle: const TextStyle(color: Colors.white38),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 20),
-            // Frequency Voice Studio
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -921,14 +980,13 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
             SizedBox(
               width: double.infinity,
               height: 52,
-              child: ElevatedButton.icon(
+              child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kNeonPurple,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 onPressed: isTransmitting ? null : _transmit,
-                icon: isTransmitting ? const SizedBox() : const Icon(Icons.send_rounded, color: Colors.white),
-                label: isTransmitting
+                child: isTransmitting
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text('BROADCAST TRANSMISSION', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5, color: Colors.white)),
               ),
@@ -941,7 +999,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 }
 
 // ==================================================
-// TAB 4: CHATS & ECHOES INBOX
+// TAB 4: DIRECT CHATS
 // ==================================================
 class ChatsInboxScreen extends StatelessWidget {
   const ChatsInboxScreen({super.key});
@@ -983,29 +1041,12 @@ class ChatsInboxScreen extends StatelessWidget {
                   border: Border.all(color: Colors.white12),
                 ),
                 child: ListTile(
-                  leading: Stack(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: kNeonPurple.withOpacity(0.3),
-                        child: Text(peerName[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: isOnline ? kMistyGreen : Colors.grey,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: kCardDark, width: 2),
-                          ),
-                        ),
-                      ),
-                    ],
+                  leading: CircleAvatar(
+                    backgroundColor: kNeonPurple.withOpacity(0.3),
+                    child: Text(peerName[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                   title: Text(peerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  subtitle: Text(isOnline ? 'Active on frequency' : 'Signal lost (Offline)', style: TextStyle(color: isOnline ? kMistyGreen : Colors.white38, fontSize: 12)),
+                  subtitle: Text(isOnline ? 'Active on frequency' : 'Signal lost', style: TextStyle(color: isOnline ? kMistyGreen : Colors.white38, fontSize: 12)),
                   trailing: const Icon(Icons.chevron_right, color: Colors.white38),
                   onTap: () {
                     Navigator.push(
@@ -1046,7 +1087,7 @@ class _NexusDirectChatScreenState extends State<NexusDirectChatScreen> {
     chatRoomId = '${list[0]}_${list[1]}';
   }
 
-  void _sendTextMessage() {
+  void _send() {
     final text = _msgController.text.trim();
     if (text.isEmpty) return;
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -1055,9 +1096,7 @@ class _NexusDirectChatScreenState extends State<NexusDirectChatScreen> {
       'senderId': myUid,
       'text': text,
       'createdAt': DateTime.now().millisecondsSinceEpoch,
-      'serverTimestamp': FieldValue.serverTimestamp(),
     });
-
     _msgController.clear();
   }
 
@@ -1068,24 +1107,7 @@ class _NexusDirectChatScreenState extends State<NexusDirectChatScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: kVoidBlack,
-        elevation: 0,
-        title: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection('users').doc(widget.peerUid).snapshots(),
-          builder: (context, snap) {
-            final uData = snap.data?.data() as Map<String, dynamic>?;
-            final isPeerOnline = uData?['isOnline'] == true;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.peerName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Text(
-                  isPeerOnline ? 'Online' : 'Offline',
-                  style: TextStyle(fontSize: 12, color: isPeerOnline ? kMistyGreen : Colors.white38),
-                ),
-              ],
-            );
-          },
-        ),
+        title: Text(widget.peerName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
       body: Column(
         children: [
@@ -1117,7 +1139,6 @@ class _NexusDirectChatScreenState extends State<NexusDirectChatScreen> {
                         decoration: BoxDecoration(
                           color: isMe ? kNeonPurple : kCardDark,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: isMe ? Colors.transparent : Colors.white12),
                         ),
                         child: Text(msg['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 14)),
                       ),
@@ -1143,15 +1164,11 @@ class _NexusDirectChatScreenState extends State<NexusDirectChatScreen> {
                         hintText: 'Transmit thought...',
                         hintStyle: const TextStyle(color: Colors.white38),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.send_rounded, color: kNeonCyan),
-                    onPressed: _sendTextMessage,
-                  ),
+                  IconButton(icon: const Icon(Icons.send_rounded, color: kNeonCyan), onPressed: _send),
                 ],
               ),
             ),
@@ -1163,10 +1180,80 @@ class _NexusDirectChatScreenState extends State<NexusDirectChatScreen> {
 }
 
 // ==================================================
-// TAB 5: EXPLORER IDENTITY & ARTIFACT VAULT
+// TAB 5: PROFILE WITH IMAGE PICKER & CROPPER
 // ==================================================
-class ExplorerProfileScreen extends StatelessWidget {
-  const ExplorerProfileScreen({super.key});
+class ExplorerProfileScreen extends StatefulWidget {
+  final Function(String) onVaultSelect;
+  const ExplorerProfileScreen({super.key, required this.onVaultSelect});
+
+  @override
+  State<ExplorerProfileScreen> createState() => _ExplorerProfileScreenState();
+}
+
+class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
+  Future<void> _pickAndCropAvatar(String uid) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: picked.path,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Crop Nexus Avatar',
+          toolbarColor: kVoidBlack,
+          toolbarWidgetColor: Colors.white,
+          initAspectRatio: CropAspectRatioPreset.square,
+          lockAspectRatio: true,
+        ),
+      ],
+    );
+
+    if (cropped != null) {
+      final bytes = await File(cropped.path).readAsBytes();
+      final base64Image = base64Encode(bytes);
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'profilePic': base64Image,
+      });
+    }
+  }
+
+  void _showEditProfileDialog(BuildContext context, String currentName, String currentBio, String uid) {
+    final nameCtrl = TextEditingController(text: currentName);
+    final bioCtrl = TextEditingController(text: currentBio);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kCardDark,
+        title: const Text('Edit Identity', style: TextStyle(color: kNeonCyan, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name', labelStyle: TextStyle(color: Colors.white70))),
+            const SizedBox(height: 12),
+            TextField(controller: bioCtrl, decoration: const InputDecoration(labelText: 'Bio', labelStyle: TextStyle(color: Colors.white70))),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: kNeonPurple),
+            onPressed: () async {
+              await FirebaseFirestore.instance.collection('users').doc(uid).update({
+                'name': nameCtrl.text.trim(),
+                'bio': bioCtrl.text.trim(),
+              });
+              await FirebaseAuth.instance.currentUser?.updateDisplayName(nameCtrl.text.trim());
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1189,6 +1276,9 @@ class ExplorerProfileScreen extends StatelessWidget {
         builder: (ctx, snap) {
           if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: kNeonPurple));
           final data = snap.data?.data() as Map<String, dynamic>? ?? {};
+          final profilePicBase64 = data['profilePic'] ?? '';
+          final name = data['name'] ?? 'Explorer';
+          final bio = data['bio'] ?? 'Exploring the Multiverse';
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -1196,7 +1286,6 @@ class ExplorerProfileScreen extends StatelessWidget {
               children: [
                 Center(
                   child: Stack(
-                    alignment: Alignment.center,
                     children: [
                       Container(
                         width: 100,
@@ -1204,29 +1293,47 @@ class ExplorerProfileScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(color: kNeonCyan, width: 2),
-                          boxShadow: [
-                            BoxShadow(color: kNeonCyan.withOpacity(0.3), blurRadius: 20, spreadRadius: 2),
-                          ],
+                          boxShadow: [BoxShadow(color: kNeonCyan.withOpacity(0.3), blurRadius: 20, spreadRadius: 2)],
+                        ),
+                        child: ClipOval(
+                          child: profilePicBase64.isNotEmpty
+                              ? Image.memory(base64Decode(profilePicBase64), fit: BoxFit.cover)
+                              : CircleAvatar(
+                                  backgroundColor: kNeonPurple.withOpacity(0.4),
+                                  child: Text(name[0].toUpperCase(), style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.white)),
+                                ),
                         ),
                       ),
-                      CircleAvatar(
-                        radius: 44,
-                        backgroundColor: kNeonPurple.withOpacity(0.4),
-                        child: Text(
-                          (data['name'] ?? 'E')[0].toUpperCase(),
-                          style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.white),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: InkWell(
+                          onTap: () => _pickAndCropAvatar(myUid),
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(color: kNeonPurple, shape: BoxShape.circle),
+                            child: const Icon(Icons.crop_original_rounded, size: 18, color: Colors.white),
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(data['name'] ?? 'Explorer', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 18, color: kNeonCyan),
+                      onPressed: () => _showEditProfileDialog(context, name, bio, myUid),
+                    ),
+                  ],
+                ),
                 Text('@${data['username'] ?? 'nexus_being'}', style: const TextStyle(color: kNeonCyan, fontSize: 13)),
                 const SizedBox(height: 8),
-                Text(data['bio'] ?? 'Traversing Parallel Timelines', style: const TextStyle(color: Colors.white60, fontSize: 13)),
-                const SizedBox(height: 20),
-                // Rank Badge
+                Text(bio, style: const TextStyle(color: Colors.white60, fontSize: 13), textAlign: TextAlign.center),
+                const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
@@ -1239,10 +1346,9 @@ class ExplorerProfileScreen extends StatelessWidget {
                 const SizedBox(height: 30),
                 const Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('ARTIFACT VAULT (SAVED LORE)', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+                  child: Text('ARTIFACT VAULT (TAP REALM TO OPEN)', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
                 ),
                 const SizedBox(height: 14),
-                // Grid of 2D Lore Artifacts
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
@@ -1250,10 +1356,10 @@ class ExplorerProfileScreen extends StatelessWidget {
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                   children: [
-                    _buildArtifactItem('The Kedarnath Alignment', 'Ancient Lore', kAncientGold),
-                    _buildArtifactItem('Lucid Tunnel Paradox', 'Dreams', kMistyGreen),
-                    _buildArtifactItem('Cyber Singularity 3050', 'Cyber', kNeonCyan),
-                    _buildArtifactItem('Midnight Static 3:15 AM', 'Horror', kHorrorCrimson),
+                    _buildArtifactItem('Ancient Gods', 'Temple Alignments & Lore', kAncientGold, () => widget.onVaultSelect('Ancient Gods')),
+                    _buildArtifactItem('Dreams', 'Lucid Dreams & Paradoxes', kMistyGreen, () => widget.onVaultSelect('Dreams')),
+                    _buildArtifactItem('Cyber 3050', 'Singularity & AI Theories', kNeonCyan, () => widget.onVaultSelect('Cyber 3050')),
+                    _buildArtifactItem('Horror', 'Midnight Paranormal EVP', kHorrorCrimson, () => widget.onVaultSelect('Horror')),
                   ],
                 ),
               ],
@@ -1264,27 +1370,30 @@ class ExplorerProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildArtifactItem(String title, String realm, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kCardDark,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Icon(Icons.token_rounded, color: color, size: 28),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              Text(realm, style: TextStyle(color: color, fontSize: 10)),
-            ],
-          ),
-        ],
+  Widget _buildArtifactItem(String title, String desc, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: kCardDark,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Icon(Icons.token_rounded, color: color, size: 28),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
+                Text(desc, style: TextStyle(color: color, fontSize: 10)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
