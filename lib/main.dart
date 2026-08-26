@@ -703,7 +703,7 @@ class TransmissionCard extends StatelessWidget {
 }
 
 // ==================================================
-// TAB 2: TIME-SLIP RADAR (LIVE ONLINE USERS ORBIT)
+// TAB 2: TIME-SLIP RADAR (SAFE & ZERO CRASH)
 // ==================================================
 class TimeSlipRadarScreen extends StatelessWidget {
   const TimeSlipRadarScreen({super.key});
@@ -713,105 +713,173 @@ class TimeSlipRadarScreen extends StatelessWidget {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
+      backgroundColor: kVoidBlack,
       appBar: AppBar(
         backgroundColor: kVoidBlack,
         elevation: 0,
         title: const Text('TIME-SLIP RADAR', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16)),
         centerTitle: true,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').snapshots(),
-        builder: (ctx, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: kNeonCyan));
-          final otherUsers = snap.data!.docs.where((d) => d.id != myUid).toList();
+      body: SafeArea(
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('users').snapshots(),
+          builder: (ctx, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: kNeonCyan));
+            }
+            
+            final allDocs = snap.data?.docs ?? [];
+            final otherUsers = allDocs.where((d) => d.id != myUid).toList();
 
-          return Column(
-            children: [
-              const SizedBox(height: 10),
-              const Text('Live thought frequencies in real-time orbit', style: TextStyle(color: Colors.white54, fontSize: 12)),
-              const SizedBox(height: 20),
-              Center(
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: 270,
-                      height: 270,
-                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: kNeonCyan.withOpacity(0.25))),
-                    ),
-                    Container(
-                      width: 180,
-                      height: 180,
-                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: kNeonPurple.withOpacity(0.3))),
-                    ),
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: kNeonCyan),
-                    ),
-                    // Live Real User Pins Positioned Orbit
-                    for (int i = 0; i < otherUsers.length && i < 3; i++)
-                      _buildOrbitNode(context, otherUsers[i], i),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-              if (otherUsers.isNotEmpty) ...[
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: kCardDark,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: kNeonPurple.withOpacity(0.5)),
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Column(
+                children: [
+                  const Text(
+                    'Live thought frequencies in real-time orbit',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
                   ),
-                  child: Column(
-                    children: [
-                      Row(
+                  const SizedBox(height: 24),
+                  
+                  // Radar Rings Center
+                  Center(
+                    child: SizedBox(
+                      width: 280,
+                      height: 280,
+                      child: Stack(
+                        alignment: Alignment.center,
                         children: [
-                          const Icon(Icons.auto_awesome, color: kNeonCyan, size: 20),
-                          const SizedBox(width: 8),
-                          Text('SYNCHRONIZED: @${otherUsers.first['username'] ?? 'Explorer'}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kNeonCyan)),
+                          Container(
+                            width: 270,
+                            height: 270,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: kNeonCyan.withOpacity(0.25), width: 1.5),
+                            ),
+                          ),
+                          Container(
+                            width: 180,
+                            height: 180,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: kNeonPurple.withOpacity(0.35), width: 1.5),
+                            ),
+                          ),
+                          Container(
+                            width: 90,
+                            height: 90,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: kAncientGold.withOpacity(0.3), width: 1),
+                            ),
+                          ),
+                          Container(
+                            width: 14,
+                            height: 14,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: kNeonCyan,
+                              boxShadow: [BoxShadow(color: kNeonCyan, blurRadius: 12, spreadRadius: 3)],
+                            ),
+                          ),
+                          
+                          // Active Orbit Users
+                          if (otherUsers.isNotEmpty)
+                            for (int i = 0; i < otherUsers.length && i < 3; i++)
+                              _buildOrbitNode(context, otherUsers[i], i)
+                          else ...[
+                            // Ambient Mock Nodes agar abhi dusre users online na hon
+                            _buildStaticNode(const Offset(-70, -75), 'Void_Seeker', kNeonCyan),
+                            _buildStaticNode(const Offset(75, 45), 'Ancient_Seer', kAncientGold),
+                            _buildStaticNode(const Offset(-45, 65), 'Shadow_01', kHorrorCrimson),
+                          ],
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text('${otherUsers.first['name']} is currently tuned to the frequency.', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: kNeonPurple, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => NexusDirectChatScreen(peerUid: otherUsers.first.id, peerName: otherUsers.first['name'] ?? 'Explorer'),
-                              ),
-                            );
-                          },
-                          child: const Text('ENTER ANONYMOUS LINK', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ] else ...[
-                const Text('No other explorers on radar frequency.', style: TextStyle(color: Colors.white38)),
-              ],
-            ],
-          );
-        },
+                  const SizedBox(height: 32),
+                  
+                  // Resonance Bottom Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: kCardDark,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: kNeonPurple.withOpacity(0.5)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.auto_awesome, color: kNeonCyan, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              otherUsers.isNotEmpty
+                                  ? 'SYNCHRONIZED: @${(otherUsers.first.data() as Map<String, dynamic>)['username'] ?? 'Explorer'}'
+                                  : 'PARALLEL RESONANCE SCANNING',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kNeonCyan),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          otherUsers.isNotEmpty
+                              ? '${(otherUsers.first.data() as Map<String, dynamic>)['name'] ?? 'Explorer'} is currently tuned to the multiverse frequency.'
+                              : 'Tuning into subconscious wave patterns across dimensions...',
+                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 46,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kNeonPurple,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () {
+                              if (otherUsers.isNotEmpty) {
+                                final firstData = otherUsers.first.data() as Map<String, dynamic>;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => NexusDirectChatScreen(
+                                      peerUid: otherUsers.first.id,
+                                      peerName: firstData['name'] ?? 'Explorer',
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Scanning cosmic frequencies...')),
+                                );
+                              }
+                            },
+                            child: const Text('ENTER ANONYMOUS LINK', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildOrbitNode(BuildContext context, QueryDocumentSnapshot userDoc, int index) {
-    final data = userDoc.data() as Map<String, dynamic>;
+    final data = userDoc.data() as Map<String, dynamic>? ?? {};
     final name = data['name'] ?? 'Explorer';
     final offsets = [
-      const Offset(-70, -80),
-      const Offset(80, 50),
-      const Offset(-50, 70),
+      const Offset(-70, -75),
+      const Offset(75, 45),
+      const Offset(-45, 65),
     ];
 
     return Transform.translate(
@@ -840,6 +908,27 @@ class TimeSlipRadarScreen extends StatelessWidget {
             Text(name, style: const TextStyle(color: kNeonCyan, fontSize: 10, fontWeight: FontWeight.bold)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStaticNode(Offset offset, String label, Color color) {
+    return Transform.translate(
+      offset: offset,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withOpacity(0.2),
+              border: Border.all(color: color, width: 1.5),
+            ),
+            child: Icon(Icons.blur_on_rounded, size: 14, color: color),
+          ),
+          Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
