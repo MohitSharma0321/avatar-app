@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -121,7 +122,7 @@ class AvatarAIEngine {
           return "Cloudflare Error: ${data['error']}";
         }
       }
-      return 'The cosmos echoes across frequencies. (Check API Key)';
+      return 'The cosmos echoes across frequencies.';
     } catch (e) {
       debugPrint('Cloudflare Avatar AI Error: $e');
       return 'Resonance signal weak. Try transmitting again.';
@@ -158,6 +159,74 @@ class RankThemeEngine {
         'createdAt': DateTime.now().millisecondsSinceEpoch,
       });
     }
+  }
+}
+
+// ==================================================
+// NEON WAVEFORM VISUALIZER WIDGET
+// ==================================================
+class NeonWaveformVisualizer extends StatefulWidget {
+  final bool isPlaying;
+  final Color color;
+  const NeonWaveformVisualizer({super.key, required this.isPlaying, required this.color});
+
+  @override
+  State<NeonWaveformVisualizer> createState() => _NeonWaveformVisualizerState();
+}
+
+class _NeonWaveformVisualizerState extends State<NeonWaveformVisualizer> with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isPlaying) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(
+          12,
+          (i) => Container(
+            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+            width: 3,
+            height: 6.0 + (i % 4) * 3,
+            decoration: BoxDecoration(color: widget.color.withOpacity(0.35), borderRadius: BorderRadius.circular(2)),
+          ),
+        ),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _animController,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(12, (i) {
+            final double height = 6.0 + 16.0 * sin((_animController.value * 2 * pi) + (i * 0.5)).abs();
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+              width: 3,
+              height: height,
+              decoration: BoxDecoration(
+                color: widget.color,
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [BoxShadow(color: widget.color.withOpacity(0.8), blurRadius: 6, spreadRadius: 1)],
+              ),
+            );
+          }),
+        );
+      },
+    );
   }
 }
 
@@ -296,7 +365,7 @@ class _AvatarLoginScreenState extends State<AvatarLoginScreen> {
 }
 
 // ==================================================
-// NOTIFICATIONS & POINT RULES SCREEN (CLEAR ALL FIXED)
+// NOTIFICATIONS & POINT RULES SCREEN
 // ==================================================
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -401,7 +470,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
                         children: [
                           Text('⚖️ RESONANCE POINT ECONOMY', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
                           SizedBox(height: 8),
-                          Text('• Broadcast Transmission: +2 Pts\n• Decipher/Comment: +1 Pt\n• Witness/Like: +1 Pt\n• Send Radar Invitation: +3 Pts\n• Invitation Accepted: +5 Pts\n• Purge Post (< 24h): -5 Pts Penalty', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
+                          Text('• Broadcast Transmission: +2 Pts\n• Decipher/Comment: +1 Pt\n• Witness/Like (Double Tap): +1 Pt\n• Send Radar Invitation: +3 Pts\n• Purge Post (< 24h): -5 Pts Penalty', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
                         ],
                       ),
                     ),
@@ -755,7 +824,7 @@ class RealmsFeedScreen extends StatelessWidget {
 }
 
 // ==================================================
-// TRANSMISSION CARD (COMMENT SHEET KEYBOARD FIX)
+// TRANSMISSION CARD (DOUBLE-TAP LIKE & NEON WAVEFORM)
 // ==================================================
 class TransmissionCard extends StatefulWidget {
   final String docId;
@@ -766,13 +835,22 @@ class TransmissionCard extends StatefulWidget {
   State<TransmissionCard> createState() => _TransmissionCardState();
 }
 
-class _TransmissionCardState extends State<TransmissionCard> {
+class _TransmissionCardState extends State<TransmissionCard> with SingleTickerProviderStateMixin {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool isPlaying = false;
+  bool showCosmicHeart = false;
+  late AnimationController _heartAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _heartAnim = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+  }
 
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _heartAnim.dispose();
     super.dispose();
   }
 
@@ -786,8 +864,12 @@ class _TransmissionCardState extends State<TransmissionCard> {
     }
   }
 
-  double _getPitchByDimension(String dim) {
-    switch (dim) {
+  double _getPitchByVoiceFilter(String voiceFilter, String dimension) {
+    if (voiceFilter == 'demonic') return 0.60;
+    if (voiceFilter == 'robotic') return 1.45;
+    if (voiceFilter == 'ethereal') return 0.85;
+
+    switch (dimension) {
       case 'Horror': return 0.65;
       case 'Cyber 3050': return 1.45;
       case 'Ancient Gods': return 0.75;
@@ -796,7 +878,7 @@ class _TransmissionCardState extends State<TransmissionCard> {
     }
   }
 
-  Future<void> _playModulatedAudio(String base64Audio, String dimension) async {
+  Future<void> _playModulatedAudio(String base64Audio, String dimension, String voiceFilter) async {
     if (isPlaying) {
       await _audioPlayer.stop();
       if (mounted) setState(() => isPlaying = false);
@@ -809,7 +891,7 @@ class _TransmissionCardState extends State<TransmissionCard> {
       final tempFile = File('${tempDir.path}/temp_${widget.docId}.m4a');
       await tempFile.writeAsBytes(bytes);
 
-      await _audioPlayer.setPlaybackRate(_getPitchByDimension(dimension));
+      await _audioPlayer.setPlaybackRate(_getPitchByVoiceFilter(voiceFilter, dimension));
       await _audioPlayer.play(DeviceFileSource(tempFile.path));
       if (mounted) setState(() => isPlaying = true);
 
@@ -819,6 +901,28 @@ class _TransmissionCardState extends State<TransmissionCard> {
     } catch (e) {
       debugPrint('Audio Playback Error: $e');
       if (mounted) setState(() => isPlaying = false);
+    }
+  }
+
+  void _triggerDoubleTapLike(String currentUid, Color dimColor) async {
+    if (currentUid.isEmpty) return;
+
+    setState(() => showCosmicHeart = true);
+    _heartAnim.forward(from: 0.0).then((_) {
+      if (mounted) setState(() => showCosmicHeart = false);
+    });
+
+    final docRef = FirebaseFirestore.instance.collection('transmissions').doc(widget.docId);
+    final witnesses = List<String>.from(widget.data['witnesses'] ?? []);
+
+    if (!witnesses.contains(currentUid)) {
+      await docRef.update({'witnesses': FieldValue.arrayUnion([currentUid])});
+      final userDoc = FirebaseFirestore.instance.collection('users').doc(currentUid);
+      final userSnap = await userDoc.get();
+      final oldPts = (userSnap.data()?['resonances'] ?? 0) as int;
+      final newPts = oldPts + 1;
+      await userDoc.update({'resonances': newPts});
+      await RankThemeEngine.checkRankUpNotification(currentUid, oldPts, newPts);
     }
   }
 
@@ -869,7 +973,7 @@ class _TransmissionCardState extends State<TransmissionCard> {
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // 🔥 Fixes keyboard overlapping
+      isScrollControlled: true,
       backgroundColor: kCardDark,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Padding(
@@ -877,7 +981,7 @@ class _TransmissionCardState extends State<TransmissionCard> {
           left: 18,
           right: 18,
           top: 18,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 18, // 🔥 Elevates above keyboard
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 18,
         ),
         child: SizedBox(
           height: 380,
@@ -996,6 +1100,7 @@ class _TransmissionCardState extends State<TransmissionCard> {
   @override
   Widget build(BuildContext context) {
     final dim = widget.data['dimension'] ?? 'Nexus';
+    final voiceFilter = widget.data['voiceFilter'] ?? 'normal';
     final dimColor = _getDimensionColor(dim);
     final witnesses = List<String>.from(widget.data['witnesses'] ?? []);
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -1007,104 +1112,126 @@ class _TransmissionCardState extends State<TransmissionCard> {
     final creatorName = widget.data['creatorName'] ?? 'Explorer';
     final audioBase64 = widget.data['audioBase64'] ?? '';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: kCardDark, borderRadius: BorderRadius.circular(20), border: Border.all(color: dimColor.withOpacity(0.3), width: 1)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return GestureDetector(
+      onDoubleTap: () => _triggerDoubleTapLike(currentUid, dimColor),
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(radius: 18, backgroundColor: dimColor.withOpacity(0.2), child: Text(creatorName[0].toUpperCase(), style: TextStyle(color: dimColor, fontWeight: FontWeight.bold))),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: kCardDark, borderRadius: BorderRadius.circular(20), border: Border.all(color: dimColor.withOpacity(0.3), width: 1)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(radius: 18, backgroundColor: dimColor.withOpacity(0.2), child: Text(creatorName[0].toUpperCase(), style: TextStyle(color: dimColor, fontWeight: FontWeight.bold))),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(creatorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            Text(widget.data['rank'] ?? 'Seeker', style: TextStyle(color: dimColor, fontSize: 11)),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: dimColor.withOpacity(0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: dimColor, width: 0.8)),
+                          child: Text(dim, style: TextStyle(color: dimColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                        if (isCreator)
+                          IconButton(icon: const Icon(Icons.more_vert, size: 18, color: Colors.white54), onPressed: () => _showDeleteDialog(context, createdAt, authorUid)),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (content.isNotEmpty) Text(content, style: const TextStyle(fontSize: 14, color: Colors.white, height: 1.4)),
+                if (widget.data['hasAudio'] == true && audioBase64.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () => _playModulatedAudio(audioBase64, dim, voiceFilter),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), borderRadius: BorderRadius.circular(14), border: Border.all(color: isPlaying ? dimColor : Colors.white12, width: isPlaying ? 1.5 : 1)),
+                      child: Row(
+                        children: [
+                          Icon(isPlaying ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded, color: dimColor, size: 28),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(isPlaying ? 'Transmitting Echo...' : 'Frequency: Modulated ${voiceFilter.toUpperCase()} Echo', style: TextStyle(fontSize: 12, color: isPlaying ? dimColor : Colors.white70, fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal)),
+                                const SizedBox(height: 2),
+                                Text('$dim Realm • Tap to Listen', style: const TextStyle(fontSize: 10, color: Colors.white38)),
+                              ],
+                            ),
+                          ),
+                          NeonWaveformVisualizer(isPlaying: isPlaying, color: dimColor),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    InkWell(
+                      onTap: () => _triggerDoubleTapLike(currentUid, dimColor),
+                      child: Row(
+                        children: [
+                          Icon(hasWitnessed ? Icons.visibility_rounded : Icons.visibility_outlined, color: hasWitnessed ? dimColor : Colors.white38, size: 18),
+                          const SizedBox(width: 6),
+                          Text('${witnesses.length} Witnessed', style: TextStyle(color: hasWitnessed ? dimColor : Colors.white54, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => _openDecipherSheet(context, dimColor),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.comment_outlined, color: Colors.white38, size: 18),
+                          const SizedBox(width: 6),
+                          Text('${widget.data['decipherCount'] ?? 0} Deciphered', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    IconButton(icon: const Icon(Icons.share_outlined, color: Colors.white38, size: 18), onPressed: () => _shareTransmission(content, dim, creatorName)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (showCosmicHeart)
+            ScaleTransition(
+              scale: Tween<double>(begin: 0.3, end: 1.4).animate(CurvedAnimation(parent: _heartAnim, curve: Curves.elasticOut)),
+              child: FadeTransition(
+                opacity: Tween<double>(begin: 1.0, end: 0.0).animate(CurvedAnimation(parent: _heartAnim, curve: Curves.easeIn)),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: dimColor.withOpacity(0.25), boxShadow: [BoxShadow(color: dimColor.withOpacity(0.6), blurRadius: 30, spreadRadius: 5)]),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(creatorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text(widget.data['rank'] ?? 'Seeker', style: TextStyle(color: dimColor, fontSize: 11)),
+                      Icon(Icons.visibility_rounded, color: dimColor, size: 54),
+                      const SizedBox(height: 4),
+                      Text('+1 Witness', style: TextStyle(color: dimColor, fontWeight: FontWeight.bold, fontSize: 13)),
                     ],
                   ),
-                ],
-              ),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: dimColor.withOpacity(0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: dimColor, width: 0.8)),
-                    child: Text(dim, style: TextStyle(color: dimColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                  ),
-                  if (isCreator)
-                    IconButton(icon: const Icon(Icons.more_vert, size: 18, color: Colors.white54), onPressed: () => _showDeleteDialog(context, createdAt, authorUid)),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          if (content.isNotEmpty) Text(content, style: const TextStyle(fontSize: 14, color: Colors.white, height: 1.4)),
-          if (widget.data['hasAudio'] == true && audioBase64.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () => _playModulatedAudio(audioBase64, dim),
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), borderRadius: BorderRadius.circular(14), border: Border.all(color: isPlaying ? dimColor : Colors.white12, width: isPlaying ? 1.5 : 1)),
-                child: Row(
-                  children: [
-                    Icon(isPlaying ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded, color: dimColor, size: 28),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(isPlaying ? 'Resonating $dim Voice...' : 'Frequency: Modulated $dim Echo', style: TextStyle(fontSize: 12, color: isPlaying ? dimColor : Colors.white70, fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal))),
-                    Icon(Icons.graphic_eq_rounded, color: isPlaying ? dimColor : Colors.white38),
-                  ],
                 ),
               ),
             ),
-          ],
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              InkWell(
-                onTap: () async {
-                  if (currentUid.isEmpty) return;
-                  final docRef = FirebaseFirestore.instance.collection('transmissions').doc(widget.docId);
-                  if (hasWitnessed) {
-                    await docRef.update({'witnesses': FieldValue.arrayRemove([currentUid])});
-                  } else {
-                    await docRef.update({'witnesses': FieldValue.arrayUnion([currentUid])});
-                    final userDoc = FirebaseFirestore.instance.collection('users').doc(currentUid);
-                    final userSnap = await userDoc.get();
-                    final oldPts = (userSnap.data()?['resonances'] ?? 0) as int;
-                    final newPts = oldPts + 1;
-                    await userDoc.update({'resonances': newPts});
-                    await RankThemeEngine.checkRankUpNotification(currentUid, oldPts, newPts);
-                  }
-                },
-                child: Row(
-                  children: [
-                    Icon(hasWitnessed ? Icons.visibility_rounded : Icons.visibility_outlined, color: hasWitnessed ? dimColor : Colors.white38, size: 18),
-                    const SizedBox(width: 6),
-                    Text('${witnesses.length} Witnessed', style: TextStyle(color: hasWitnessed ? dimColor : Colors.white54, fontSize: 12)),
-                  ],
-                ),
-              ),
-              InkWell(
-                onTap: () => _openDecipherSheet(context, dimColor),
-                child: Row(
-                  children: [
-                    const Icon(Icons.comment_outlined, color: Colors.white38, size: 18),
-                    const SizedBox(width: 6),
-                    Text('${widget.data['decipherCount'] ?? 0} Deciphered', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                  ],
-                ),
-              ),
-              IconButton(icon: const Icon(Icons.share_outlined, color: Colors.white38, size: 18), onPressed: () => _shareTransmission(content, dim, creatorName)),
-            ],
-          ),
         ],
       ),
     );
@@ -1112,7 +1239,7 @@ class _TransmissionCardState extends State<TransmissionCard> {
 }
 
 // ==================================================
-// TAB 2: RANK-MATCHED TIME-SLIP RADAR (+3 PTS ON INVITE)
+// TAB 2: RANK-MATCHED TIME-SLIP RADAR
 // ==================================================
 class TimeSlipRadarScreen extends StatefulWidget {
   final Color accentColor;
@@ -1141,14 +1268,12 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: widget.accentColor),
             onPressed: () async {
-              // Push notification / invitation to target user
               await FirebaseFirestore.instance.collection('users').doc(peerUid).collection('notifications').add({
                 'title': 'Cosmic Invitation',
                 'desc': '@$myName has sent you a Time-Slip link invitation!',
                 'createdAt': DateTime.now().millisecondsSinceEpoch,
               });
 
-              // Reward +3 Points for Sending Invitation
               if (myUid.isNotEmpty) {
                 final userDoc = FirebaseFirestore.instance.collection('users').doc(myUid);
                 final snap = await userDoc.get();
@@ -1183,10 +1308,7 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: () {
-              setState(() => refreshSeed++);
-              // 🔥 Refresh only changes radar target, no points given on refresh!
-            },
+            onPressed: () => setState(() => refreshSeed++),
           ),
         ],
       ),
@@ -1295,7 +1417,7 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
 }
 
 // ==================================================
-// TAB 3: TRANSMISSION STUDIO (+2 PTS)
+// TAB 3: TRANSMISSION STUDIO (1-TAP VOICE FILTERS)
 // ==================================================
 class TransmissionStudioScreen extends StatefulWidget {
   final Color accentColor;
@@ -1309,18 +1431,28 @@ class TransmissionStudioScreen extends StatefulWidget {
 class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
   final _contentController = TextEditingController();
   final AudioRecorder _audioRecorder = AudioRecorder();
-  
+  final AudioPlayer _previewPlayer = AudioPlayer();
+
   String selectedDim = 'Horror';
+  String selectedVoiceFilter = 'normal'; // 'normal', 'demonic', 'robotic', 'ethereal'
   bool isRecording = false;
+  bool isPreviewPlaying = false;
   String? recordedAudioPath;
   String? recordedAudioBase64;
   bool isTransmitting = false;
 
   final List<String> dimensions = ['Horror', 'Ancient Gods', 'Cyber 3050', 'Dreams'];
+  final List<Map<String, String>> voiceFilters = [
+    {'id': 'normal', 'label': '🎙️ Pure'},
+    {'id': 'demonic', 'label': '👹 Demonic'},
+    {'id': 'robotic', 'label': '🤖 Cyber Bot'},
+    {'id': 'ethereal', 'label': '🌌 Ethereal'},
+  ];
 
   @override
   void dispose() {
     _audioRecorder.dispose();
+    _previewPlayer.dispose();
     super.dispose();
   }
 
@@ -1346,6 +1478,32 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
     }
   }
 
+  Future<void> _previewFilteredVoice(String filterId) async {
+    if (recordedAudioPath == null) return;
+
+    if (isPreviewPlaying) {
+      await _previewPlayer.stop();
+      setState(() => isPreviewPlaying = false);
+      return;
+    }
+
+    double pitch = 1.0;
+    if (filterId == 'demonic') pitch = 0.60;
+    if (filterId == 'robotic') pitch = 1.45;
+    if (filterId == 'ethereal') pitch = 0.85;
+
+    await _previewPlayer.setPlaybackRate(pitch);
+    await _previewPlayer.play(DeviceFileSource(recordedAudioPath!));
+    setState(() {
+      selectedVoiceFilter = filterId;
+      isPreviewPlaying = true;
+    });
+
+    _previewPlayer.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => isPreviewPlaying = false);
+    });
+  }
+
   Future<void> _transmit() async {
     final text = _contentController.text.trim();
     if (text.isEmpty && recordedAudioBase64 == null) {
@@ -1366,6 +1524,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
         'creatorName': user?.displayName ?? 'Explorer',
         'rank': currentRank,
         'dimension': selectedDim,
+        'voiceFilter': selectedVoiceFilter,
         'content': text,
         'hasAudio': recordedAudioBase64 != null,
         'audioBase64': recordedAudioBase64 ?? '',
@@ -1417,18 +1576,39 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(color: kCardDark, borderRadius: BorderRadius.circular(18), border: Border.all(color: isRecording ? kHorrorCrimson : Colors.white12)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Voice Frequency Echo (+2 Pts)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      const SizedBox(height: 2),
-                      Text('Auto-modulates into $selectedDim Voice', style: TextStyle(color: widget.accentColor, fontSize: 11)),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Voice Frequency Echo (+2 Pts)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          const SizedBox(height: 2),
+                          Text(recordedAudioBase64 != null ? 'Voice Captured! Choose Modulator filter below.' : 'Tap mic to capture paranormal audio frequency', style: TextStyle(color: widget.accentColor, fontSize: 11)),
+                        ],
+                      ),
+                      IconButton(onPressed: _toggleRecording, iconSize: 34, icon: Icon(isRecording ? Icons.stop_circle_rounded : Icons.mic_rounded, color: isRecording ? kHorrorCrimson : (recordedAudioBase64 != null ? kMistyGreen : Colors.white70))),
                     ],
                   ),
-                  IconButton(onPressed: _toggleRecording, iconSize: 34, icon: Icon(isRecording ? Icons.stop_circle_rounded : Icons.mic_rounded, color: isRecording ? kHorrorCrimson : (recordedAudioBase64 != null ? kMistyGreen : Colors.white70))),
+                  if (recordedAudioBase64 != null) ...[
+                    const Divider(color: Colors.white12, height: 24),
+                    const Text('1-TAP REAL-TIME VOICE FILTERS (PREVIEW):', style: TextStyle(color: kNeonCyan, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      children: voiceFilters.map((vf) {
+                        final isSel = selectedVoiceFilter == vf['id'];
+                        return ActionChip(
+                          backgroundColor: isSel ? widget.accentColor : Colors.black45,
+                          label: Text(vf['label']!, style: TextStyle(color: isSel ? Colors.black : Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                          onPressed: () => _previewFilteredVoice(vf['id']!),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1517,7 +1697,7 @@ class ChatsInboxScreen extends StatelessWidget {
 }
 
 // ==================================================
-// MULTILINGUAL AI CHAT SCREEN (KEYBOARD & AUTO-SCROLL FIXED)
+// MULTILINGUAL AI CHAT SCREEN
 // ==================================================
 class AvatarAIChatScreen extends StatefulWidget {
   const AvatarAIChatScreen({super.key});
