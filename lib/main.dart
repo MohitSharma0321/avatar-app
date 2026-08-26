@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
+import 'package:share_plus/share_plus.dart';
 
 // ==================================================
 // NEXUS PALETTE & CORE THEMES
@@ -117,7 +118,7 @@ class RankThemeEngine {
 }
 
 // ==================================================
-// AUTHENTICATION & REGISTRATION
+// AUTHENTICATION
 // ==================================================
 class AuthGatekeeper extends StatelessWidget {
   const AuthGatekeeper({super.key});
@@ -313,7 +314,7 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
 }
 
 // ==================================================
-// NOTIFICATION & 5-TIER ACHIEVEMENT TRACKER
+// NOTIFICATIONS & REWARD ACHIEVEMENTS PANEL
 // ==================================================
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
@@ -342,7 +343,6 @@ class NotificationScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Live Progression Progress Bar
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
@@ -378,11 +378,8 @@ class NotificationScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // 5 Tough Hard-Coded Reward Achievements
                 const Text('LORE ACHIEVEMENTS (REWARD TIERS)', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
                 const SizedBox(height: 12),
-
                 _buildAchievementItem('1. Seeker of the Void', 'Initialize neural transmitter in the multiverse.', points >= 0, Icons.explore_outlined, Colors.white70),
                 _buildAchievementItem('2. Dimensional Walker', 'Broadcast verified mystery transmissions into realms.', points >= 50, Icons.wifi_tethering_rounded, kMistyGreen),
                 _buildAchievementItem('3. Astral Decipherer', 'Decipher & analyze parallel dimension entries.', points >= 200, Icons.fingerprint_rounded, kNeonPurple),
@@ -544,7 +541,7 @@ class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsB
 }
 
 // ==================================================
-// TAB 1: REALMS FEED
+// TAB 1: REALMS FEED SCREEN
 // ==================================================
 class RealmsFeedScreen extends StatelessWidget {
   final String selectedRealm;
@@ -672,6 +669,9 @@ class RealmsFeedScreen extends StatelessWidget {
   }
 }
 
+// ==================================================
+// TRANSMISSION CARD (DECIPHER + SHARE + DELETE)
+// ==================================================
 class TransmissionCard extends StatelessWidget {
   final String docId;
   final Map<String, dynamic> data;
@@ -723,6 +723,140 @@ class TransmissionCard extends StatelessWidget {
     );
   }
 
+  void _openDecipherSheet(BuildContext context, Color dimColor) {
+    final commentCtrl = TextEditingController();
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final currentName = FirebaseAuth.instance.currentUser?.displayName ?? 'Explorer';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: kCardDark,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 18,
+          right: 18,
+          top: 18,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 18,
+        ),
+        child: SizedBox(
+          height: 420,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('DECIPHER TRANSMISSION', style: TextStyle(color: dimColor, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1.5)),
+                  IconButton(icon: const Icon(Icons.close, color: Colors.white54, size: 20), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const Divider(color: Colors.white12),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('transmissions')
+                      .doc(docId)
+                      .collection('deciphers')
+                      .orderBy('createdAt', descending: false)
+                  .snapshots(),
+                  builder: (context, snap) {
+                    if (!snap.hasData) return Center(child: CircularProgressIndicator(color: dimColor));
+                    final comments = snap.data!.docs;
+
+                    if (comments.isEmpty) {
+                      return const Center(
+                        child: Text('No deciphers yet. Be the first to decode this frequency.', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: comments.length,
+                      itemBuilder: (context, i) {
+                        final cData = comments[i].data() as Map<String, dynamic>;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              CircleAvatar(
+                                radius: 14,
+                                backgroundColor: dimColor.withOpacity(0.2),
+                                child: Text((cData['userName'] ?? 'E')[0].toUpperCase(), style: TextStyle(color: dimColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(cData['userName'] ?? 'Explorer', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)),
+                                    const SizedBox(height: 2),
+                                    Text(cData['text'] ?? '', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: commentCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: kVoidBlack,
+                        hintText: 'Add decipher thought...',
+                        hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: Icon(Icons.send_rounded, color: dimColor),
+                    onPressed: () async {
+                      final text = commentCtrl.text.trim();
+                      if (text.isEmpty) return;
+
+                      await FirebaseFirestore.instance.collection('transmissions').doc(docId).collection('deciphers').add({
+                        'uid': currentUid,
+                        'userName': currentName,
+                        'text': text,
+                        'createdAt': DateTime.now().millisecondsSinceEpoch,
+                      });
+
+                      await FirebaseFirestore.instance.collection('transmissions').doc(docId).update({
+                        'decipherCount': FieldValue.increment(1),
+                      });
+
+                      commentCtrl.clear();
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _shareTransmission(String content, String dimension, String creator) {
+    Share.share(
+      '🌌 NEXUS TRANSMISSION [$dimension Realm]\n\n"$content"\n\n- Transmitted by @$creator on NEXUS Multiverse Network.',
+      subject: 'NEXUS Transmission',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dim = data['dimension'] ?? 'Nexus';
@@ -732,6 +866,8 @@ class TransmissionCard extends StatelessWidget {
     final hasWitnessed = witnesses.contains(currentUid);
     final isCreator = (data['uid'] == currentUid);
     final createdAt = data['createdAt'] ?? 0;
+    final content = data['content'] ?? '';
+    final creatorName = data['creatorName'] ?? 'Explorer';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -753,7 +889,7 @@ class TransmissionCard extends StatelessWidget {
                     radius: 18,
                     backgroundColor: dimColor.withOpacity(0.2),
                     child: Text(
-                      (data['creatorName'] ?? 'U')[0].toUpperCase(),
+                      creatorName[0].toUpperCase(),
                       style: TextStyle(color: dimColor, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -761,7 +897,7 @@ class TransmissionCard extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(data['creatorName'] ?? 'Explorer', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text(creatorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       Text(data['rank'] ?? 'Seeker', style: TextStyle(color: dimColor, fontSize: 11)),
                     ],
                   ),
@@ -788,7 +924,7 @@ class TransmissionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Text(data['content'] ?? '', style: const TextStyle(fontSize: 14, color: Colors.white, height: 1.4)),
+          Text(content, style: const TextStyle(fontSize: 14, color: Colors.white, height: 1.4)),
           if (data['hasAudio'] == true) ...[
             const SizedBox(height: 12),
             Container(
@@ -838,14 +974,20 @@ class TransmissionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Row(
-                children: [
-                  const Icon(Icons.comment_outlined, color: Colors.white38, size: 18),
-                  const SizedBox(width: 6),
-                  Text('${data['decipherCount'] ?? 0} Deciphered', style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                ],
+              InkWell(
+                onTap: () => _openDecipherSheet(context, dimColor),
+                child: Row(
+                  children: [
+                    const Icon(Icons.comment_outlined, color: Colors.white38, size: 18),
+                    const SizedBox(width: 6),
+                    Text('${data['decipherCount'] ?? 0} Deciphered', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                  ],
+                ),
               ),
-              const Icon(Icons.share_outlined, color: Colors.white38, size: 18),
+              IconButton(
+                icon: const Icon(Icons.share_outlined, color: Colors.white38, size: 18),
+                onPressed: () => _shareTransmission(content, dim, creatorName),
+              ),
             ],
           ),
         ],
@@ -1058,7 +1200,7 @@ class TimeSlipRadarScreen extends StatelessWidget {
 }
 
 // ==================================================
-// TAB 3: TRANSMISSION STUDIO
+// TAB 3: TRANSMISSION STUDIO SCREEN
 // ==================================================
 class TransmissionStudioScreen extends StatefulWidget {
   final Color accentColor;
@@ -1090,7 +1232,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     try {
-      final docRef = await FirebaseFirestore.instance.collection('transmissions').add({
+      await FirebaseFirestore.instance.collection('transmissions').add({
         'uid': user?.uid ?? 'anon',
         'creatorName': user?.displayName ?? 'Explorer',
         'rank': 'Seeker',
@@ -1103,7 +1245,6 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
         'createdAt': DateTime.now().millisecondsSinceEpoch,
       });
 
-      // Reward User with +10 Resonance Points per Post
       if (user?.uid != null) {
         await FirebaseFirestore.instance.collection('users').doc(user!.uid).update({
           'resonances': FieldValue.increment(10),
@@ -1221,7 +1362,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 }
 
 // ==================================================
-// TAB 4: DIRECT REAL-TIME CHAT
+// TAB 4: DIRECT CHATS
 // ==================================================
 class ChatsInboxScreen extends StatelessWidget {
   final Color accentColor;
@@ -1403,7 +1544,7 @@ class _NexusDirectChatScreenState extends State<NexusDirectChatScreen> {
 }
 
 // ==================================================
-// TAB 5: PROFILE SCREEN & VAULT
+// TAB 5: PROFILE & ARTIFACT VAULT
 // ==================================================
 class ExplorerProfileScreen extends StatelessWidget {
   final Color accentColor;
