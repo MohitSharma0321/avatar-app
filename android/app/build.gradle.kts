@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.nexus.nexusapp"
+    namespace = "com.avatar.avatarapp"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -16,7 +16,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.nexus.nexusapp"
+        applicationId = "com.avatar.avatarapp"
         minSdk = 21
         targetSdk = 36
         versionCode = flutter.versionCode
