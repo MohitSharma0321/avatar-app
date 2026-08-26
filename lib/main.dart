@@ -13,6 +13,7 @@ import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
 
 // ==================================================
 // NEXUS PALETTE & CORE THEMES
@@ -59,6 +60,31 @@ class NexusApp extends StatelessWidget {
       ),
       home: const AuthGatekeeper(),
     );
+  }
+}
+
+// ==================================================
+// CLOUDFLARE BACKED GEMINI AI ENGINE
+// ==================================================
+class NexusAIEngine {
+  static const String _workerUrl = 'https://nexus-friend-api.projectkhurafat.workers.dev/';
+
+  static Future<String> getAIResponse(String userMessage) async {
+    try {
+      final response = await http.post(
+        Uri.parse(_workerUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'message': userMessage}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['reply'] ?? 'The cosmos echoes across frequencies.';
+      }
+    } catch (e) {
+      debugPrint('Cloudflare Nexus AI Error: $e');
+    }
+    return 'Resonance signal weak. Try transmitting again.';
   }
 }
 
@@ -122,7 +148,7 @@ class RankThemeEngine {
 }
 
 // ==================================================
-// AUTHENTICATION
+// AUTHENTICATION GATEWAY
 // ==================================================
 class AuthGatekeeper extends StatelessWidget {
   const AuthGatekeeper({super.key});
@@ -318,7 +344,7 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
 }
 
 // ==================================================
-// NOTIFICATIONS & REWARD ACHIEVEMENTS PANEL
+// NOTIFICATIONS & ACHIEVEMENTS PANEL
 // ==================================================
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
@@ -545,7 +571,7 @@ class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsB
 }
 
 // ==================================================
-// TAB 1: REALMS FEED
+// TAB 1: REALMS FEED SCREEN
 // ==================================================
 class RealmsFeedScreen extends StatelessWidget {
   final String selectedRealm;
@@ -674,7 +700,7 @@ class RealmsFeedScreen extends StatelessWidget {
 }
 
 // ==================================================
-// TRANSMISSION CARD (VOICE AUDIO MODULATION PLAYER)
+// TRANSMISSION CARD (REAL VOICE ECHO MODULATOR)
 // ==================================================
 class TransmissionCard extends StatefulWidget {
   final String docId;
@@ -705,13 +731,12 @@ class _TransmissionCardState extends State<TransmissionCard> {
     }
   }
 
-  // Voice Transformation Settings based on realm
   double _getPitchByDimension(String dim) {
     switch (dim) {
-      case 'Horror': return 0.65; // Deep spooky demon pitch
-      case 'Cyber 3050': return 1.45; // High robot frequency pitch
-      case 'Ancient Gods': return 0.75; // Ancient deep resonant pitch
-      case 'Dreams': return 0.85; // Surreal misty pitch
+      case 'Horror': return 0.65;
+      case 'Cyber 3050': return 1.45;
+      case 'Ancient Gods': return 0.75;
+      case 'Dreams': return 0.85;
       default: return 1.0;
     }
   }
@@ -982,7 +1007,6 @@ class _TransmissionCardState extends State<TransmissionCard> {
           const SizedBox(height: 14),
           if (content.isNotEmpty)
             Text(content, style: const TextStyle(fontSize: 14, color: Colors.white, height: 1.4)),
-          // 🔥 REAL LIVE VOICE ECHO PLAYER
           if (widget.data['hasAudio'] == true && audioBase64.isNotEmpty) ...[
             const SizedBox(height: 12),
             InkWell(
@@ -1005,7 +1029,7 @@ class _TransmissionCardState extends State<TransmissionCard> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        isPlaying ? 'Resonating ${dim} Voice...' : 'Frequency: Modulated ${dim} Echo',
+                        isPlaying ? 'Resonating $dim Voice...' : 'Frequency: Modulated $dim Echo',
                         style: TextStyle(fontSize: 12, color: isPlaying ? dimColor : Colors.white70, fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal),
                       ),
                     ),
@@ -1266,7 +1290,7 @@ class TimeSlipRadarScreen extends StatelessWidget {
 }
 
 // ==================================================
-// TAB 3: TRANSMISSION STUDIO (MIC RECORDING + VOICE MODULATION)
+// TAB 3: TRANSMISSION STUDIO SCREEN
 // ==================================================
 class TransmissionStudioScreen extends StatefulWidget {
   final Color accentColor;
@@ -1307,7 +1331,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Voice Frequency Captured! Auto-tuning to $selectedDim Realm.')),
+            SnackBar(content: Text('Voice Frequency Captured! Tuned to $selectedDim Realm.')),
           );
         }
       }
@@ -1325,7 +1349,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Microphone permission required to transmit frequency.')),
+            const SnackBar(content: Text('Microphone permission required.')),
           );
         }
       }
@@ -1422,8 +1446,6 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            
-            // 🔥 REAL MIC VOICE RECORDER BOX
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -1501,7 +1523,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 }
 
 // ==================================================
-// TAB 4: DIRECT CHATS
+// TAB 4: CHATS (NEXUS FRIEND AI COMPANION PINNED)
 // ==================================================
 class ChatsInboxScreen extends StatelessWidget {
   final Color accentColor;
@@ -1518,56 +1540,209 @@ class ChatsInboxScreen extends StatelessWidget {
         elevation: 0,
         title: const Text('ECHO FREQUENCIES', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16)),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').snapshots(),
-        builder: (ctx, snap) {
-          if (!snap.hasData) return Center(child: CircularProgressIndicator(color: accentColor));
-          final users = snap.data!.docs.where((d) => d.id != myUid).toList();
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [kCardDark, kNeonPurple.withOpacity(0.2)]),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: accentColor, width: 1.5),
+            ),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: accentColor,
+                child: const Icon(Icons.auto_awesome, color: Colors.black),
+              ),
+              title: const Text('Nexus Friend (AI Companion)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+              subtitle: const Text('Multilingual AI Oracle • Always Online', style: TextStyle(color: kMistyGreen, fontSize: 12)),
+              trailing: Icon(Icons.chevron_right, color: accentColor),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NexusAIChatScreen()),
+                );
+              },
+            ),
+          ),
+          const Divider(color: Colors.white12),
+          const SizedBox(height: 6),
 
-          if (users.isEmpty) {
-            return const Center(child: Text('No other explorers online.', style: TextStyle(color: Colors.white38)));
-          }
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('users').snapshots(),
+            builder: (ctx, snap) {
+              if (!snap.hasData) return Center(child: CircularProgressIndicator(color: accentColor));
+              final users = snap.data!.docs.where((d) => d.id != myUid).toList();
 
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            itemCount: users.length,
-            itemBuilder: (ctx, i) {
-              final u = users[i].data() as Map<String, dynamic>;
-              final isOnline = u['isOnline'] == true;
-              final peerUid = users[i].id;
-              final peerName = u['name'] ?? 'Explorer';
+              if (users.isEmpty) {
+                return const Center(child: Text('No other explorers online.', style: TextStyle(color: Colors.white38)));
+              }
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: kCardDark,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: accentColor.withOpacity(0.3),
-                    child: Text(peerName[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: Text(peerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  subtitle: Text(isOnline ? 'Active on frequency' : 'Signal lost', style: TextStyle(color: isOnline ? kMistyGreen : Colors.white38, fontSize: 12)),
-                  trailing: const Icon(Icons.chevron_right, color: Colors.white38),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => NexusDirectChatScreen(peerUid: peerUid, peerName: peerName)),
-                    );
-                  },
-                ),
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: users.length,
+                itemBuilder: (ctx, i) {
+                  final u = users[i].data() as Map<String, dynamic>;
+                  final isOnline = u['isOnline'] == true;
+                  final peerUid = users[i].id;
+                  final peerName = u['name'] ?? 'Explorer';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: kCardDark,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: accentColor.withOpacity(0.3),
+                        child: Text(peerName[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                      title: Text(peerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      subtitle: Text(isOnline ? 'Active on frequency' : 'Signal lost', style: TextStyle(color: isOnline ? kMistyGreen : Colors.white38, fontSize: 12)),
+                      trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => NexusDirectChatScreen(peerUid: peerUid, peerName: peerName)),
+                        );
+                      },
+                    ),
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 }
 
+// ==================================================
+// MULTILINGUAL AI CHAT SCREEN (NEXUS FRIEND)
+// ==================================================
+class NexusAIChatScreen extends StatefulWidget {
+  const NexusAIChatScreen({super.key});
+
+  @override
+  State<NexusAIChatScreen> createState() => _NexusAIChatScreenState();
+}
+
+class _NexusAIChatScreenState extends State<NexusAIChatScreen> {
+  final _msgController = TextEditingController();
+  final List<Map<String, String>> _messages = [
+    {
+      'sender': 'ai',
+      'text': 'Greetings, Explorer. I am Nexus Friend. Speak to me in any language—Hindi, English, or beyond. What mystery shall we decode today?'
+    }
+  ];
+  bool isThinking = false;
+
+  void _sendToAI() async {
+    final text = _msgController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _messages.add({'sender': 'me', 'text': text});
+      isThinking = true;
+    });
+    _msgController.clear();
+
+    final aiReply = await NexusAIEngine.getAIResponse(text);
+
+    if (mounted) {
+      setState(() {
+        _messages.add({'sender': 'ai', 'text': aiReply});
+        isThinking = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kVoidBlack,
+      appBar: AppBar(
+        backgroundColor: kVoidBlack,
+        title: const Row(
+          children: [
+            CircleAvatar(radius: 14, backgroundColor: kNeonCyan, child: Icon(Icons.auto_awesome, size: 14, color: Colors.black)),
+            SizedBox(width: 10),
+            Text('Nexus Friend (AI)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              reverse: false,
+              padding: const EdgeInsets.all(16),
+              itemCount: _messages.length,
+              itemBuilder: (ctx, i) {
+                final msg = _messages[i];
+                final isMe = msg['sender'] == 'me';
+
+                return Align(
+                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                    decoration: BoxDecoration(
+                      color: isMe ? kNeonPurple : kCardDark,
+                      borderRadius: BorderRadius.circular(16),
+                      border: isMe ? null : Border.all(color: kNeonCyan.withOpacity(0.3)),
+                    ),
+                    child: Text(msg['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3)),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (isThinking)
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Text('Nexus Friend is channeling dimensions...', style: TextStyle(color: kNeonCyan, fontSize: 12, fontStyle: FontStyle.italic)),
+            ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: kCardDark,
+            child: SafeArea(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _msgController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: kVoidBlack,
+                        hintText: 'Type in any language...',
+                        hintStyle: const TextStyle(color: Colors.white38),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(icon: const Icon(Icons.send_rounded, color: kNeonCyan), onPressed: _sendToAI),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================
+// DIRECT PEER-TO-PEER CHAT SCREEN
+// ==================================================
 class NexusDirectChatScreen extends StatefulWidget {
   final String peerUid;
   final String peerName;
