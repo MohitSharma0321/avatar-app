@@ -16,6 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 // ==================================================
 // AVATAR PALETTE & CORE THEMES
@@ -45,6 +46,12 @@ void main() async {
     await Firebase.initializeApp();
   } catch (e) {
     debugPrint("Firebase Init: $e");
+  }
+
+  try {
+    await MobileAds.instance.initialize();
+  } catch (e) {
+    debugPrint("MobileAds Init: $e");
   }
 
   const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -189,10 +196,97 @@ class AvatarAIEngine {
       return "Pranaam Explorer! Avatar dimension mein aapka swagat hai. Aaj koun sa cosmic mystery decode karein?";
     } else if (lower.contains('hindi')) {
       return "Haan bilkul, main Hindi aur English dono mein baat kar sakta hoon. Apne mysterious vichar share kijiye!";
-    } else if (lower.contains('kaise ho') || lower.contains('how are you')) {
-      return "Main multiverse ke vibrations mein ekdum aligned hoon! Aap suniye aaj kaun sa supernatural encounter hua?";
     }
     return "The frequency of '$userMessage' has been received across dimensions. Transmitting cosmic resonance...";
+  }
+}
+
+// ==================================================
+// IN-FEED SOCIAL MEDIA STYLE AD BANNER WIDGET
+// ==================================================
+class InFeedAdWidget extends StatefulWidget {
+  const InFeedAdWidget({super.key});
+
+  @override
+  State<InFeedAdWidget> createState() => _InFeedAdWidgetState();
+}
+
+class _InFeedAdWidgetState extends State<InFeedAdWidget> {
+  BannerAd? _bannerAd;
+  bool _isAdLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAd();
+  }
+
+  void _loadAd() {
+    _bannerAd = BannerAd(
+      adUnitId: 'ca-app-pub-3940256099942544/6300978111', // Official Google Test Banner ID
+      size: AdSize.mediumRectangle, // 300x250 Natural Card Fit
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (mounted) setState(() => _isAdLoaded = true);
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          debugPrint("AdMob In-Feed Ad Failed: $error");
+        },
+      ),
+    )..load();
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isAdLoaded || _bannerAd == null) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: kCardDark,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(6)),
+                    child: const Text('Sponsored', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Featured Transmission', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                ],
+              ),
+              const Icon(Icons.info_outline, size: 14, color: Colors.white24),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Center(
+            child: SizedBox(
+              width: _bannerAd!.size.width.toDouble(),
+              height: _bannerAd!.size.height.toDouble(),
+              child: AdWidget(ad: _bannerAd!),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -868,7 +962,7 @@ class _AvatarNavigationHostState extends State<AvatarNavigationHost> with Widget
 }
 
 // ==================================================
-// TAB 1: REALMS FEED SCREEN (WITH GLOBAL LANGUAGE SWITCHER)
+// TAB 1: REALMS FEED SCREEN (WITH IN-FEED NATIVE ADS)
 // ==================================================
 class RealmsFeedScreen extends StatelessWidget {
   final String selectedRealm;
@@ -1060,7 +1154,15 @@ class RealmsFeedScreen extends StatelessWidget {
                   itemCount: docs.length,
                   itemBuilder: (context, i) {
                     final data = docs[i].data() as Map<String, dynamic>;
-                    return TransmissionCard(docId: docs[i].id, data: data);
+                    // 🌟 Social Media In-Feed Ad insertion (Every 4th post)
+                    final bool shouldShowInFeedAd = (i != 0 && i % 4 == 0);
+
+                    return Column(
+                      children: [
+                        if (shouldShowInFeedAd) const InFeedAdWidget(),
+                        TransmissionCard(docId: docs[i].id, data: data),
+                      ],
+                    );
                   },
                 );
               },
@@ -1850,15 +1952,10 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
     }
   }
 
-  // -------------------------------------------------------------------
-  // 🌟 24-HOUR AI SNAP MODAL & BOTTOM RIGHT QUICK POST TRIGGER
-  // -------------------------------------------------------------------
   void _open24hThoughtCreator(BuildContext context) async {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final now = DateTime.now().millisecondsSinceEpoch;
-    final twentyFourHours = 24 * 60 * 60 * 1000;
 
-    // Check if user already posted in last 24h
     final recentSnap = await FirebaseFirestore.instance
         .collection('daily_snaps')
         .where('uid', isEqualTo: myUid)
@@ -1933,7 +2030,6 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Image Preview or Generator
                   if (generatedImageUrl != null) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(16),
@@ -1976,7 +2072,6 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 
                           setModalState(() => isGenerating = true);
 
-                          // Generate prompt-based artistic AI image
                           final cleanPrompt = Uri.encodeComponent("cinematic surreal multiverse mystic art of: $text, high quality, 8k render, glowing neon");
                           final aiUrl = "https://image.pollinations.ai/prompt/$cleanPrompt?width=600&height=600&nologo=true";
 
@@ -1991,7 +2086,6 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                       ),
                     ),
 
-                  // AUTOMATIC UPLOAD BUTTON APPEARS AFTER PIC CONVERSION
                   if (generatedImageUrl != null)
                     SizedBox(
                       width: double.infinity,
@@ -2107,7 +2201,6 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
     return Scaffold(
       backgroundColor: kVoidBlack,
       appBar: AppBar(backgroundColor: kVoidBlack, elevation: 0, title: const Text('TRANSMISSION STUDIO', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)), centerTitle: true),
-      // 🌟 Bottom-Right Floating + Trigger (Identical to reference screenshot)
       floatingActionButton: Container(
         margin: const EdgeInsets.only(bottom: 6, right: 4),
         child: FloatingActionButton(
@@ -2122,7 +2215,6 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 24H Community Live Snap Feed Strip
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance.collection('daily_snaps').where('expiresAt', isGreaterThan: nowMillis).snapshots(),
               builder: (ctx, snap) {
@@ -2444,7 +2536,6 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
       body: TabBarView(
         controller: _tabController,
         children: [
-          // SUB-TAB 1: DEVELOPER BROADCASTS
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('developer_broadcasts').orderBy('createdAt', descending: true).snapshots(),
             builder: (ctx, snap) {
@@ -2544,8 +2635,6 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
               );
             },
           ),
-
-          // SUB-TAB 2: DAILY 20 QUESTIONS
           Column(
             children: [
               Padding(
@@ -2993,7 +3082,7 @@ class _AvatarAIChatScreenState extends State<AvatarAIChatScreen> {
 }
 
 // ==================================================
-// DIRECT PEER-TO-PEER CHAT SCREEN (WITH 3-DAY PROFILE UNLOCK, TYPING, SEEN TICKS & UNSEND)
+// DIRECT PEER-TO-PEER CHAT SCREEN
 // ==================================================
 class AvatarDirectChatScreen extends StatefulWidget {
   final String peerUid;
@@ -3217,7 +3306,7 @@ class _AvatarDirectChatScreenState extends State<AvatarDirectChatScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(color: isMe ? kNeonPurple : kCardDark, borderRadius: BorderRadius.circular(16)),
                           child: Column(
-                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(msg['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 14)),
                               const SizedBox(height: 3),
@@ -3274,7 +3363,7 @@ class _AvatarDirectChatScreenState extends State<AvatarDirectChatScreen> {
 }
 
 // ==================================================
-// TAB 6: PROFILE & ARTIFACT VAULT
+// TAB 6: IDENTITY VAULT (EXPLORER PROFILE)
 // ==================================================
 class ExplorerProfileScreen extends StatelessWidget {
   final Color accentColor;
