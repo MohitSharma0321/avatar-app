@@ -100,7 +100,7 @@ class NotificationService {
 }
 
 // ==================================================
-// CLOUDFLARE GEMINI AI ENGINE (UPDATED URL)
+// CLOUDFLARE GEMINI AI ENGINE
 // ==================================================
 class AvatarAIEngine {
   static const String _workerUrl = 'https://avatar-friend-ai.projectkhurafat.workers.dev/';
@@ -111,19 +111,17 @@ class AvatarAIEngine {
         Uri.parse(_workerUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'message': userMessage}),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['reply'] != null) {
+        if (data['reply'] != null && data['reply'].toString().isNotEmpty) {
           return data['reply'];
         } else if (data['error'] != null) {
           return "Cloudflare Error: ${data['error']}";
         }
-        return 'The cosmos echoes across frequencies.';
-      } else {
-        return "Gateway status: ${response.statusCode}. Check GEMINI_API_KEY secret in Cloudflare.";
       }
+      return 'The cosmos echoes across frequencies. (Check API Key)';
     } catch (e) {
       debugPrint('Cloudflare Avatar AI Error: $e');
       return 'Resonance signal weak. Try transmitting again.';
@@ -298,7 +296,7 @@ class _AvatarLoginScreenState extends State<AvatarLoginScreen> {
 }
 
 // ==================================================
-// NOTIFICATIONS & POINT RULES SCREEN
+// NOTIFICATIONS & POINT RULES SCREEN (CLEAR ALL FIXED)
 // ==================================================
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -316,6 +314,15 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
     _tabController = TabController(length: 2, vsync: this);
   }
 
+  Future<void> _clearAllNotifications(String uid) async {
+    final batch = FirebaseFirestore.instance.batch();
+    final snapshots = await FirebaseFirestore.instance.collection('users').doc(uid).collection('notifications').get();
+    for (var doc in snapshots.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+
   @override
   Widget build(BuildContext context) {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -326,6 +333,13 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
         backgroundColor: kVoidBlack,
         elevation: 0,
         title: const Text('TRANSMISSIONS & RANKS', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 15)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.done_all_rounded, color: kNeonCyan),
+            tooltip: 'Clear All Read',
+            onPressed: () => _clearAllNotifications(myUid),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: kNeonCyan,
@@ -387,7 +401,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
                         children: [
                           Text('⚖️ RESONANCE POINT ECONOMY', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
                           SizedBox(height: 8),
-                          Text('• Broadcast Transmission: +2 Pts\n• Decipher/Comment: +1 Pt\n• Witness/Like: +1 Pt\n• Use Time-Slip Radar: +3 Pts\n• Purge Post (< 24h): -5 Pts Penalty', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
+                          Text('• Broadcast Transmission: +2 Pts\n• Decipher/Comment: +1 Pt\n• Witness/Like: +1 Pt\n• Send Radar Invitation: +3 Pts\n• Invitation Accepted: +5 Pts\n• Purge Post (< 24h): -5 Pts Penalty', style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
                         ],
                       ),
                     ),
@@ -483,7 +497,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
 }
 
 // ==================================================
-// DYNAMIC NAVIGATION HOST WITH NOTIFICATION COUNTER
+// DYNAMIC NAVIGATION HOST
 // ==================================================
 class AvatarNavigationHost extends StatefulWidget {
   const AvatarNavigationHost({super.key});
@@ -741,7 +755,7 @@ class RealmsFeedScreen extends StatelessWidget {
 }
 
 // ==================================================
-// TRANSMISSION CARD (WITH 24H DELETE PENALTY -5 PTS)
+// TRANSMISSION CARD (COMMENT SHEET KEYBOARD FIX)
 // ==================================================
 class TransmissionCard extends StatefulWidget {
   final String docId;
@@ -855,13 +869,18 @@ class _TransmissionCardState extends State<TransmissionCard> {
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
+      isScrollControlled: true, // 🔥 Fixes keyboard overlapping
       backgroundColor: kCardDark,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Padding(
-        padding: EdgeInsets.only(left: 18, right: 18, top: 18, bottom: MediaQuery.of(ctx).viewInsets.bottom + 18),
+        padding: EdgeInsets.only(
+          left: 18,
+          right: 18,
+          top: 18,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 18, // 🔥 Elevates above keyboard
+        ),
         child: SizedBox(
-          height: 420,
+          height: 380,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -923,7 +942,14 @@ class _TransmissionCardState extends State<TransmissionCard> {
                     child: TextField(
                       controller: commentCtrl,
                       style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(filled: true, fillColor: kVoidBlack, hintText: 'Add decipher thought (+1 Pt)...', hintStyle: const TextStyle(color: Colors.white38, fontSize: 13), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: kVoidBlack,
+                        hintText: 'Add decipher thought (+1 Pt)...',
+                        hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1086,7 +1112,7 @@ class _TransmissionCardState extends State<TransmissionCard> {
 }
 
 // ==================================================
-// TAB 2: RANK-MATCHED TIME-SLIP RADAR
+// TAB 2: RANK-MATCHED TIME-SLIP RADAR (+3 PTS ON INVITE)
 // ==================================================
 class TimeSlipRadarScreen extends StatefulWidget {
   final Color accentColor;
@@ -1100,27 +1126,41 @@ class TimeSlipRadarScreen extends StatefulWidget {
 class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
   int refreshSeed = 0;
 
-  void _sendInvitation(BuildContext context, String peerUid, String peerName) {
+  void _sendInvitation(BuildContext context, String peerUid, String peerName) async {
+    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final myName = FirebaseAuth.instance.currentUser?.displayName ?? 'Explorer';
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: kCardDark,
         title: const Text('SUBCONSCIOUS INVITATION', style: TextStyle(color: kNeonCyan, fontWeight: FontWeight.bold, fontSize: 15)),
-        content: Text('Send a frequency link invitation to $peerName?', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        content: Text('Send a frequency link invitation to $peerName?\n(You will earn +3 Points)', style: const TextStyle(color: Colors.white70, fontSize: 13)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: widget.accentColor),
             onPressed: () async {
-              final myName = FirebaseAuth.instance.currentUser?.displayName ?? 'Explorer';
+              // Push notification / invitation to target user
               await FirebaseFirestore.instance.collection('users').doc(peerUid).collection('notifications').add({
                 'title': 'Cosmic Invitation',
                 'desc': '@$myName has sent you a Time-Slip link invitation!',
                 'createdAt': DateTime.now().millisecondsSinceEpoch,
               });
-              await NotificationService.showLocalNotification('Invitation Sent', 'Link transmitted to $peerName successfully.');
+
+              // Reward +3 Points for Sending Invitation
+              if (myUid.isNotEmpty) {
+                final userDoc = FirebaseFirestore.instance.collection('users').doc(myUid);
+                final snap = await userDoc.get();
+                final oldPts = (snap.data()?['resonances'] ?? 0) as int;
+                final newPts = oldPts + 3;
+                await userDoc.update({'resonances': newPts});
+                await RankThemeEngine.checkRankUpNotification(myUid, oldPts, newPts);
+              }
+
+              await NotificationService.showLocalNotification('Invitation Sent', 'Link transmitted to $peerName (+3 Pts Earned).');
               if (ctx.mounted) Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invitation broadcasted successfully!')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invitation sent! +3 Resonance Points added.')));
             },
             child: const Text('Send Invitation', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           ),
@@ -1143,16 +1183,9 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: () async {
+            onPressed: () {
               setState(() => refreshSeed++);
-              if (myUid.isNotEmpty) {
-                final userDoc = FirebaseFirestore.instance.collection('users').doc(myUid);
-                final snap = await userDoc.get();
-                final oldPts = (snap.data()?['resonances'] ?? 0) as int;
-                final newPts = oldPts + 3;
-                await userDoc.update({'resonances': newPts});
-                await RankThemeEngine.checkRankUpNotification(myUid, oldPts, newPts);
-              }
+              // 🔥 Refresh only changes radar target, no points given on refresh!
             },
           ),
         ],
@@ -1221,7 +1254,7 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
                                 final data = doc.data() as Map<String, dynamic>;
                                 _sendInvitation(context, doc.id, data['name'] ?? 'Explorer');
                               },
-                              child: const Text('SEND INVITATION', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              child: const Text('SEND INVITATION (+3 PTS)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                             ),
                           ),
                         ],
