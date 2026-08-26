@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -11,7 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 
 // ==================================================
-// NEXUS PALETTE & THEME
+// NEXUS PALETTE & CORE THEMES
 // ==================================================
 const Color kVoidBlack = Color(0xFF0A0714);
 const Color kCardDark = Color(0xFF130E24);
@@ -59,7 +58,66 @@ class NexusApp extends StatelessWidget {
 }
 
 // ==================================================
-// AUTHENTICATION
+// DYNAMIC RANK THEME ENGINE
+// ==================================================
+class RankThemeEngine {
+  static Map<String, dynamic> getThemeByPoints(int points) {
+    if (points >= 1200) {
+      return {
+        'rank': 'Multiverse Prime',
+        'primary': kAncientGold,
+        'secondary': const Color(0xFFFFD54F),
+        'glowColor': kAncientGold.withOpacity(0.35),
+        'next': 'MAX LEVEL',
+        'target': 1200,
+        'progress': 1.0,
+      };
+    } else if (points >= 500) {
+      return {
+        'rank': 'Subconscious Oracle',
+        'primary': kNeonCyan,
+        'secondary': const Color(0xFF80D8FF),
+        'glowColor': kNeonCyan.withOpacity(0.35),
+        'next': 'Multiverse Prime (1200 Pts)',
+        'target': 1200,
+        'progress': (points - 500) / 700,
+      };
+    } else if (points >= 200) {
+      return {
+        'rank': 'Astral Decipherer',
+        'primary': kNeonPurple,
+        'secondary': const Color(0xFFE040FB),
+        'glowColor': kNeonPurple.withOpacity(0.35),
+        'next': 'Subconscious Oracle (500 Pts)',
+        'target': 500,
+        'progress': (points - 200) / 300,
+      };
+    } else if (points >= 50) {
+      return {
+        'rank': 'Dimensional Walker',
+        'primary': kMistyGreen,
+        'secondary': const Color(0xFFB9F6CA),
+        'glowColor': kMistyGreen.withOpacity(0.35),
+        'next': 'Astral Decipherer (200 Pts)',
+        'target': 200,
+        'progress': (points - 50) / 150,
+      };
+    } else {
+      return {
+        'rank': 'Seeker of the Void',
+        'primary': Colors.white70,
+        'secondary': Colors.white38,
+        'glowColor': Colors.white10,
+        'next': 'Dimensional Walker (50 Pts)',
+        'target': 50,
+        'progress': points / 50,
+      };
+    }
+  }
+}
+
+// ==================================================
+// AUTHENTICATION & REGISTRATION
 // ==================================================
 class AuthGatekeeper extends StatelessWidget {
   const AuthGatekeeper({super.key});
@@ -122,7 +180,8 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
           'username': name.toLowerCase().replaceAll(' ', '_'),
           'bio': 'Exploring the Multiverse in NEXUS',
           'profilePic': '',
-          'rank': 'Oracle',
+          'rank': 'Seeker of the Void',
+          'resonances': 0,
           'isOnline': true,
           'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': DateTime.now().millisecondsSinceEpoch,
@@ -254,53 +313,119 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
 }
 
 // ==================================================
-// NOTIFICATION ACTIVITY PANEL
+// NOTIFICATION & 5-TIER ACHIEVEMENT TRACKER
 // ==================================================
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
     return Scaffold(
+      backgroundColor: kVoidBlack,
       appBar: AppBar(
         backgroundColor: kVoidBlack,
-        title: const Text('COSMIC TRANSMISSIONS', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, fontSize: 15)),
+        elevation: 0,
+        title: const Text('TRANSMISSIONS & RANKS', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 15)),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildNotifyItem('Dimensional Sync', 'A new being resonated with your Ancient Lore transmission.', Icons.auto_awesome, kAncientGold),
-          _buildNotifyItem('Radar Frequency Alert', 'Midnight anomaly detected in your time-zone.', Icons.radar, kNeonCyan),
-          _buildNotifyItem('Oracle Promotion', 'Your frequency resonance reached Rank II.', Icons.shield, kNeonPurple),
-        ],
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(myUid).snapshots(),
+        builder: (context, snap) {
+          final data = snap.data?.data() as Map<String, dynamic>? ?? {};
+          final points = (data['resonances'] ?? 0) as int;
+          final rankInfo = RankThemeEngine.getThemeByPoints(points);
+
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Live Progression Progress Bar
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: kCardDark,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: (rankInfo['primary'] as Color).withOpacity(0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('CURRENT RANK', style: TextStyle(color: rankInfo['primary'] as Color, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                          Text('$points PTS', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(rankInfo['rank'] as String, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: (rankInfo['progress'] as double).clamp(0.0, 1.0),
+                          minHeight: 8,
+                          backgroundColor: Colors.white10,
+                          valueColor: AlwaysStoppedAnimation<Color>(rankInfo['primary'] as Color),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text('Next Goal: ${rankInfo['next']}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 5 Tough Hard-Coded Reward Achievements
+                const Text('LORE ACHIEVEMENTS (REWARD TIERS)', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+                const SizedBox(height: 12),
+
+                _buildAchievementItem('1. Seeker of the Void', 'Initialize neural transmitter in the multiverse.', points >= 0, Icons.explore_outlined, Colors.white70),
+                _buildAchievementItem('2. Dimensional Walker', 'Broadcast verified mystery transmissions into realms.', points >= 50, Icons.wifi_tethering_rounded, kMistyGreen),
+                _buildAchievementItem('3. Astral Decipherer', 'Decipher & analyze parallel dimension entries.', points >= 200, Icons.fingerprint_rounded, kNeonPurple),
+                _buildAchievementItem('4. Subconscious Oracle', 'Establish anonymous links via Time-Slip Radar.', points >= 500, Icons.remove_red_eye_rounded, kNeonCyan),
+                _buildAchievementItem('5. Multiverse Prime', 'Grandmaster: Accumulate 1200+ resonance points.', points >= 1200, Icons.military_tech_rounded, kAncientGold),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildNotifyItem(String title, String desc, IconData icon, Color color) {
+  Widget _buildAchievementItem(String title, String desc, bool unlocked, IconData icon, Color color) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: kCardDark,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: unlocked ? color.withOpacity(0.5) : Colors.white10),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withOpacity(0.15), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 20),
+            decoration: BoxDecoration(color: unlocked ? color.withOpacity(0.15) : Colors.black26, shape: BoxShape.circle),
+            child: Icon(icon, color: unlocked ? color : Colors.white24, size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: unlocked ? Colors.white : Colors.white38)),
+                    Icon(unlocked ? Icons.lock_open_rounded : Icons.lock_outline_rounded, size: 16, color: unlocked ? color : Colors.white24),
+                  ],
+                ),
                 const SizedBox(height: 4),
-                Text(desc, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                Text(desc, style: TextStyle(color: unlocked ? Colors.white70 : Colors.white24, fontSize: 11)),
               ],
             ),
           ),
@@ -311,26 +436,22 @@ class NotificationScreen extends StatelessWidget {
 }
 
 // ==================================================
-// MAIN NAVIGATION HOST
+// DYNAMIC NAVIGATION HOST
 // ==================================================
 class NexusNavigationHost extends StatefulWidget {
-  final int initialIndex;
-  final String initialRealm;
-  const NexusNavigationHost({super.key, this.initialIndex = 0, this.initialRealm = 'All'});
+  const NexusNavigationHost({super.key});
 
   @override
   State<NexusNavigationHost> createState() => _NexusNavigationHostState();
 }
 
 class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsBindingObserver {
-  late int _currentIndex;
-  late String _selectedRealm;
+  int _currentIndex = 0;
+  String _selectedRealm = 'All';
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _selectedRealm = widget.initialRealm;
     WidgetsBinding.instance.addObserver(this);
     _setUserOnline(true);
   }
@@ -361,37 +482,63 @@ class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsB
 
   @override
   Widget build(BuildContext context) {
-    final screens = [
-      RealmsFeedScreen(selectedRealm: _selectedRealm, onRealmChange: (r) => setState(() => _selectedRealm = r)),
-      const TimeSlipRadarScreen(),
-      TransmissionStudioScreen(onPostSuccess: () => setState(() => _currentIndex = 0)),
-      const ChatsInboxScreen(),
-      ExplorerProfileScreen(onVaultSelect: (realm) => switchToRealm(realm)),
-    ];
+    final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    return Scaffold(
-      body: screens[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: kCardDark,
-          border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (idx) => setState(() => _currentIndex = idx),
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.transparent,
-          selectedItemColor: kNeonCyan,
-          unselectedItemColor: Colors.white38,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.blur_on_rounded), label: 'Realms'),
-            BottomNavigationBarItem(icon: Icon(Icons.radar_rounded), label: 'Radar'),
-            BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline_rounded, size: 28), label: 'Drop'),
-            BottomNavigationBarItem(icon: Icon(Icons.bubble_chart_rounded), label: 'Echoes'),
-            BottomNavigationBarItem(icon: Icon(Icons.shield_rounded), label: 'Identity'),
-          ],
-        ),
-      ),
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(myUid).snapshots(),
+      builder: (context, userSnap) {
+        final userData = userSnap.data?.data() as Map<String, dynamic>? ?? {};
+        final userPoints = (userData['resonances'] ?? 0) as int;
+        final rankTheme = RankThemeEngine.getThemeByPoints(userPoints);
+        final Color activeColor = rankTheme['primary'] as Color;
+
+        final screens = [
+          RealmsFeedScreen(
+            selectedRealm: _selectedRealm,
+            accentColor: activeColor,
+            onRealmChange: (r) => setState(() => _selectedRealm = r),
+          ),
+          TimeSlipRadarScreen(accentColor: activeColor),
+          TransmissionStudioScreen(
+            accentColor: activeColor,
+            onPostSuccess: () => setState(() => _currentIndex = 0),
+          ),
+          ChatsInboxScreen(accentColor: activeColor),
+          ExplorerProfileScreen(
+            accentColor: activeColor,
+            onVaultSelect: (realm) => switchToRealm(realm),
+          ),
+        ];
+
+        return Scaffold(
+          backgroundColor: kVoidBlack,
+          body: screens[_currentIndex],
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              color: kCardDark,
+              border: Border(top: BorderSide(color: activeColor.withOpacity(0.2))),
+              boxShadow: [
+                BoxShadow(color: (rankTheme['glowColor'] as Color), blurRadius: 10, spreadRadius: 1),
+              ],
+            ),
+            child: BottomNavigationBar(
+              currentIndex: _currentIndex,
+              onTap: (idx) => setState(() => _currentIndex = idx),
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Colors.transparent,
+              selectedItemColor: activeColor,
+              unselectedItemColor: Colors.white38,
+              items: const [
+                BottomNavigationBarItem(icon: Icon(Icons.blur_on_rounded), label: 'Realms'),
+                BottomNavigationBarItem(icon: Icon(Icons.radar_rounded), label: 'Radar'),
+                BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline_rounded, size: 28), label: 'Drop'),
+                BottomNavigationBarItem(icon: Icon(Icons.bubble_chart_rounded), label: 'Echoes'),
+                BottomNavigationBarItem(icon: Icon(Icons.shield_rounded), label: 'Identity'),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -401,8 +548,15 @@ class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsB
 // ==================================================
 class RealmsFeedScreen extends StatelessWidget {
   final String selectedRealm;
+  final Color accentColor;
   final Function(String) onRealmChange;
-  const RealmsFeedScreen({super.key, required this.selectedRealm, required this.onRealmChange});
+
+  const RealmsFeedScreen({
+    super.key,
+    required this.selectedRealm,
+    required this.accentColor,
+    required this.onRealmChange,
+  });
 
   final List<Map<String, dynamic>> realms = const [
     {'name': 'All', 'icon': Icons.all_inclusive_rounded, 'color': kNeonPurple},
@@ -415,6 +569,7 @@ class RealmsFeedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kVoidBlack,
       appBar: AppBar(
         backgroundColor: kVoidBlack,
         elevation: 0,
@@ -422,8 +577,8 @@ class RealmsFeedScreen extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: kNeonPurple, width: 1.5)),
-              child: const Icon(Icons.hub_rounded, color: kNeonCyan, size: 18),
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: accentColor, width: 1.5)),
+              child: Icon(Icons.hub_rounded, color: accentColor, size: 18),
             ),
             const SizedBox(width: 10),
             const Text('N E X U S', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 4, fontSize: 18)),
@@ -432,9 +587,7 @@ class RealmsFeedScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen()));
-            },
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
           ),
         ],
       ),
@@ -488,7 +641,7 @@ class RealmsFeedScreen extends StatelessWidget {
                   ? FirebaseFirestore.instance.collection('transmissions').orderBy('createdAt', descending: true).snapshots()
                   : FirebaseFirestore.instance.collection('transmissions').where('dimension', isEqualTo: selectedRealm).snapshots(),
               builder: (ctx, snap) {
-                if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: kNeonCyan));
+                if (!snap.hasData) return Center(child: CircularProgressIndicator(color: accentColor));
                 final docs = snap.data!.docs;
                 if (docs.isEmpty) {
                   return Center(
@@ -507,8 +660,7 @@ class RealmsFeedScreen extends StatelessWidget {
                   itemCount: docs.length,
                   itemBuilder: (context, i) {
                     final data = docs[i].data() as Map<String, dynamic>;
-                    final docId = docs[i].id;
-                    return TransmissionCard(docId: docId, data: data);
+                    return TransmissionCard(docId: docs[i].id, data: data);
                   },
                 );
               },
@@ -610,7 +762,7 @@ class TransmissionCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(data['creatorName'] ?? 'Explorer', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text(data['rank'] ?? 'Oracle', style: TextStyle(color: dimColor, fontSize: 11)),
+                      Text(data['rank'] ?? 'Seeker', style: TextStyle(color: dimColor, fontSize: 11)),
                     ],
                   ),
                 ],
@@ -703,10 +855,11 @@ class TransmissionCard extends StatelessWidget {
 }
 
 // ==================================================
-// TAB 2: TIME-SLIP RADAR (SAFE & ZERO CRASH)
+// TAB 2: TIME-SLIP RADAR
 // ==================================================
 class TimeSlipRadarScreen extends StatelessWidget {
-  const TimeSlipRadarScreen({super.key});
+  final Color accentColor;
+  const TimeSlipRadarScreen({super.key, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
@@ -725,9 +878,8 @@ class TimeSlipRadarScreen extends StatelessWidget {
           stream: FirebaseFirestore.instance.collection('users').snapshots(),
           builder: (ctx, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: kNeonCyan));
+              return Center(child: CircularProgressIndicator(color: accentColor));
             }
-            
             final allDocs = snap.data?.docs ?? [];
             final otherUsers = allDocs.where((d) => d.id != myUid).toList();
 
@@ -736,13 +888,8 @@ class TimeSlipRadarScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Column(
                 children: [
-                  const Text(
-                    'Live thought frequencies in real-time orbit',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
+                  const Text('Live thought frequencies in real-time orbit', style: TextStyle(color: Colors.white54, fontSize: 12)),
                   const SizedBox(height: 24),
-                  
-                  // Radar Rings Center
                   Center(
                     child: SizedBox(
                       width: 280,
@@ -753,44 +900,32 @@ class TimeSlipRadarScreen extends StatelessWidget {
                           Container(
                             width: 270,
                             height: 270,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: kNeonCyan.withOpacity(0.25), width: 1.5),
-                            ),
+                            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: accentColor.withOpacity(0.25), width: 1.5)),
                           ),
                           Container(
                             width: 180,
                             height: 180,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: kNeonPurple.withOpacity(0.35), width: 1.5),
-                            ),
+                            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: kNeonPurple.withOpacity(0.35), width: 1.5)),
                           ),
                           Container(
                             width: 90,
                             height: 90,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: kAncientGold.withOpacity(0.3), width: 1),
-                            ),
+                            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: kAncientGold.withOpacity(0.3), width: 1)),
                           ),
                           Container(
                             width: 14,
                             height: 14,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: kNeonCyan,
-                              boxShadow: [BoxShadow(color: kNeonCyan, blurRadius: 12, spreadRadius: 3)],
+                              color: accentColor,
+                              boxShadow: [BoxShadow(color: accentColor, blurRadius: 12, spreadRadius: 3)],
                             ),
                           ),
-                          
-                          // Active Orbit Users
                           if (otherUsers.isNotEmpty)
                             for (int i = 0; i < otherUsers.length && i < 3; i++)
                               _buildOrbitNode(context, otherUsers[i], i)
                           else ...[
-                            // Ambient Mock Nodes agar abhi dusre users online na hon
-                            _buildStaticNode(const Offset(-70, -75), 'Void_Seeker', kNeonCyan),
+                            _buildStaticNode(const Offset(-70, -75), 'Void_Seeker', accentColor),
                             _buildStaticNode(const Offset(75, 45), 'Ancient_Seer', kAncientGold),
                             _buildStaticNode(const Offset(-45, 65), 'Shadow_01', kHorrorCrimson),
                           ],
@@ -799,35 +934,33 @@ class TimeSlipRadarScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  
-                  // Resonance Bottom Card
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: kCardDark,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: kNeonPurple.withOpacity(0.5)),
+                      border: Border.all(color: accentColor.withOpacity(0.5)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.auto_awesome, color: kNeonCyan, size: 20),
+                            Icon(Icons.auto_awesome, color: accentColor, size: 20),
                             const SizedBox(width: 8),
                             Text(
                               otherUsers.isNotEmpty
                                   ? 'SYNCHRONIZED: @${(otherUsers.first.data() as Map<String, dynamic>)['username'] ?? 'Explorer'}'
                                   : 'PARALLEL RESONANCE SCANNING',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kNeonCyan),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: accentColor),
                             ),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Text(
                           otherUsers.isNotEmpty
-                              ? '${(otherUsers.first.data() as Map<String, dynamic>)['name'] ?? 'Explorer'} is currently tuned to the multiverse frequency.'
+                              ? '${(otherUsers.first.data() as Map<String, dynamic>)['name'] ?? 'Explorer'} is currently tuned to the frequency.'
                               : 'Tuning into subconscious wave patterns across dimensions...',
                           style: const TextStyle(color: Colors.white70, fontSize: 13),
                         ),
@@ -837,7 +970,7 @@ class TimeSlipRadarScreen extends StatelessWidget {
                           height: 46,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: kNeonPurple,
+                              backgroundColor: accentColor,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: () {
@@ -852,13 +985,9 @@ class TimeSlipRadarScreen extends StatelessWidget {
                                     ),
                                   ),
                                 );
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Scanning cosmic frequencies...')),
-                                );
                               }
                             },
-                            child: const Text('ENTER ANONYMOUS LINK', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                            child: const Text('ENTER ANONYMOUS LINK', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                           ),
                         ),
                       ],
@@ -888,9 +1017,7 @@ class TimeSlipRadarScreen extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => NexusDirectChatScreen(peerUid: userDoc.id, peerName: name),
-            ),
+            MaterialPageRoute(builder: (_) => NexusDirectChatScreen(peerUid: userDoc.id, peerName: name)),
           );
         },
         child: Column(
@@ -901,11 +1028,11 @@ class TimeSlipRadarScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: kNeonPurple.withOpacity(0.3),
-                border: Border.all(color: kNeonCyan, width: 1.5),
+                border: Border.all(color: accentColor, width: 1.5),
               ),
               child: const Icon(Icons.person, size: 14, color: Colors.white),
             ),
-            Text(name, style: const TextStyle(color: kNeonCyan, fontSize: 10, fontWeight: FontWeight.bold)),
+            Text(name, style: TextStyle(color: accentColor, fontSize: 10, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -920,11 +1047,7 @@ class TimeSlipRadarScreen extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withOpacity(0.2),
-              border: Border.all(color: color, width: 1.5),
-            ),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(0.2), border: Border.all(color: color, width: 1.5)),
             child: Icon(Icons.blur_on_rounded, size: 14, color: color),
           ),
           Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -935,11 +1058,13 @@ class TimeSlipRadarScreen extends StatelessWidget {
 }
 
 // ==================================================
-// TAB 3: TRANSMISSION STUDIO (POST CREATION FIX)
+// TAB 3: TRANSMISSION STUDIO
 // ==================================================
 class TransmissionStudioScreen extends StatefulWidget {
+  final Color accentColor;
   final VoidCallback onPostSuccess;
-  const TransmissionStudioScreen({super.key, required this.onPostSuccess});
+  const TransmissionStudioScreen({super.key, required this.accentColor, required this.onPostSuccess});
+
   @override
   State<TransmissionStudioScreen> createState() => _TransmissionStudioScreenState();
 }
@@ -965,11 +1090,11 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     try {
-      await FirebaseFirestore.instance.collection('transmissions').add({
+      final docRef = await FirebaseFirestore.instance.collection('transmissions').add({
         'uid': user?.uid ?? 'anon',
         'creatorName': user?.displayName ?? 'Explorer',
-        'rank': 'Oracle',
-        'dimension': selectedDim, // 🔥 Guaranteed selected dimension
+        'rank': 'Seeker',
+        'dimension': selectedDim,
         'content': text,
         'hasAudio': hasVoiceNote,
         'audioFilter': hasVoiceNote ? selectedFilter : '',
@@ -977,6 +1102,13 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
         'decipherCount': 0,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
       });
+
+      // Reward User with +10 Resonance Points per Post
+      if (user?.uid != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user!.uid).update({
+          'resonances': FieldValue.increment(10),
+        });
+      }
 
       _contentController.clear();
       setState(() => hasVoiceNote = false);
@@ -991,6 +1123,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kVoidBlack,
       appBar: AppBar(
         backgroundColor: kVoidBlack,
         elevation: 0,
@@ -1002,7 +1135,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('SELECT REALM DIMENSION', style: TextStyle(color: kNeonCyan, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+            Text('SELECT REALM DIMENSION', style: TextStyle(color: widget.accentColor, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 10,
@@ -1011,7 +1144,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                 return ChoiceChip(
                   label: Text(d, style: TextStyle(color: isSel ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
                   selected: isSel,
-                  selectedColor: kNeonCyan,
+                  selectedColor: widget.accentColor,
                   backgroundColor: kCardDark,
                   onSelected: (val) => setState(() => selectedDim = d),
                 );
@@ -1045,7 +1178,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                     children: [
                       const Text('Voice Frequency Echo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       Switch(
-                        activeColor: kNeonPurple,
+                        activeColor: widget.accentColor,
                         value: hasVoiceNote,
                         onChanged: (v) => setState(() => hasVoiceNote = v),
                       ),
@@ -1071,13 +1204,13 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
               height: 52,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kNeonPurple,
+                  backgroundColor: widget.accentColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 onPressed: isTransmitting ? null : _transmit,
                 child: isTransmitting
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('BROADCAST TRANSMISSION', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5, color: Colors.white)),
+                    ? const CircularProgressIndicator(color: Colors.black)
+                    : const Text('BROADCAST TRANSMISSION', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5, color: Colors.black)),
               ),
             ),
           ],
@@ -1088,16 +1221,18 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 }
 
 // ==================================================
-// TAB 4: DIRECT CHATS
+// TAB 4: DIRECT REAL-TIME CHAT
 // ==================================================
 class ChatsInboxScreen extends StatelessWidget {
-  const ChatsInboxScreen({super.key});
+  final Color accentColor;
+  const ChatsInboxScreen({super.key, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
+      backgroundColor: kVoidBlack,
       appBar: AppBar(
         backgroundColor: kVoidBlack,
         elevation: 0,
@@ -1106,7 +1241,7 @@ class ChatsInboxScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('users').snapshots(),
         builder: (ctx, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: kNeonPurple));
+          if (!snap.hasData) return Center(child: CircularProgressIndicator(color: accentColor));
           final users = snap.data!.docs.where((d) => d.id != myUid).toList();
 
           if (users.isEmpty) {
@@ -1131,7 +1266,7 @@ class ChatsInboxScreen extends StatelessWidget {
                 ),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: kNeonPurple.withOpacity(0.3),
+                    backgroundColor: accentColor.withOpacity(0.3),
                     child: Text(peerName[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                   title: Text(peerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
@@ -1140,9 +1275,7 @@ class ChatsInboxScreen extends StatelessWidget {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => NexusDirectChatScreen(peerUid: peerUid, peerName: peerName),
-                      ),
+                      MaterialPageRoute(builder: (_) => NexusDirectChatScreen(peerUid: peerUid, peerName: peerName)),
                     );
                   },
                 ),
@@ -1194,6 +1327,7 @@ class _NexusDirectChatScreenState extends State<NexusDirectChatScreen> {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
+      backgroundColor: kVoidBlack,
       appBar: AppBar(
         backgroundColor: kVoidBlack,
         title: Text(widget.peerName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -1269,17 +1403,13 @@ class _NexusDirectChatScreenState extends State<NexusDirectChatScreen> {
 }
 
 // ==================================================
-// TAB 5: PROFILE WITH IMAGE PICKER & CROPPER
+// TAB 5: PROFILE SCREEN & VAULT
 // ==================================================
-class ExplorerProfileScreen extends StatefulWidget {
+class ExplorerProfileScreen extends StatelessWidget {
+  final Color accentColor;
   final Function(String) onVaultSelect;
-  const ExplorerProfileScreen({super.key, required this.onVaultSelect});
+  const ExplorerProfileScreen({super.key, required this.accentColor, required this.onVaultSelect});
 
-  @override
-  State<ExplorerProfileScreen> createState() => _ExplorerProfileScreenState();
-}
-
-class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
   Future<void> _pickAndCropAvatar(String uid) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
@@ -1290,7 +1420,7 @@ class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
       aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
       uiSettings: [
         AndroidUiSettings(
-          toolbarTitle: 'Crop Nexus Avatar',
+          toolbarTitle: 'Crop Avatar',
           toolbarColor: kVoidBlack,
           toolbarWidgetColor: Colors.white,
           initAspectRatio: CropAspectRatioPreset.square,
@@ -1316,7 +1446,7 @@ class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: kCardDark,
-        title: const Text('Edit Identity', style: TextStyle(color: kNeonCyan, fontWeight: FontWeight.bold)),
+        title: Text('Edit Identity', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1328,7 +1458,7 @@ class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: kNeonPurple),
+            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
             onPressed: () async {
               await FirebaseFirestore.instance.collection('users').doc(uid).update({
                 'name': nameCtrl.text.trim(),
@@ -1337,7 +1467,7 @@ class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
               await FirebaseAuth.instance.currentUser?.updateDisplayName(nameCtrl.text.trim());
               if (ctx.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Save'),
+            child: const Text('Save', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -1349,6 +1479,7 @@ class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
+      backgroundColor: kVoidBlack,
       appBar: AppBar(
         backgroundColor: kVoidBlack,
         elevation: 0,
@@ -1363,11 +1494,13 @@ class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(myUid).snapshots(),
         builder: (ctx, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: kNeonPurple));
+          if (!snap.hasData) return Center(child: CircularProgressIndicator(color: accentColor));
           final data = snap.data?.data() as Map<String, dynamic>? ?? {};
           final profilePicBase64 = data['profilePic'] ?? '';
           final name = data['name'] ?? 'Explorer';
           final bio = data['bio'] ?? 'Exploring the Multiverse';
+          final points = (data['resonances'] ?? 0) as int;
+          final rankTheme = RankThemeEngine.getThemeByPoints(points);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -1381,8 +1514,8 @@ class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
                         height: 100,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: kNeonCyan, width: 2),
-                          boxShadow: [BoxShadow(color: kNeonCyan.withOpacity(0.3), blurRadius: 20, spreadRadius: 2)],
+                          border: Border.all(color: accentColor, width: 2),
+                          boxShadow: [BoxShadow(color: accentColor.withOpacity(0.3), blurRadius: 20, spreadRadius: 2)],
                         ),
                         child: ClipOval(
                           child: profilePicBase64.isNotEmpty
@@ -1400,8 +1533,8 @@ class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
                           onTap: () => _pickAndCropAvatar(myUid),
                           child: Container(
                             padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(color: kNeonPurple, shape: BoxShape.circle),
-                            child: const Icon(Icons.crop_original_rounded, size: 18, color: Colors.white),
+                            decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle),
+                            child: const Icon(Icons.crop_original_rounded, size: 18, color: Colors.black),
                           ),
                         ),
                       ),
@@ -1414,23 +1547,23 @@ class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
                   children: [
                     Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     IconButton(
-                      icon: const Icon(Icons.edit, size: 18, color: kNeonCyan),
+                      icon: Icon(Icons.edit, size: 18, color: accentColor),
                       onPressed: () => _showEditProfileDialog(context, name, bio, myUid),
                     ),
                   ],
                 ),
-                Text('@${data['username'] ?? 'nexus_being'}', style: const TextStyle(color: kNeonCyan, fontSize: 13)),
+                Text('@${data['username'] ?? 'nexus_being'}', style: TextStyle(color: accentColor, fontSize: 13)),
                 const SizedBox(height: 8),
                 Text(bio, style: const TextStyle(color: Colors.white60, fontSize: 13), textAlign: TextAlign.center),
                 const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: kNeonPurple.withOpacity(0.2),
+                    color: (rankTheme['primary'] as Color).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: kNeonPurple),
+                    border: Border.all(color: rankTheme['primary'] as Color),
                   ),
-                  child: Text('Rank: ${data['rank'] ?? 'Oracle'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: Text('Rank: ${rankTheme['rank']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
                 const SizedBox(height: 30),
                 const Align(
@@ -1445,10 +1578,10 @@ class _ExplorerProfileScreenState extends State<ExplorerProfileScreen> {
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                   children: [
-                    _buildArtifactItem('Ancient Gods', 'Temple Alignments & Lore', kAncientGold, () => widget.onVaultSelect('Ancient Gods')),
-                    _buildArtifactItem('Dreams', 'Lucid Dreams & Paradoxes', kMistyGreen, () => widget.onVaultSelect('Dreams')),
-                    _buildArtifactItem('Cyber 3050', 'Singularity & AI Theories', kNeonCyan, () => widget.onVaultSelect('Cyber 3050')),
-                    _buildArtifactItem('Horror', 'Midnight Paranormal EVP', kHorrorCrimson, () => widget.onVaultSelect('Horror')),
+                    _buildArtifactItem('Ancient Gods', 'Temple Alignments & Lore', kAncientGold, () => onVaultSelect('Ancient Gods')),
+                    _buildArtifactItem('Dreams', 'Lucid Dreams & Paradoxes', kMistyGreen, () => onVaultSelect('Dreams')),
+                    _buildArtifactItem('Cyber 3050', 'Singularity & AI Theories', kNeonCyan, () => onVaultSelect('Cyber 3050')),
+                    _buildArtifactItem('Horror', 'Midnight Paranormal EVP', kHorrorCrimson, () => onVaultSelect('Horror')),
                   ],
                 ),
               ],
