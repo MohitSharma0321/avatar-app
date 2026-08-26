@@ -17,7 +17,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 // ==================================================
-// NEXUS PALETTE & CORE THEMES
+// AVATAR PALETTE & CORE THEMES
 // ==================================================
 const Color kVoidBlack = Color(0xFF0A0714);
 const Color kCardDark = Color(0xFF130E24);
@@ -47,16 +47,16 @@ void main() async {
   const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
-  runApp(const NexusApp());
+  runApp(const AvatarApp());
 }
 
-class NexusApp extends StatelessWidget {
-  const NexusApp({super.key});
+class AvatarApp extends StatelessWidget {
+  const AvatarApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'NEXUS',
+      title: 'Avatar',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: kVoidBlack,
@@ -82,8 +82,8 @@ class NotificationService {
 
   static Future<void> showLocalNotification(String title, String body) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'nexus_channel_id',
-      'Nexus Transmissions',
+      'avatar_chat_channel',
+      'Avatar Transmissions',
       channelDescription: 'Multiverse notifications and radar invitations',
       importance: Importance.max,
       priority: Priority.high,
@@ -100,10 +100,10 @@ class NotificationService {
 }
 
 // ==================================================
-// CLOUDFLARE GEMINI AI ENGINE
+// CLOUDFLARE GEMINI AI ENGINE (UPDATED URL)
 // ==================================================
-class NexusAIEngine {
-  static const String _workerUrl = 'https://nexus-friend-api.projectkhurafat.workers.dev/';
+class AvatarAIEngine {
+  static const String _workerUrl = 'https://avatar-friend-ai.projectkhurafat.workers.dev/';
 
   static Future<String> getAIResponse(String userMessage) async {
     try {
@@ -125,7 +125,7 @@ class NexusAIEngine {
         return "Gateway status: ${response.statusCode}. Check GEMINI_API_KEY secret in Cloudflare.";
       }
     } catch (e) {
-      debugPrint('Cloudflare Nexus AI Error: $e');
+      debugPrint('Cloudflare Avatar AI Error: $e');
       return 'Resonance signal weak. Try transmitting again.';
     }
   }
@@ -189,21 +189,21 @@ class _AuthGatekeeperState extends State<AuthGatekeeper> {
           return const Scaffold(body: Center(child: CircularProgressIndicator(color: kNeonPurple)));
         }
         if (snapshot.hasData && snapshot.data != null) {
-          return const NexusNavigationHost();
+          return const AvatarNavigationHost();
         }
-        return const NexusLoginScreen();
+        return const AvatarLoginScreen();
       },
     );
   }
 }
 
-class NexusLoginScreen extends StatefulWidget {
-  const NexusLoginScreen({super.key});
+class AvatarLoginScreen extends StatefulWidget {
+  const AvatarLoginScreen({super.key});
   @override
-  State<NexusLoginScreen> createState() => _NexusLoginScreenState();
+  State<AvatarLoginScreen> createState() => _AvatarLoginScreenState();
 }
 
-class _NexusLoginScreenState extends State<NexusLoginScreen> {
+class _AvatarLoginScreenState extends State<AvatarLoginScreen> {
   final _emailController = TextEditingController();
   final _passController = TextEditingController();
   final _nameController = TextEditingController();
@@ -229,7 +229,7 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
           'uid': cred.user!.uid,
           'name': name,
           'username': name.toLowerCase().replaceAll(' ', '_'),
-          'bio': 'Exploring the Multiverse in NEXUS',
+          'bio': 'Exploring the Multiverse in Avatar',
           'profilePic': '',
           'rank': 'Seeker of the Void',
           'resonances': 0,
@@ -264,7 +264,7 @@ class _NexusLoginScreenState extends State<NexusLoginScreen> {
                     child: const Icon(Icons.hub_rounded, color: Colors.white, size: 40),
                   ),
                   const SizedBox(height: 20),
-                  const Text('N E X U S', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 8, color: Colors.white)),
+                  const Text('A V A T A R', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 8, color: Colors.white)),
                   const Text('The Multiverse Network', style: TextStyle(color: kNeonCyan, fontSize: 13, letterSpacing: 2)),
                   const SizedBox(height: 36),
                   if (isSignUp)
@@ -485,14 +485,14 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
 // ==================================================
 // DYNAMIC NAVIGATION HOST WITH NOTIFICATION COUNTER
 // ==================================================
-class NexusNavigationHost extends StatefulWidget {
-  const NexusNavigationHost({super.key});
+class AvatarNavigationHost extends StatefulWidget {
+  const AvatarNavigationHost({super.key});
 
   @override
-  State<NexusNavigationHost> createState() => _NexusNavigationHostState();
+  State<AvatarNavigationHost> createState() => _AvatarNavigationHostState();
 }
 
-class _NexusNavigationHostState extends State<NexusNavigationHost> with WidgetsBindingObserver {
+class _AvatarNavigationHostState extends State<AvatarNavigationHost> with WidgetsBindingObserver {
   int _currentIndex = 0;
   String _selectedRealm = 'All';
 
@@ -639,7 +639,7 @@ class RealmsFeedScreen extends StatelessWidget {
               child: Icon(Icons.hub_rounded, color: accentColor, size: 18),
             ),
             const SizedBox(width: 10),
-            const Text('N E X U S', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 4, fontSize: 18)),
+            const Text('A V A T A R', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 4, fontSize: 18)),
           ],
         ),
         actions: [
@@ -964,7 +964,7 @@ class _TransmissionCardState extends State<TransmissionCard> {
   }
 
   void _shareTransmission(String content, String dimension, String creator) {
-    Share.share('🌌 NEXUS TRANSMISSION [$dimension Realm]\n\n"$content"\n\n- Transmitted by @$creator on NEXUS Multiverse Network.', subject: 'NEXUS Transmission');
+    Share.share('🌌 AVATAR TRANSMISSION [$dimension Realm]\n\n"$content"\n\n- Transmitted by @$creator on Avatar Multiverse Network.', subject: 'Avatar Transmission');
   }
 
   @override
@@ -1416,7 +1416,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 }
 
 // ==================================================
-// TAB 4: CHATS (NEXUS FRIEND AI COMPANION)
+// TAB 4: CHATS (AVATAR FRIEND AI COMPANION)
 // ==================================================
 class ChatsInboxScreen extends StatelessWidget {
   final Color accentColor;
@@ -1437,10 +1437,10 @@ class ChatsInboxScreen extends StatelessWidget {
             decoration: BoxDecoration(gradient: LinearGradient(colors: [kCardDark, kNeonPurple.withOpacity(0.2)]), borderRadius: BorderRadius.circular(16), border: Border.all(color: accentColor, width: 1.5)),
             child: ListTile(
               leading: CircleAvatar(backgroundColor: accentColor, child: const Icon(Icons.auto_awesome, color: Colors.black)),
-              title: const Text('Nexus Friend (AI Companion)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+              title: const Text('Avatar Friend (AI Companion)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
               subtitle: const Text('Multilingual AI Oracle • Always Online', style: TextStyle(color: kMistyGreen, fontSize: 12)),
               trailing: Icon(Icons.chevron_right, color: accentColor),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NexusAIChatScreen())),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarAIChatScreen())),
             ),
           ),
           const Divider(color: Colors.white12),
@@ -1470,7 +1470,7 @@ class ChatsInboxScreen extends StatelessWidget {
                       title: Text(peerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                       subtitle: Text(isOnline ? 'Active on frequency' : 'Signal lost', style: TextStyle(color: isOnline ? kMistyGreen : Colors.white38, fontSize: 12)),
                       trailing: const Icon(Icons.chevron_right, color: Colors.white38),
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NexusDirectChatScreen(peerUid: peerUid, peerName: peerName))),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AvatarDirectChatScreen(peerUid: peerUid, peerName: peerName))),
                     ),
                   );
                 },
@@ -1486,20 +1486,20 @@ class ChatsInboxScreen extends StatelessWidget {
 // ==================================================
 // MULTILINGUAL AI CHAT SCREEN (KEYBOARD & AUTO-SCROLL FIXED)
 // ==================================================
-class NexusAIChatScreen extends StatefulWidget {
-  const NexusAIChatScreen({super.key});
+class AvatarAIChatScreen extends StatefulWidget {
+  const AvatarAIChatScreen({super.key});
 
   @override
-  State<NexusAIChatScreen> createState() => _NexusAIChatScreenState();
+  State<AvatarAIChatScreen> createState() => _AvatarAIChatScreenState();
 }
 
-class _NexusAIChatScreenState extends State<NexusAIChatScreen> {
+class _AvatarAIChatScreenState extends State<AvatarAIChatScreen> {
   final _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [
     {
       'sender': 'ai',
-      'text': 'Greetings, Explorer. I am Nexus Friend. Speak to me in any language—Hindi, English, or beyond. What mystery shall we decode today?'
+      'text': 'Greetings, Explorer. I am Avatar Friend. Speak to me in any language—Hindi, English, or beyond. What mystery shall we decode today?'
     }
   ];
   bool isThinking = false;
@@ -1527,7 +1527,7 @@ class _NexusAIChatScreenState extends State<NexusAIChatScreen> {
     _msgController.clear();
     _scrollToBottom();
 
-    final aiReply = await NexusAIEngine.getAIResponse(text);
+    final aiReply = await AvatarAIEngine.getAIResponse(text);
 
     if (mounted) {
       setState(() {
@@ -1549,7 +1549,7 @@ class _NexusAIChatScreenState extends State<NexusAIChatScreen> {
           children: [
             CircleAvatar(radius: 14, backgroundColor: kNeonCyan, child: Icon(Icons.auto_awesome, size: 14, color: Colors.black)),
             SizedBox(width: 10),
-            Text('Nexus Friend (AI)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Avatar Friend (AI)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -1583,7 +1583,7 @@ class _NexusAIChatScreenState extends State<NexusAIChatScreen> {
           if (isThinking)
             const Padding(
               padding: EdgeInsets.all(8.0),
-              child: Text('Nexus Friend is channeling dimensions...', style: TextStyle(color: kNeonCyan, fontSize: 12, fontStyle: FontStyle.italic)),
+              child: Text('Avatar Friend is channeling dimensions...', style: TextStyle(color: kNeonCyan, fontSize: 12, fontStyle: FontStyle.italic)),
             ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1619,16 +1619,16 @@ class _NexusAIChatScreenState extends State<NexusAIChatScreen> {
 // ==================================================
 // DIRECT PEER-TO-PEER CHAT SCREEN
 // ==================================================
-class NexusDirectChatScreen extends StatefulWidget {
+class AvatarDirectChatScreen extends StatefulWidget {
   final String peerUid;
   final String peerName;
-  const NexusDirectChatScreen({super.key, required this.peerUid, required this.peerName});
+  const AvatarDirectChatScreen({super.key, required this.peerUid, required this.peerName});
 
   @override
-  State<NexusDirectChatScreen> createState() => _NexusDirectChatScreenState();
+  State<AvatarDirectChatScreen> createState() => _AvatarDirectChatScreenState();
 }
 
-class _NexusDirectChatScreenState extends State<NexusDirectChatScreen> {
+class _AvatarDirectChatScreenState extends State<AvatarDirectChatScreen> {
   final _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late final String chatRoomId;
@@ -1839,7 +1839,7 @@ class ExplorerProfileScreen extends StatelessWidget {
                     IconButton(icon: Icon(Icons.edit, size: 18, color: accentColor), onPressed: () => _showEditProfileDialog(context, name, bio, myUid)),
                   ],
                 ),
-                Text('@${data['username'] ?? 'nexus_being'}', style: TextStyle(color: accentColor, fontSize: 13)),
+                Text('@${data['username'] ?? 'avatar_being'}', style: TextStyle(color: accentColor, fontSize: 13)),
                 const SizedBox(height: 8),
                 Text(bio, style: const TextStyle(color: Colors.white60, fontSize: 13), textAlign: TextAlign.center),
                 const SizedBox(height: 14),
