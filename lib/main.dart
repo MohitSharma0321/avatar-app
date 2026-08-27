@@ -58,6 +58,7 @@ void main() async {
   const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
+  await AppLanguage.loadSavedLanguage();
   runApp(const AvatarApp());
 }
 
@@ -84,6 +85,31 @@ class AppLanguage {
     {'name': 'Telugu', 'native': 'తెలుగు', 'code': 'te'},
     {'name': 'Marathi', 'native': 'मराठी', 'code': 'mr'},
   ];
+
+  // Persist the selected language locally so it survives app restarts.
+  static Future<void> loadSavedLanguage() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/avatar_selected_language.txt');
+      if (await file.exists()) {
+        final saved = (await file.readAsString()).trim();
+        final exists = supportedLanguages.any((language) => language['name'] == saved);
+        if (exists) currentLang.value = saved;
+      }
+    } catch (e) {
+      debugPrint('Language load error: $e');
+    }
+  }
+
+  static Future<void> saveLanguage(String language) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/avatar_selected_language.txt');
+      await file.writeAsString(language, flush: true);
+    } catch (e) {
+      debugPrint('Language save error: $e');
+    }
+  }
 
   static const Map<String, Map<String, String>> dictionary = {
     'English': {
@@ -162,7 +188,37 @@ class AppLanguage {
       'online': 'En línea', 'offline': 'Desconectado', 'typing': 'escribiendo...', 'snap_feed': 'FEED DE SNAPS DE IA 24H',
       'snap_creator': 'CREADOR DE SNAPS DE IA 24H', 'create_snap_banner': 'Crear Snap de IA 24H (+)',
       'no_transmissions': 'No hay transmisiones en esta dimensión aún.', 'active_perks': 'VENTAJAS Y ARTEFACTOS ACTIVOS', 'artifact_vault': 'BÓVEDA DE ARTEFACTOS'
-    }
+    },
+    'French': {
+      'home':'Accueil','radar':'Radar','post':'Publier','hub':'Centre','echoes':'Échos','identity':'Identité','select_realm':'CHOISIR LA DIMENSION','share_hint':'Partagez votre rencontre surnaturelle, votre rêve ou votre mystère...','voice_echo':'Écho de fréquence vocale (+2 pts)','voice_tap':'Touchez le micro pour enregistrer','voice_captured':'Voix enregistrée ! Choisissez un filtre.','filters_title':'FILTRES VOCAUX EN TEMPS RÉEL :','broadcast_btn':'DIFFUSER LA TRANSMISSION (+2 PTS)','transmitting_audio':'Transmission en cours...','witnessed':'Observé','deciphered':'Déchiffré','self_witness':'Auto-observation','plus_witness':'+1 témoin','sponsored':'Sponsorisé','featured':'Transmission à la une','search_lang':'Rechercher une langue...','select_lang':'Choisir la langue','online':'En ligne','offline':'Hors ligne','typing':'écrit...','delete_me':'Supprimer pour moi','delete_everyone':'Supprimer pour tous','unsend':'Annuler l’envoi','pin_chat':'Épingler la conversation','unpin_chat':'Désépingler la conversation','share_link':'Partager avec le lien de l’application','share_text':'Partager uniquement le texte','profile_locked':'Le profil se débloque après 3 jours de connexion','snap_feed':'FIL 24H DE SNAPS IA','snap_creator':'CRÉATEUR DE SNAPS IA 24H','snap_hint':'Écrivez votre pensée, mystère ou citation...','generating_pic':'L’IA transforme votre pensée en image...','done_pic':'GÉNÉRER L’IMAGE IA','upload_snap':'PUBLIER LE SNAP (24H)','expires_in':'Expire automatiquement dans 24h','all':'Tous','horror':'Horreur','ancient_gods':'Dieux anciens','cyber_3050':'Cyber 3050','dreams':'Rêves','scan_radar':'Recherche des fréquences du multivers','send_invite':'ENVOYER L’INVITATION (+3 PTS)','creator_stories':'Histoires et actualités du créateur','daily_questions':'20 questions quotidiennes (20h)','publish_lore':'PUBLIER LE RÉCIT','solve_btn':'RÉPONDRE','solved_tag':'RÉSOLU','pending_tag':'EN ATTENTE','ai_friend_title':'Avatar Friend (Compagnon IA)','ai_friend_sub':'Oracle IA multilingue • Toujours en ligne','active_perks':'AVANTAGES ET ARTEFACTS ACTIFS','artifact_vault':'COFFRE DES ARTEFACTS','no_transmissions':'Aucune transmission dans cette dimension.','create_snap_banner':'Créer un Snap IA 24H (+)',
+    },
+    'German': {
+      'home':'Start','radar':'Radar','post':'Post','hub':'Zentrum','echoes':'Echos','identity':'Identität','select_realm':'DIMENSION AUSWÄHLEN','share_hint':'Teile dein übernatürliches Erlebnis, deinen Traum oder dein Geheimnis...','voice_echo':'Stimmfrequenz-Echo (+2 Pkt.)','voice_tap':'Tippe auf das Mikrofon zum Aufnehmen','voice_captured':'Stimme aufgenommen! Filter auswählen.','filters_title':'ECHTZEIT-SPRACHFILTER:','broadcast_btn':'ÜBERTRAGUNG SENDEN (+2 PKT.)','transmitting_audio':'Echo wird übertragen...','witnessed':'Bezeugt','deciphered':'Entschlüsselt','self_witness':'Selbst bezeugt','plus_witness':'+1 Zeuge','sponsored':'Gesponsert','featured':'Empfohlene Übertragung','search_lang':'Sprache suchen...','select_lang':'Globale Sprache auswählen','online':'Online','offline':'Offline','typing':'schreibt...','delete_me':'Für mich löschen','delete_everyone':'Für alle löschen','unsend':'Nachricht zurücknehmen','pin_chat':'Chat anheften','unpin_chat':'Chat lösen','share_link':'Mit App-Link teilen','share_text':'Nur Text teilen','profile_locked':'Profildetails werden nach 3 Tagen Verbindung freigeschaltet','snap_feed':'24H KI-SNAP-FEED','snap_creator':'24-STUNDEN-KI-SNAP-CREATOR','snap_hint':'Gib deinen Gedanken, dein Rätsel oder Zitat ein...','generating_pic':'KI verwandelt deinen Gedanken in ein Bild...','done_pic':'KI-BILD ERSTELLEN','upload_snap':'SNAP HOCHLADEN (24H)','expires_in':'Läuft automatisch nach 24h ab','all':'Alle','horror':'Horror','ancient_gods':'Alte Götter','cyber_3050':'Cyber 3050','dreams':'Träume','scan_radar':'Suche nach Multiversum-Frequenzen','send_invite':'EINLADUNG SENDEN (+3 PKT.)','creator_stories':'Creator-Geschichten & News','daily_questions':'Tägliche 20 Fragen (20 Uhr)','publish_lore':'LORE VERÖFFENTLICHEN','solve_btn':'LÖSUNG','solved_tag':'GELÖST','pending_tag':'OFFEN','ai_friend_title':'Avatar Friend (KI-Begleiter)','ai_friend_sub':'Mehrsprachiger KI-Orakel • Immer online','active_perks':'AKTIVE VORTEILE & ARTEFAKTE','artifact_vault':'ARTEFAKT-TRESOR','no_transmissions':'Noch keine Übertragungen in dieser Dimension.','create_snap_banner':'24H KI-Snap erstellen (+)',
+    },
+    'Japanese': {
+      'home':'ホーム','radar':'レーダー','post':'投稿','hub':'ハブ','echoes':'エコー','identity':'アイデンティティ','select_realm':'次元を選択','share_hint':'超常現象、夢、謎めいた体験を共有...','voice_echo':'音声周波数エコー (+2pt)','voice_tap':'マイクをタップして録音','voice_captured':'音声を録音しました！フィルターを選択してください。','filters_title':'リアルタイム音声フィルター:','broadcast_btn':'送信をブロードキャスト (+2pt)','transmitting_audio':'エコーを送信中...','witnessed':'目撃','deciphered':'解読','self_witness':'自分で目撃','plus_witness':'+1目撃','sponsored':'スポンサー','featured':'注目の送信','search_lang':'言語を検索...','select_lang':'グローバル言語を選択','online':'オンライン','offline':'オフライン','typing':'入力中...','delete_me':'自分から削除','delete_everyone':'全員から削除','unsend':'送信取り消し','pin_chat':'会話をピン留め','unpin_chat':'ピン留めを解除','share_link':'アプリリンクと共有','share_text':'テキストのみ共有','profile_locked':'3日間つながるとプロフィールが解除されます','snap_feed':'24時間AIスナップフィード','snap_creator':'24時間AIスナップ作成','snap_hint':'考え、謎、引用を入力...','generating_pic':'AIが考えを画像に変換中...','done_pic':'AI画像を生成','upload_snap':'スナップを投稿 (24H)','expires_in':'24時間後に自動消去','all':'すべて','horror':'ホラー','ancient_gods':'古代の神々','cyber_3050':'サイバー3050','dreams':'夢','scan_radar':'マルチバース周波数を探索中','send_invite':'招待を送信 (+3pt)','creator_stories':'クリエイターの物語とニュース','daily_questions':'毎日の20問 (20時)','publish_lore':'物語を公開','solve_btn':'回答','solved_tag':'解決済み','pending_tag':'保留中','ai_friend_title':'Avatar Friend (AIコンパニオン)','ai_friend_sub':'多言語AIオラクル • 常時オンライン','active_perks':'有効な特典とアーティファクト','artifact_vault':'アーティファクト保管庫','no_transmissions':'この次元にはまだ送信がありません。','create_snap_banner':'24H AIスナップを作成 (+)',
+    },
+    'Korean': {
+      'home':'홈','radar':'레이더','post':'게시','hub':'허브','echoes':'에코','identity':'아이덴티티','select_realm':'차원 선택','share_hint':'초자연적 경험, 꿈 또는 미스터리를 공유하세요...','voice_echo':'음성 주파수 에코 (+2점)','voice_tap':'마이크를 눌러 녹음','voice_captured':'음성이 녹음되었습니다! 필터를 선택하세요.','filters_title':'실시간 음성 필터:','broadcast_btn':'전송 방송 (+2점)','transmitting_audio':'에코 전송 중...','witnessed':'목격','deciphered':'해독','self_witness':'본인 목격','plus_witness':'+1 목격','sponsored':'스폰서','featured':'추천 전송','search_lang':'언어 검색...','select_lang':'글로벌 언어 선택','online':'온라인','offline':'오프라인','typing':'입력 중...','delete_me':'나에게서 삭제','delete_everyone':'모두에게서 삭제','unsend':'메시지 보내기 취소','pin_chat':'대화 고정','unpin_chat':'대화 고정 해제','share_link':'앱 링크와 공유','share_text':'텍스트만 공유','profile_locked':'3일간 연결 후 프로필이 잠금 해제됩니다','snap_feed':'24시간 AI 스냅 피드','snap_creator':'24시간 AI 스냅 생성기','snap_hint':'생각, 미스터리 또는 문구를 입력하세요...','generating_pic':'AI가 생각을 이미지로 변환 중...','done_pic':'AI 이미지 생성','upload_snap':'스냅 게시 (24시간)','expires_in':'24시간 후 자동 만료','all':'전체','horror':'공포','ancient_gods':'고대의 신들','cyber_3050':'사이버 3050','dreams':'꿈','scan_radar':'멀티버스 주파수를 탐색하는 중','send_invite':'초대 보내기 (+3점)','creator_stories':'크리에이터 스토리 및 뉴스','daily_questions':'매일 20개 질문 (오후 8시)','publish_lore':'스토리 게시','solve_btn':'답변','solved_tag':'해결됨','pending_tag':'대기 중','ai_friend_title':'Avatar Friend (AI 동반자)','ai_friend_sub':'다국어 AI 오라클 • 항상 온라인','active_perks':'활성 혜택 및 아티팩트','artifact_vault':'아티팩트 보관함','no_transmissions':'이 차원에는 아직 전송이 없습니다.','create_snap_banner':'24시간 AI 스냅 만들기 (+)',
+    },
+    'Portuguese': {
+      'home':'Início','radar':'Radar','post':'Publicar','hub':'Central','echoes':'Ecos','identity':'Identidade','select_realm':'SELECIONE A DIMENSÃO','share_hint':'Compartilhe seu encontro sobrenatural, sonho ou mistério...','voice_echo':'Eco de Frequência de Voz (+2 pts)','voice_tap':'Toque no microfone para gravar','voice_captured':'Voz capturada! Escolha um filtro.','filters_title':'FILTROS DE VOZ EM TEMPO REAL:','broadcast_btn':'TRANSMITIR (+2 PTS)','transmitting_audio':'Transmitindo eco...','witnessed':'Testemunhado','deciphered':'Decifrado','self_witness':'Auto testemunho','plus_witness':'+1 testemunha','sponsored':'Patrocinado','featured':'Transmissão em destaque','search_lang':'Pesquisar idioma...','select_lang':'Selecionar idioma global','online':'Online','offline':'Offline','typing':'digitando...','delete_me':'Excluir para mim','delete_everyone':'Excluir para todos','unsend':'Cancelar envio','pin_chat':'Fixar conversa','unpin_chat':'Desafixar conversa','share_link':'Compartilhar com link do app','share_text':'Compartilhar apenas texto','profile_locked':'Detalhes do perfil são liberados após 3 dias de conexão','snap_feed':'FEED DE SNAPS DE IA 24H','snap_creator':'CRIADOR DE SNAPS DE IA 24H','snap_hint':'Digite seu pensamento, mistério ou frase...','generating_pic':'A IA está transformando seu pensamento em arte...','done_pic':'GERAR IMAGEM DE IA','upload_snap':'PUBLICAR SNAP (24H)','expires_in':'Expira automaticamente em 24h','all':'Todos','horror':'Terror','ancient_gods':'Deuses Antigos','cyber_3050':'Cyber 3050','dreams':'Sonhos','scan_radar':'Procurando frequências do multiverso','send_invite':'ENVIAR CONVITE (+3 PTS)','creator_stories':'Histórias e notícias do criador','daily_questions':'20 perguntas diárias (20h)','publish_lore':'PUBLICAR LORE','solve_btn':'RESPONDER','solved_tag':'RESOLVIDO','pending_tag':'PENDENTE','ai_friend_title':'Avatar Friend (Companheiro IA)','ai_friend_sub':'Oráculo IA multilíngue • Sempre online','active_perks':'VANTAGENS E ARTEFATOS ATIVOS','artifact_vault':'COFRE DE ARTEFATOS','no_transmissions':'Ainda não há transmissões nesta dimensão.','create_snap_banner':'Criar Snap de IA 24H (+)',
+    },
+    'Bengali': {
+      'home':'হোম','radar':'রাডার','post':'পোস্ট','hub':'হাব','echoes':'ইকো','identity':'পরিচয়','select_realm':'ডাইমেনশন নির্বাচন করুন','share_hint':'আপনার অতিপ্রাকৃত অভিজ্ঞতা, স্বপ্ন বা রহস্য শেয়ার করুন...','voice_echo':'ভয়েস ফ্রিকোয়েন্সি ইকো (+2 পয়েন্ট)','voice_tap':'রেকর্ড করতে মাইক্রোফোন চাপুন','voice_captured':'ভয়েস রেকর্ড হয়েছে! ফিল্টার বেছে নিন।','filters_title':'রিয়েল-টাইম ভয়েস ফিল্টার:','broadcast_btn':'ট্রান্সমিশন সম্প্রচার (+2 পয়েন্ট)','transmitting_audio':'ইকো পাঠানো হচ্ছে...','witnessed':'দেখেছেন','deciphered':'ডিকোড হয়েছে','self_witness':'নিজে দেখেছেন','plus_witness':'+1 সাক্ষী','sponsored':'স্পনসরড','featured':'বিশেষ ট্রান্সমিশন','search_lang':'ভাষা খুঁজুন...','select_lang':'গ্লোবাল ভাষা নির্বাচন','online':'অনলাইন','offline':'অফলাইন','typing':'টাইপ করছেন...','delete_me':'আমার জন্য মুছুন','delete_everyone':'সবার জন্য মুছুন','unsend':'মেসেজ আনসেন্ড','pin_chat':'চ্যাট পিন করুন','unpin_chat':'চ্যাট আনপিন করুন','share_link':'অ্যাপ লিংকসহ শেয়ার','share_text':'শুধু টেক্সট শেয়ার','profile_locked':'৩ দিন সংযোগের পর প্রোফাইলের তথ্য খুলবে','snap_feed':'২৪ ঘণ্টার AI স্ন্যাপ ফিড','snap_creator':'২৪ ঘণ্টার AI স্ন্যাপ ক্রিয়েটর','snap_hint':'আপনার ভাবনা, রহস্য বা উদ্ধৃতি লিখুন...','generating_pic':'AI আপনার ভাবনাকে ছবিতে রূপ দিচ্ছে...','done_pic':'AI ছবি তৈরি করুন','upload_snap':'স্ন্যাপ প্রকাশ করুন (২৪ ঘণ্টা)','expires_in':'২৪ ঘণ্টায় স্বয়ংক্রিয়ভাবে শেষ হবে','all':'সব','horror':'হরর','ancient_gods':'প্রাচীন দেবতা','cyber_3050':'সাইবার ৩০৫০','dreams':'স্বপ্ন','scan_radar':'মাল্টিভার্স ফ্রিকোয়েন্সি খোঁজা হচ্ছে','send_invite':'আমন্ত্রণ পাঠান (+৩ পয়েন্ট)','creator_stories':'ক্রিয়েটর গল্প ও খবর','daily_questions':'দৈনিক ২০ প্রশ্ন (রাত ৮টা)','publish_lore':'লোর প্রকাশ করুন','solve_btn':'উত্তর দিন','solved_tag':'সমাধান হয়েছে','pending_tag':'অপেক্ষমাণ','ai_friend_title':'Avatar Friend (AI সঙ্গী)','ai_friend_sub':'বহুভাষী AI ওরাকল • সবসময় অনলাইন','active_perks':'সক্রিয় সুবিধা ও আর্টিফ্যাক্ট','artifact_vault':'আর্টিফ্যাক্ট ভল্ট','no_transmissions':'এই ডাইমেনশনে এখনও কোনো ট্রান্সমিশন নেই।','create_snap_banner':'২৪ ঘণ্টার AI স্ন্যাপ তৈরি করুন (+)',
+    },
+    'Punjabi': {
+      'home':'ਹੋਮ','radar':'ਰਡਾਰ','post':'ਪੋਸਟ','hub':'ਹੱਬ','echoes':'ਏਕੋਜ਼','identity':'ਪਛਾਣ','select_realm':'ਡਾਈਮੇਂਸ਼ਨ ਚੁਣੋ','share_hint':'ਆਪਣਾ ਅਲੌਕਿਕ ਤਜਰਬਾ, ਸੁਪਨਾ ਜਾਂ ਰਹੱਸ ਸਾਂਝਾ ਕਰੋ...','voice_echo':'ਵੌਇਸ ਫ੍ਰਿਕਵੈਂਸੀ ਏਕੋ (+2 ਅੰਕ)','voice_tap':'ਰਿਕਾਰਡ ਕਰਨ ਲਈ ਮਾਈਕ ਦਬਾਓ','voice_captured':'ਆਵਾਜ਼ ਰਿਕਾਰਡ ਹੋ ਗਈ! ਫਿਲਟਰ ਚੁਣੋ।','filters_title':'ਰੀਅਲ-ਟਾਈਮ ਵੌਇਸ ਫਿਲਟਰ:','broadcast_btn':'ਟ੍ਰਾਂਸਮਿਸ਼ਨ ਪ੍ਰਸਾਰਿਤ ਕਰੋ (+2 ਅੰਕ)','transmitting_audio':'ਏਕੋ ਭੇਜਿਆ ਜਾ ਰਿਹਾ ਹੈ...','witnessed':'ਦੇਖਿਆ','deciphered':'ਡਿਕੋਡ ਕੀਤਾ','self_witness':'ਆਪ ਦੇਖਿਆ','plus_witness':'+1 ਗਵਾਹ','sponsored':'ਪ੍ਰਾਯੋਜਿਤ','featured':'ਖਾਸ ਟ੍ਰਾਂਸਮਿਸ਼ਨ','search_lang':'ਭਾਸ਼ਾ ਖੋਜੋ...','select_lang':'ਗਲੋਬਲ ਭਾਸ਼ਾ ਚੁਣੋ','online':'ਆਨਲਾਈਨ','offline':'ਆਫਲਾਈਨ','typing':'ਟਾਈਪ ਕਰ ਰਿਹਾ ਹੈ...','delete_me':'ਮੇਰੇ ਲਈ ਮਿਟਾਓ','delete_everyone':'ਸਭ ਲਈ ਮਿਟਾਓ','unsend':'ਮੈਸੇਜ ਵਾਪਸ ਲਓ','pin_chat':'ਚੈਟ ਪਿੰਨ ਕਰੋ','unpin_chat':'ਚੈਟ ਅਨਪਿੰਨ ਕਰੋ','share_link':'ਐਪ ਲਿੰਕ ਨਾਲ ਸਾਂਝਾ ਕਰੋ','share_text':'ਸਿਰਫ਼ ਟੈਕਸਟ ਸਾਂਝਾ ਕਰੋ','profile_locked':'3 ਦਿਨਾਂ ਦੀ ਕਨੈਕਸ਼ਨ ਤੋਂ ਬਾਅਦ ਪ੍ਰੋਫਾਈਲ ਖੁੱਲ੍ਹੇਗੀ','snap_feed':'24 ਘੰਟੇ AI ਸਨੈਪ ਫੀਡ','snap_creator':'24 ਘੰਟੇ AI ਸਨੈਪ ਬਣਾਉਣ ਵਾਲਾ','snap_hint':'ਆਪਣਾ ਵਿਚਾਰ, ਰਹੱਸ ਜਾਂ ਕੋਟ ਲਿਖੋ...','generating_pic':'AI ਤੁਹਾਡੇ ਵਿਚਾਰ ਨੂੰ ਤਸਵੀਰ ਵਿੱਚ ਬਦਲ ਰਿਹਾ ਹੈ...','done_pic':'AI ਤਸਵੀਰ ਬਣਾਓ','upload_snap':'ਸਨੈਪ ਪੋਸਟ ਕਰੋ (24 ਘੰਟੇ)','expires_in':'24 ਘੰਟਿਆਂ ਬਾਅਦ ਆਪਣੇ ਆਪ ਖਤਮ','all':'ਸਾਰੇ','horror':'ਹੌਰਰ','ancient_gods':'ਪੁਰਾਤਨ ਦੇਵਤੇ','cyber_3050':'ਸਾਈਬਰ 3050','dreams':'ਸੁਪਨੇ','scan_radar':'ਮਲਟੀਵਰਸ ਫ੍ਰਿਕਵੈਂਸੀ ਖੋਜ ਰਹੇ ਹਾਂ','send_invite':'ਸੱਦਾ ਭੇਜੋ (+3 ਅੰਕ)','creator_stories':'ਕ੍ਰੀਏਟਰ ਕਹਾਣੀਆਂ ਅਤੇ ਖ਼ਬਰਾਂ','daily_questions':'ਰੋਜ਼ਾਨਾ 20 ਸਵਾਲ (ਰਾਤ 8 ਵਜੇ)','publish_lore':'ਲੋਰ ਪ੍ਰਕਾਸ਼ਿਤ ਕਰੋ','solve_btn':'ਜਵਾਬ ਦਿਓ','solved_tag':'ਹੱਲ ਹੋਇਆ','pending_tag':'ਬਾਕੀ','ai_friend_title':'Avatar Friend (AI ਸਾਥੀ)','ai_friend_sub':'ਬਹੁਭਾਸ਼ੀ AI ਓਰੇਕਲ • ਹਮੇਸ਼ਾ ਆਨਲਾਈਨ','active_perks':'ਸਰਗਰਮ ਫਾਇਦੇ ਅਤੇ ਆਰਟੀਫੈਕਟ','artifact_vault':'ਆਰਟੀਫੈਕਟ ਵਾਲਟ','no_transmissions':'ਇਸ ਡਾਈਮੇਂਸ਼ਨ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਟ੍ਰਾਂਸਮਿਸ਼ਨ ਨਹੀਂ।','create_snap_banner':'24 ਘੰਟੇ ਦਾ AI ਸਨੈਪ ਬਣਾਓ (+)',
+    },
+    'Tamil': {
+      'home':'முகப்பு','radar':'ரேடார்','post':'பதிவு','hub':'மையம்','echoes':'எதிரொலிகள்','identity':'அடையாளம்','select_realm':'பரிமாணத்தைத் தேர்ந்தெடுக்கவும்','share_hint':'உங்கள் அமானுஷ்ய அனுபவம், கனவு அல்லது மர்மத்தைப் பகிருங்கள்...','voice_echo':'குரல் அதிர்வெண் எதிரொலி (+2 புள்ளிகள்)','voice_tap':'பதிவு செய்ய மைக்கைத் தட்டவும்','voice_captured':'குரல் பதிவு செய்யப்பட்டது! வடிகட்டியைத் தேர்ந்தெடுக்கவும்.','filters_title':'நிகழ்நேர குரல் வடிகட்டிகள்:','broadcast_btn':'ஒலிபரப்பு அனுப்பவும் (+2 புள்ளிகள்)','transmitting_audio':'எதிரொலி அனுப்பப்படுகிறது...','witnessed':'பார்த்தவர்கள்','deciphered':'விளக்கப்பட்டது','self_witness':'சுய பார்வை','plus_witness':'+1 பார்வையாளர்','sponsored':'ஸ்பான்சர்','featured':'சிறப்பு ஒலிபரப்பு','search_lang':'மொழியைத் தேடுங்கள்...','select_lang':'உலக மொழியைத் தேர்ந்தெடுக்கவும்','online':'ஆன்லைன்','offline':'ஆஃப்லைன்','typing':'தட்டச்சு செய்கிறார்...','delete_me':'எனக்காக நீக்கு','delete_everyone':'அனைவருக்கும் நீக்கு','unsend':'செய்தியை அனுப்பாதே','pin_chat':'உரையாடலைப் பின் செய்','unpin_chat':'பின்னை நீக்கு','share_link':'ஆப் இணைப்புடன் பகிர்','share_text':'உரை மட்டும் பகிர்','profile_locked':'3 நாட்கள் இணைந்த பிறகு சுயவிவரம் திறக்கும்','snap_feed':'24 மணி AI ஸ்னாப் ஃபீட்','snap_creator':'24 மணி AI ஸ்னாப் உருவாக்கி','snap_hint':'உங்கள் எண்ணம், மர்மம் அல்லது மேற்கோளை உள்ளிடவும்...','generating_pic':'AI உங்கள் எண்ணத்தை படமாக மாற்றுகிறது...','done_pic':'AI படத்தை உருவாக்கு','upload_snap':'ஸ்னாப்பை வெளியிடு (24 மணி)','expires_in':'24 மணி நேரத்தில் தானாக முடியும்','all':'அனைத்தும்','horror':'திகில்','ancient_gods':'பண்டைய தெய்வங்கள்','cyber_3050':'சைபர் 3050','dreams':'கனவுகள்','scan_radar':'மல்டிவெர்ஸ் அதிர்வெண்களைத் தேடுகிறது','send_invite':'அழைப்பை அனுப்பு (+3 புள்ளிகள்)','creator_stories':'உருவாக்குநர் கதைகள் மற்றும் செய்திகள்','daily_questions':'தினசரி 20 கேள்விகள் (இரவு 8 மணி)','publish_lore':'கதையை வெளியிடு','solve_btn':'பதில் அளி','solved_tag':'தீர்க்கப்பட்டது','pending_tag':'நிலுவையில்','ai_friend_title':'Avatar Friend (AI துணை)','ai_friend_sub':'பலமொழி AI ஓராக்கிள் • எப்போதும் ஆன்லைன்','active_perks':'செயலில் உள்ள சலுகைகள் மற்றும் கலைப்பொருட்கள்','artifact_vault':'கலைப்பொருள் களஞ்சியம்','no_transmissions':'இந்த பரிமாணத்தில் இன்னும் எந்த ஒலிபரப்பும் இல்லை.','create_snap_banner':'24 மணி AI ஸ்னாப் உருவாக்கு (+)',
+    },
+    'Telugu': {
+      'home':'హోమ్','radar':'రాడార్','post':'పోస్ట్','hub':'హబ్','echoes':'ఎకోస్','identity':'గుర్తింపు','select_realm':'డైమెన్షన్ ఎంచుకోండి','share_hint':'మీ అతీంద్రియ అనుభవం, కల లేదా రహస్యాన్ని పంచుకోండి...','voice_echo':'వాయిస్ ఫ్రీక్వెన్సీ ఎకో (+2 పాయింట్లు)','voice_tap':'రికార్డ్ చేయడానికి మైక్ నొక్కండి','voice_captured':'వాయిస్ రికార్డ్ అయింది! ఫిల్టర్ ఎంచుకోండి.','filters_title':'రియల్-టైమ్ వాయిస్ ఫిల్టర్లు:','broadcast_btn':'ట్రాన్స్‌మిషన్ ప్రసారం (+2 పాయింట్లు)','transmitting_audio':'ఎకో పంపబడుతోంది...','witnessed':'చూసినవారు','deciphered':'డీకోడ్ అయింది','self_witness':'స్వయంగా చూశారు','plus_witness':'+1 సాక్షి','sponsored':'స్పాన్సర్డ్','featured':'ప్రత్యేక ట్రాన్స్‌మిషన్','search_lang':'భాషను వెతకండి...','select_lang':'గ్లోబల్ భాషను ఎంచుకోండి','online':'ఆన్‌లైన్','offline':'ఆఫ్‌లైన్','typing':'టైప్ చేస్తున్నారు...','delete_me':'నా కోసం తొలగించు','delete_everyone':'అందరికీ తొలగించు','unsend':'మెసేజ్ పంపడం రద్దు','pin_chat':'చాట్ పిన్ చేయి','unpin_chat':'చాట్ అన్‌పిన్ చేయి','share_link':'యాప్ లింక్‌తో షేర్ చేయి','share_text':'టెక్స్ట్ మాత్రమే షేర్ చేయి','profile_locked':'3 రోజుల కనెక్షన్ తర్వాత ప్రొఫైల్ వివరాలు తెరవబడతాయి','snap_feed':'24 గంటల AI స్నాప్ ఫీడ్','snap_creator':'24 గంటల AI స్నాప్ క్రియేటర్','snap_hint':'మీ ఆలోచన, రహస్యం లేదా కోట్ టైప్ చేయండి...','generating_pic':'AI మీ ఆలోచనను చిత్రంగా మార్చుతోంది...','done_pic':'AI చిత్రాన్ని రూపొందించు','upload_snap':'స్నాప్ ప్రచురించు (24 గంటలు)','expires_in':'24 గంటల తర్వాత ఆటోమేటిక్‌గా ముగుస్తుంది','all':'అన్నీ','horror':'హారర్','ancient_gods':'ప్రాచీన దేవతలు','cyber_3050':'సైబర్ 3050','dreams':'కలలు','scan_radar':'మల్టీవర్స్ ఫ్రీక్వెన్సీల కోసం వెతుకుతోంది','send_invite':'ఆహ్వానం పంపండి (+3 పాయింట్లు)','creator_stories':'క్రియేటర్ కథలు & వార్తలు','daily_questions':'రోజువారీ 20 ప్రశ్నలు (రాత్రి 8)','publish_lore':'లోర్ ప్రచురించండి','solve_btn':'సమాధానం ఇవ్వండి','solved_tag':'పరిష్కరించబడింది','pending_tag':'పెండింగ్','ai_friend_title':'Avatar Friend (AI సహచరుడు)','ai_friend_sub':'బహుభాషా AI ఒరాకిల్ • ఎల్లప్పుడూ ఆన్‌లైన్','active_perks':'యాక్టివ్ పెర్క్స్ & ఆర్టిఫాక్ట్స్','artifact_vault':'ఆర్టిఫాక్ట్ వాల్ట్','no_transmissions':'ఈ డైమెన్షన్‌లో ఇంకా ట్రాన్స్‌మిషన్‌లు లేవు.','create_snap_banner':'24 గంటల AI స్నాప్ సృష్టించండి (+)',
+    },
+    'Marathi': {
+      'home':'होम','radar':'रडार','post':'पोस्ट','hub':'हब','echoes':'प्रतिध्वनी','identity':'ओळख','select_realm':'डायमेन्शन निवडा','share_hint':'तुमचा अलौकिक अनुभव, स्वप्न किंवा रहस्य शेअर करा...','voice_echo':'व्हॉइस फ्रिक्वेन्सी इको (+2 गुण)','voice_tap':'रेकॉर्ड करण्यासाठी माइक दाबा','voice_captured':'आवाज रेकॉर्ड झाला! फिल्टर निवडा.','filters_title':'रिअल-टाइम व्हॉइस फिल्टर्स:','broadcast_btn':'ट्रान्समिशन प्रसारित करा (+2 गुण)','transmitting_audio':'इको पाठवत आहे...','witnessed':'पाहिले','deciphered':'उलगडले','self_witness':'स्वतः पाहिले','plus_witness':'+1 साक्षीदार','sponsored':'प्रायोजित','featured':'वैशिष्ट्यपूर्ण ट्रान्समिशन','search_lang':'भाषा शोधा...','select_lang':'ग्लोबल भाषा निवडा','online':'ऑनलाइन','offline':'ऑफलाइन','typing':'टाइप करत आहे...','delete_me':'माझ्यासाठी हटवा','delete_everyone':'सर्वांसाठी हटवा','unsend':'मेसेज अनसेंड करा','pin_chat':'चॅट पिन करा','unpin_chat':'चॅट अनपिन करा','share_link':'अॅप लिंकसह शेअर करा','share_text':'फक्त मजकूर शेअर करा','profile_locked':'3 दिवसांच्या कनेक्शननंतर प्रोफाइल तपशील उघडतील','snap_feed':'24 तास AI स्नॅप फीड','snap_creator':'24 तास AI स्नॅप क्रिएटर','snap_hint':'तुमचा विचार, रहस्य किंवा कोट लिहा...','generating_pic':'AI तुमचा विचार चित्रात बदलत आहे...','done_pic':'AI चित्र तयार करा','upload_snap':'स्नॅप प्रकाशित करा (24 तास)','expires_in':'24 तासांनी आपोआप संपेल','all':'सर्व','horror':'हॉरर','ancient_gods':'प्राचीन देव','cyber_3050':'सायबर 3050','dreams':'स्वप्ने','scan_radar':'मल्टीव्हर्स फ्रिक्वेन्सी शोधत आहे','send_invite':'आमंत्रण पाठवा (+3 गुण)','creator_stories':'क्रिएटर कथा आणि बातम्या','daily_questions':'दररोज 20 प्रश्न (रात्री 8)','publish_lore':'लोर प्रकाशित करा','solve_btn':'उत्तर द्या','solved_tag':'सोडवले','pending_tag':'प्रलंबित','ai_friend_title':'Avatar Friend (AI साथी)','ai_friend_sub':'बहुभाषिक AI ओरॅकल • नेहमी ऑनलाइन','active_perks':'सक्रिय फायदे आणि कलाकृती','artifact_vault':'आर्टिफॅक्ट व्हॉल्ट','no_transmissions':'या डायमेन्शनमध्ये अजून कोणतेही ट्रान्समिशन नाही.','create_snap_banner':'24 तासांचा AI स्नॅप तयार करा (+)',
+    },
   };
 
   static String tr(String key) {
@@ -234,6 +290,7 @@ class NotificationService {
 // ==================================================
 class AvatarAIEngine {
   static const String _workerUrl = 'https://avatar-friend-ai.projectkhurafat.workers.dev/';
+  static const String snapWorkerUrl = 'https://avatar-snap-ai.projectkhurafat.workers.dev/generate';
 
   static Future<String> getAIResponse(String userMessage) async {
     try {
@@ -1110,9 +1167,11 @@ class RealmsFeedScreen extends StatelessWidget {
                             title: Text(item['name']!, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? kNeonCyan : Colors.white)),
                             subtitle: Text(item['native']!, style: const TextStyle(color: Colors.white54, fontSize: 12)),
                             trailing: isSelected ? const Icon(Icons.check, color: kNeonCyan) : null,
-                            onTap: () {
-                              AppLanguage.currentLang.value = item['name']!;
-                              Navigator.pop(ctx);
+                            onTap: () async {
+                              final selectedLanguage = item['name']!;
+                              AppLanguage.currentLang.value = selectedLanguage;
+                              await AppLanguage.saveLanguage(selectedLanguage);
+                              if (ctx.mounted) Navigator.pop(ctx);
                             },
                           );
                         },
@@ -2156,15 +2215,37 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 
                           setModalState(() => isGenerating = true);
 
-                          final cleanPrompt = Uri.encodeComponent("cinematic surreal multiverse mystic art of: $text, high quality, 8k render, glowing neon");
-                          final aiUrl = "https://image.pollinations.ai/prompt/$cleanPrompt?width=600&height=600&nologo=true";
+                          try {
+                            final response = await http.post(
+                              Uri.parse(AvatarAIEngine.snapWorkerUrl),
+                              headers: {'Content-Type': 'application/json'},
+                              body: jsonEncode({
+                                'prompt': 'cinematic surreal multiverse mystic art of: $text, high quality, glowing neon, portrait composition',
+                              }),
+                            ).timeout(const Duration(seconds: 90));
 
-                          await Future.delayed(const Duration(seconds: 2));
+                            if (response.statusCode != 200) {
+                              throw Exception('Image Worker HTTP ${response.statusCode}: ${response.body}');
+                            }
 
-                          setModalState(() {
-                            generatedImageUrl = aiUrl;
-                            isGenerating = false;
-                          });
+                            final data = jsonDecode(response.body) as Map<String, dynamic>;
+                            final imageUrl = data['imageUrl']?.toString();
+                            if (data['success'] != true || imageUrl == null || imageUrl.isEmpty) {
+                              throw Exception(data['error']?.toString() ?? 'Image generation failed.');
+                            }
+
+                            setModalState(() {
+                              generatedImageUrl = imageUrl;
+                              isGenerating = false;
+                            });
+                          } catch (e) {
+                            setModalState(() => isGenerating = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('AI image error: $e')),
+                              );
+                            }
+                          }
                         },
                         child: Text(AppLanguage.tr('done_pic'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                       ),
@@ -2285,14 +2366,6 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
     return Scaffold(
       backgroundColor: kVoidBlack,
       appBar: AppBar(backgroundColor: kVoidBlack, elevation: 0, title: const Text('TRANSMISSION STUDIO', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)), centerTitle: true),
-      // 🔥 ZERO-CONFLICT DIRECT RESPONSIVE FLOATING BUTTON
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: widget.accentColor,
-        elevation: 8,
-        onPressed: () => _open24hThoughtCreator(context),
-        icon: const Icon(Icons.add, color: Colors.black, size: 24),
-        label: Text(AppLanguage.tr('snap_creator'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
