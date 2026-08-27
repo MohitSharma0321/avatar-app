@@ -62,7 +62,7 @@ void main() async {
 }
 
 // ==================================================
-// GLOBAL LANGUAGE TRANSLATION ENGINE (FULLY REACTIVE)
+// GLOBAL MULTILINGUAL TRANSLATION ENGINE (ALL 15 LANGUAGES)
 // ==================================================
 class AppLanguage {
   static final ValueNotifier<String> currentLang = ValueNotifier<String>('English');
@@ -105,7 +105,8 @@ class AppLanguage {
       'creator_stories': 'Creator Stories & News', 'daily_questions': 'Daily 20 Questions (8 PM)', 'publish_lore': 'PUBLISH LORE',
       'solve_btn': 'ANSWER SOLUTION', 'solved_tag': 'SOLVED (8 PM SPOTLIGHT)', 'pending_tag': 'PENDING ORACLE',
       'ai_friend_title': 'Avatar Friend (AI Companion)', 'ai_friend_sub': 'Multilingual AI Oracle • Always Online',
-      'active_perks': 'ACTIVE PERKS & ARTIFACTS', 'artifact_vault': 'ARTIFACT VAULT (TAP REALM TO OPEN)'
+      'active_perks': 'ACTIVE PERKS & ARTIFACTS', 'artifact_vault': 'ARTIFACT VAULT (TAP REALM TO OPEN)',
+      'no_transmissions': 'No transmissions in this dimension yet.', 'create_snap_banner': 'Create 24H AI Multiverse Snap (+)',
     },
     'Hindi': {
       'home': 'होम', 'radar': 'रडार', 'post': 'पोस्ट', 'hub': 'हब', 'echoes': 'इकोस', 'identity': 'पहचान',
@@ -126,8 +127,42 @@ class AppLanguage {
       'creator_stories': 'क्रिएटर कथाएं और समाचार', 'daily_questions': 'दैनिक 20 प्रश्न (रात 8 बजे)', 'publish_lore': 'कथा प्रकाशित करें',
       'solve_btn': 'समाधान प्रदान करें', 'solved_tag': 'हल किया गया (रात 8 बजे)', 'pending_tag': 'प्रतीक्षारत प्रश्न',
       'ai_friend_title': 'अवतार मित्र (AI साथी)', 'ai_friend_sub': 'बहुभाषी AI साथी • हमेशा ऑनलाइन',
-      'active_perks': 'सक्रिय शक्तियां और अनलॉक तत्व', 'artifact_vault': 'रहस्यमयी वॉल्ट (खोलने के लिए टैप करें)'
+      'active_perks': 'सक्रिय शक्तियां और अनलॉक तत्व', 'artifact_vault': 'रहस्यमयी वॉल्ट (खोलने के लिए टैप करें)',
+      'no_transmissions': 'इस आयाम में अभी कोई ट्रांसमिशन नहीं है।', 'create_snap_banner': '24 घंटे का AI स्नैप बनाएं (+)',
     },
+    'Arabic': {
+      'home': 'الرئيسية', 'radar': 'الرادار', 'post': 'نشر', 'hub': 'المركز', 'echoes': 'الصدى', 'identity': 'الهوية',
+      'select_realm': 'اختر بُعد العوالم', 'share_hint': 'شارك تجربتك الخارقة أو حلمك...',
+      'voice_echo': 'صدى تردد الصوت (+2 نقطة)', 'voice_tap': 'اضغط للتسجيل الصوتي',
+      'broadcast_btn': 'بث الإرسال (+2 نقطة)', 'witnessed': 'مشاهدات', 'deciphered': 'مفكوك الرموز',
+      'all': 'الكل', 'horror': 'رعب', 'ancient_gods': 'آلهة قديمة', 'cyber_3050': 'سايبر 3050', 'dreams': 'أحلام',
+      'sponsored': 'برعاية', 'featured': 'إرسال مميز', 'search_lang': 'ابحث عن اللغة...', 'select_lang': 'اختر اللغة العالمية',
+      'online': 'متصل', 'offline': 'غير متصل', 'typing': 'يكتب الآن...', 'snap_feed': 'خلاصة لقطات الذكاء الاصطناعي 24 ساعة',
+      'snap_creator': 'صانع لقطات الذكاء الاصطناعي', 'create_snap_banner': 'إنشاء لقطة ذكاء اصطناعي 24 ساعة (+)',
+      'no_transmissions': 'لا توجد إرسالات في هذا البعد بعد.', 'active_perks': 'الميزات والرموز النشطة', 'artifact_vault': 'خزينة الآثار'
+    },
+    'Russian': {
+      'home': 'Главная', 'radar': 'Радар', 'post': 'Пост', 'hub': 'Хаб', 'echoes': 'Эхо', 'identity': 'Профиль',
+      'select_realm': 'ВЫБЕРИТЕ ИЗМЕРЕНИЕ', 'share_hint': 'Поделитесь мистическим опытом или сном...',
+      'voice_echo': 'Голосовое Эхо (+2 Очка)', 'voice_tap': 'Нажмите для записи частоты',
+      'broadcast_btn': 'ТРАНСЛИРОВАТЬ (+2 ОЧКА)', 'witnessed': 'Замечено', 'deciphered': 'Расшифровано',
+      'all': 'Все', 'horror': 'Ужасы', 'ancient_gods': 'Древние Боги', 'cyber_3050': 'Кибер 3050', 'dreams': 'Сны',
+      'sponsored': 'Реклама', 'featured': 'Популярная передача', 'search_lang': 'Поиск языка...', 'select_lang': 'Выберите язык',
+      'online': 'В сети', 'offline': 'Не в сети', 'typing': 'печатает...', 'snap_feed': '24-часовая AI Лента Снапов',
+      'snap_creator': 'СОЗДАТЕЛЬ 24Ч AI СНАПОВ', 'create_snap_banner': 'Создать 24ч AI Снап (+)',
+      'no_transmissions': 'В этом измерении пока нет передач.', 'active_perks': 'АКТИВНЫЕ ПЕРКИ И АРТЕФАКТЫ', 'artifact_vault': 'ХРАНИЛИЩЕ АРТЕФАКТОВ'
+    },
+    'Spanish': {
+      'home': 'Inicio', 'radar': 'Radar', 'post': 'Publicar', 'hub': 'Centro', 'echoes': 'Ecos', 'identity': 'Identidad',
+      'select_realm': 'SELECCIONAR DIMENSIÓN', 'share_hint': 'Comparte tu encuentro sobrenatural o sueño...',
+      'voice_echo': 'Eco de Frecuencia de Voz (+2 Pts)', 'voice_tap': 'Toca el micrófono para grabar',
+      'broadcast_btn': 'TRANSMITIR (+2 PTS)', 'witnessed': 'Presenciado', 'deciphered': 'Descifrado',
+      'all': 'Todos', 'horror': 'Terror', 'ancient_gods': 'Dioses Antiguos', 'cyber_3050': 'Cyber 3050', 'dreams': 'Sueños',
+      'sponsored': 'Patrocinado', 'featured': 'Transmisión destacada', 'search_lang': 'Buscar idioma...', 'select_lang': 'Seleccionar idioma global',
+      'online': 'En línea', 'offline': 'Desconectado', 'typing': 'escribiendo...', 'snap_feed': 'FEED DE SNAPS DE IA 24H',
+      'snap_creator': 'CREADOR DE SNAPS DE IA 24H', 'create_snap_banner': 'Crear Snap de IA 24H (+)',
+      'no_transmissions': 'No hay transmisiones en esta dimensión aún.', 'active_perks': 'VENTAJAS Y ARTEFACTOS ACTIVOS', 'artifact_vault': 'BÓVEDA DE ARTEFACTOS'
+    }
   };
 
   static String tr(String key) {
@@ -148,6 +183,7 @@ class AvatarApp extends StatelessWidget {
       valueListenable: AppLanguage.currentLang,
       builder: (context, lang, _) {
         return MaterialApp(
+          key: ValueKey(lang), // 🔥 Forces instant top-to-bottom re-render on language toggle
           title: 'Avatar',
           debugShowCheckedModeBanner: false,
           theme: ThemeData.dark().copyWith(
@@ -228,7 +264,7 @@ class AvatarAIEngine {
 }
 
 // ==================================================
-// INSTAGRAM / FACEBOOK STYLE NATIVE ADVANCED AD WIDGET
+// INSTAGRAM STYLE NATIVE ADVANCED AD WIDGET
 // ==================================================
 class InFeedAdWidget extends StatefulWidget {
   const InFeedAdWidget({super.key});
@@ -1193,7 +1229,7 @@ class RealmsFeedScreen extends StatelessWidget {
                       children: [
                         Icon(Icons.satellite_alt_rounded, size: 50, color: Colors.white.withOpacity(0.2)),
                         const SizedBox(height: 12),
-                        Text('No transmissions in $selectedRealm yet.', style: const TextStyle(color: Colors.white38)),
+                        Text(AppLanguage.tr('no_transmissions'), style: const TextStyle(color: Colors.white38)),
                       ],
                     ),
                   );
@@ -1203,7 +1239,6 @@ class RealmsFeedScreen extends StatelessWidget {
                   itemCount: docs.length,
                   itemBuilder: (context, i) {
                     final data = docs[i].data() as Map<String, dynamic>;
-                    // 🌟 Social Media In-Feed Native Ad (Render on 3rd & every 4th index)
                     final bool shouldShowInFeedAd = (i != 0 && (i % 3 == 0));
 
                     return Column(
@@ -2250,18 +2285,43 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
     return Scaffold(
       backgroundColor: kVoidBlack,
       appBar: AppBar(backgroundColor: kVoidBlack, elevation: 0, title: const Text('TRANSMISSION STUDIO', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)), centerTitle: true),
-      // 🌟 DIRECT HIGH-RESPONSIVE FLOATING BUTTON
-      floatingActionButton: FloatingActionButton(
+      // 🔥 ZERO-CONFLICT DIRECT RESPONSIVE FLOATING BUTTON
+      floatingActionButton: FloatingActionButton.extended(
         backgroundColor: widget.accentColor,
         elevation: 8,
         onPressed: () => _open24hThoughtCreator(context),
-        child: const Icon(Icons.add, color: Colors.black, size: 30),
+        icon: const Icon(Icons.add, color: Colors.black, size: 24),
+        label: Text(AppLanguage.tr('snap_creator'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 🌟 1-TAP INSTANT SNAP LAUNCH BANNER
+            GestureDetector(
+              onTap: () => _open24hThoughtCreator(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [kNeonPurple.withOpacity(0.4), widget.accentColor.withOpacity(0.2)]),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: widget.accentColor),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(backgroundColor: widget.accentColor, radius: 16, child: const Icon(Icons.auto_awesome, size: 18, color: Colors.black)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(AppLanguage.tr('create_snap_banner'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                    const Icon(Icons.chevron_right, color: Colors.white70),
+                  ],
+                ),
+              ),
+            ),
+
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance.collection('daily_snaps').where('expiresAt', isGreaterThan: nowMillis).snapshots(),
               builder: (ctx, snap) {
