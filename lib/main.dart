@@ -62,7 +62,7 @@ void main() async {
 }
 
 // ==================================================
-// GLOBAL LANGUAGE TRANSLATION ENGINE
+// GLOBAL LANGUAGE TRANSLATION ENGINE (FULLY REACTIVE)
 // ==================================================
 class AppLanguage {
   static final ValueNotifier<String> currentLang = ValueNotifier<String>('English');
@@ -88,19 +88,45 @@ class AppLanguage {
   static const Map<String, Map<String, String>> dictionary = {
     'English': {
       'home': 'Home', 'radar': 'Radar', 'post': 'Post', 'hub': 'Hub', 'echoes': 'Echoes', 'identity': 'Identity',
-      'search_lang': 'Search language...', 'select_lang': 'Select Global Language',
-      'online': 'Online', 'typing': 'typing...', 'seen': 'Seen',
-      'share_link': 'Share with App Link', 'share_text': 'Share Text Only',
-      'delete_me': 'Delete for Me', 'delete_everyone': 'Delete for Everyone', 'unsend': 'Unsend Message',
-      'pin_chat': 'Pin Conversation', 'profile_locked': 'Profile details unlock after 3 days of frequency connection',
+      'select_realm': 'SELECT REALM DIMENSION', 'share_hint': 'Share your supernatural encounter, dream, or myth...',
+      'voice_echo': 'Voice Frequency Echo (+2 Pts)', 'voice_tap': 'Tap mic to capture paranormal audio frequency',
+      'voice_captured': 'Voice Captured! Choose Modulator filter below.', 'filters_title': '1-TAP REAL-TIME VOICE FILTERS (PREVIEW):',
+      'broadcast_btn': 'BROADCAST TRANSMISSION (+2 PTS)', 'transmitting_audio': 'Transmitting Echo...',
+      'witnessed': 'Witnessed', 'deciphered': 'Deciphered', 'self_witness': 'Self Witness', 'plus_witness': '+1 Witness',
+      'sponsored': 'Sponsored', 'featured': 'Featured Transmission', 'search_lang': 'Search language...', 'select_lang': 'Select Global Language',
+      'online': 'Online', 'offline': 'Offline', 'typing': 'typing...', 'delete_me': 'Delete for Me', 'delete_everyone': 'Delete for Everyone',
+      'unsend': 'Unsend Message', 'pin_chat': 'Pin Conversation', 'unpin_chat': 'Unpin Conversation', 'share_link': 'Share with App Link', 'share_text': 'Share Text Only',
+      'profile_locked': 'Profile details unlock after 3 days of frequency connection', 'snap_feed': '24H AI SNAP EXPLORER FEED',
+      'snap_creator': '24-HOUR AI SNAP CREATOR', 'snap_hint': 'Type your deepest thought, mystery or quote...',
+      'generating_pic': 'AI is turning your thought into visual art (Under 60s)...', 'done_pic': 'DONE (GENERATE AI PIC)',
+      'upload_snap': 'UPLOAD SNAP (LIVE FOR 24H)', 'expires_in': 'Expires automatically in 24h',
+      'all': 'All', 'horror': 'Horror', 'ancient_gods': 'Ancient Gods', 'cyber_3050': 'Cyber 3050', 'dreams': 'Dreams',
+      'scan_radar': 'Scanning for Multiverse Frequencies in Orbit', 'send_invite': 'SEND INVITATION (+3 PTS)',
+      'creator_stories': 'Creator Stories & News', 'daily_questions': 'Daily 20 Questions (8 PM)', 'publish_lore': 'PUBLISH LORE',
+      'solve_btn': 'ANSWER SOLUTION', 'solved_tag': 'SOLVED (8 PM SPOTLIGHT)', 'pending_tag': 'PENDING ORACLE',
+      'ai_friend_title': 'Avatar Friend (AI Companion)', 'ai_friend_sub': 'Multilingual AI Oracle • Always Online',
+      'active_perks': 'ACTIVE PERKS & ARTIFACTS', 'artifact_vault': 'ARTIFACT VAULT (TAP REALM TO OPEN)'
     },
     'Hindi': {
       'home': 'होम', 'radar': 'रडार', 'post': 'पोस्ट', 'hub': 'हब', 'echoes': 'इकोस', 'identity': 'पहचान',
-      'search_lang': 'भाषा खोजें...', 'select_lang': 'भाषा चुनें',
-      'online': 'ऑनलाइन', 'typing': 'टाइप कर रहे हैं...', 'seen': 'देखा गया',
-      'share_link': 'ऐप लिंक के साथ शेयर करें', 'share_text': 'सिर्फ टेक्स्ट शेयर करें',
-      'delete_me': 'मेरे लिए हटाएं', 'delete_everyone': 'सबके लिए हटाएं', 'unsend': 'मैसेज अनसेंड करें',
-      'pin_chat': 'चैट पिन करें', 'profile_locked': '3 दिन की बातचीत के बाद प्रोफाइल अनलॉक होगी',
+      'select_realm': 'आयाम (डाइमेंशन) चुनें', 'share_hint': 'अपना अलौकिक अनुभव, सपना या विचार यहाँ लिखें...',
+      'voice_echo': 'ध्वनि तरंग इको (+2 अंक)', 'voice_tap': 'आवाज़ रिकॉर्ड करने के लिए माइक दबाएं',
+      'voice_captured': 'आवाज़ रिकॉर्ड हो गई! नीचे दिए गए वॉइस फ़िल्टर चुनें।', 'filters_title': 'वॉइस मॉड्यूलेशन फ़िल्टर (प्रीव्यू):',
+      'broadcast_btn': 'पोस्ट प्रसारित करें (+2 अंक)', 'transmitting_audio': 'ध्वनि प्रसारित हो रही है...',
+      'witnessed': 'देखा गया', 'deciphered': 'डिकोड किया गया', 'self_witness': 'स्वयं साक्षी', 'plus_witness': '+1 साक्षी',
+      'sponsored': 'प्रायोजित', 'featured': 'विशेष ट्रांसमिशन', 'search_lang': 'भाषा खोजें...', 'select_lang': 'भाषा चुनें',
+      'online': 'ऑनलाइन', 'offline': 'ऑफ़लाइन', 'typing': 'टाइप कर रहे हैं...', 'delete_me': 'मेरे लिए हटाएं', 'delete_everyone': 'सबके लिए हटाएं',
+      'unsend': 'मैसेज अनसेंड करें', 'pin_chat': 'चैट पिन करें', 'unpin_chat': 'चैट अनपिन करें', 'share_link': 'ऐप लिंक के साथ शेयर करें', 'share_text': 'सिर्फ टेक्स्ट शेयर करें',
+      'profile_locked': '3 दिन की बातचीत के बाद प्रोफाइल अनलॉक होगी', 'snap_feed': '24 घंटे का AI स्नैप फीड',
+      'snap_creator': '24-घंटे का AI स्नैप बनाएं', 'snap_hint': 'अपना विचार, रहस्य या संदेश यहाँ लिखें...',
+      'generating_pic': 'AI आपके विचार को तस्वीर में बदल रहा है (60s)...', 'done_pic': 'तस्वीर बनाएं (DONE)',
+      'upload_snap': 'स्नैप अपलोड करें (24H लाइव)', 'expires_in': '24 घंटे में अपने आप हट जाएगा',
+      'all': 'सभी', 'horror': 'हॉरर', 'ancient_gods': 'प्राचीन देवता', 'cyber_3050': 'साइबर 3050', 'dreams': 'सपने',
+      'scan_radar': 'ब्रह्मांडीय आवृत्तियों को रडार पर खोजा जा रहा है', 'send_invite': 'निमंत्रण भेजें (+3 अंक)',
+      'creator_stories': 'क्रिएटर कथाएं और समाचार', 'daily_questions': 'दैनिक 20 प्रश्न (रात 8 बजे)', 'publish_lore': 'कथा प्रकाशित करें',
+      'solve_btn': 'समाधान प्रदान करें', 'solved_tag': 'हल किया गया (रात 8 बजे)', 'pending_tag': 'प्रतीक्षारत प्रश्न',
+      'ai_friend_title': 'अवतार मित्र (AI साथी)', 'ai_friend_sub': 'बहुभाषी AI साथी • हमेशा ऑनलाइन',
+      'active_perks': 'सक्रिय शक्तियां और अनलॉक तत्व', 'artifact_vault': 'रहस्यमयी वॉल्ट (खोलने के लिए टैप करें)'
     },
   };
 
@@ -202,7 +228,7 @@ class AvatarAIEngine {
 }
 
 // ==================================================
-// IN-FEED SOCIAL MEDIA STYLE AD BANNER WIDGET
+// INSTAGRAM / FACEBOOK STYLE NATIVE ADVANCED AD WIDGET
 // ==================================================
 class InFeedAdWidget extends StatefulWidget {
   const InFeedAdWidget({super.key});
@@ -212,41 +238,61 @@ class InFeedAdWidget extends StatefulWidget {
 }
 
 class _InFeedAdWidgetState extends State<InFeedAdWidget> {
-  BannerAd? _bannerAd;
+  NativeAd? _nativeAd;
   bool _isAdLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _loadAd();
+    _loadNativeAd();
   }
 
-  void _loadAd() {
-    _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-3940256099942544/6300978111', // Official Google Test Banner ID
-      size: AdSize.mediumRectangle, // 300x250 Natural Card Fit
+  void _loadNativeAd() {
+    _nativeAd = NativeAd(
+      adUnitId: 'ca-app-pub-8605443231327124/6022222057', // Real Native Ad Unit ID
+      factoryId: 'listTile',
       request: const AdRequest(),
-      listener: BannerAdListener(
+      listener: NativeAdListener(
         onAdLoaded: (ad) {
           if (mounted) setState(() => _isAdLoaded = true);
         },
         onAdFailedToLoad: (ad, error) {
           ad.dispose();
-          debugPrint("AdMob In-Feed Ad Failed: $error");
+          debugPrint('Native Ad Failed: $error');
         },
+      ),
+      nativeTemplateStyle: NativeTemplateStyle(
+        templateType: TemplateType.medium,
+        mainBackgroundColor: kCardDark,
+        cornerRadius: 16.0,
+        callToActionTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.black,
+          backgroundColor: kNeonCyan,
+          style: NativeTemplateFontStyle.bold,
+          size: 13.0,
+        ),
+        primaryTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white,
+          style: NativeTemplateFontStyle.bold,
+          size: 14.0,
+        ),
+        secondaryTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white70,
+          size: 12.0,
+        ),
       ),
     )..load();
   }
 
   @override
   void dispose() {
-    _bannerAd?.dispose();
+    _nativeAd?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isAdLoaded || _bannerAd == null) return const SizedBox.shrink();
+    if (!_isAdLoaded || _nativeAd == null) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -262,27 +308,23 @@ class _InFeedAdWidgetState extends State<InFeedAdWidget> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(6)),
-                    child: const Text('Sponsored', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text('Featured Transmission', style: TextStyle(color: Colors.white38, fontSize: 11)),
-                ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(6)),
+                child: Text(AppLanguage.tr('sponsored'), style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
-              const Icon(Icons.info_outline, size: 14, color: Colors.white24),
+              Text(AppLanguage.tr('featured'), style: const TextStyle(color: Colors.white38, fontSize: 11)),
             ],
           ),
-          const SizedBox(height: 10),
-          Center(
-            child: SizedBox(
-              width: _bannerAd!.size.width.toDouble(),
-              height: _bannerAd!.size.height.toDouble(),
-              child: AdWidget(ad: _bannerAd!),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: 300,
+              minHeight: 300,
+              maxHeight: 340,
+              maxWidth: 400,
             ),
+            child: AdWidget(ad: _nativeAd!),
           ),
         ],
       ),
@@ -834,7 +876,7 @@ class _NotificationScreenState extends State<NotificationScreen> with SingleTick
 }
 
 // ==================================================
-// DYNAMIC NAVIGATION HOST (WITH MINIMALISTIC 6 TABS)
+// DYNAMIC NAVIGATION HOST (6 TABS WITH REACTIVE TRANSLATION)
 // ==================================================
 class AvatarNavigationHost extends StatefulWidget {
   const AvatarNavigationHost({super.key});
@@ -897,62 +939,67 @@ class _AvatarNavigationHostState extends State<AvatarNavigationHost> with Widget
 
             final screens = [
               RealmsFeedScreen(selectedRealm: _selectedRealm, accentColor: activeColor, onRealmChange: (r) => setState(() => _selectedRealm = r)),
-              TimeSlipRadarScreen(accentColor: activeColor), // 🔥 ANY-RANK MATCHING
+              TimeSlipRadarScreen(accentColor: activeColor),
               TransmissionStudioScreen(accentColor: activeColor, onPostSuccess: () => setState(() => _currentIndex = 0)),
-              OracleSanctumScreen(accentColor: activeColor), // 🔥 Developer Hub & 20 Questions
+              OracleSanctumScreen(accentColor: activeColor),
               ChatsInboxScreen(accentColor: activeColor),
               ExplorerProfileScreen(accentColor: activeColor, onVaultSelect: (realm) => switchToRealm(realm)),
             ];
 
-            return Scaffold(
-              backgroundColor: kVoidBlack,
-              body: screens[_currentIndex],
-              bottomNavigationBar: Container(
-                decoration: BoxDecoration(
-                  color: kCardDark,
-                  border: Border(top: BorderSide(color: activeColor.withOpacity(0.2))),
-                  boxShadow: [BoxShadow(color: (rankTheme['glowColor'] as Color), blurRadius: 10, spreadRadius: 1)],
-                ),
-                child: BottomNavigationBar(
-                  currentIndex: _currentIndex,
-                  onTap: (idx) => setState(() => _currentIndex = idx),
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.transparent,
-                  selectedItemColor: activeColor,
-                  unselectedItemColor: Colors.white38,
-                  selectedFontSize: 11,
-                  unselectedFontSize: 11,
-                  items: [
-                    BottomNavigationBarItem(icon: const Icon(Icons.home_rounded), label: AppLanguage.tr('home')),
-                    BottomNavigationBarItem(icon: const Icon(Icons.radar_rounded), label: AppLanguage.tr('radar')),
-                    BottomNavigationBarItem(icon: const Icon(Icons.add_circle_outline_rounded, size: 26), label: AppLanguage.tr('post')),
-                    BottomNavigationBarItem(icon: const Icon(Icons.auto_stories_rounded), label: AppLanguage.tr('hub')),
-                    BottomNavigationBarItem(icon: const Icon(Icons.bubble_chart_rounded), label: AppLanguage.tr('echoes')),
-                    BottomNavigationBarItem(
-                      icon: Stack(
-                        children: [
-                          const Icon(Icons.shield_rounded),
-                          if (notifCount > 0)
-                            Positioned(
-                              right: 0, top: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: const BoxDecoration(color: kHorrorCrimson, shape: BoxShape.circle),
-                                constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                                child: Text(
-                                  notifCount > 10 ? '10+' : '$notifCount',
-                                  style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      label: AppLanguage.tr('identity'),
+            return ValueListenableBuilder<String>(
+              valueListenable: AppLanguage.currentLang,
+              builder: (context, lang, _) {
+                return Scaffold(
+                  backgroundColor: kVoidBlack,
+                  body: screens[_currentIndex],
+                  bottomNavigationBar: Container(
+                    decoration: BoxDecoration(
+                      color: kCardDark,
+                      border: Border(top: BorderSide(color: activeColor.withOpacity(0.2))),
+                      boxShadow: [BoxShadow(color: (rankTheme['glowColor'] as Color), blurRadius: 10, spreadRadius: 1)],
                     ),
-                  ],
-                ),
-              ),
+                    child: BottomNavigationBar(
+                      currentIndex: _currentIndex,
+                      onTap: (idx) => setState(() => _currentIndex = idx),
+                      type: BottomNavigationBarType.fixed,
+                      backgroundColor: Colors.transparent,
+                      selectedItemColor: activeColor,
+                      unselectedItemColor: Colors.white38,
+                      selectedFontSize: 11,
+                      unselectedFontSize: 11,
+                      items: [
+                        BottomNavigationBarItem(icon: const Icon(Icons.home_rounded), label: AppLanguage.tr('home')),
+                        BottomNavigationBarItem(icon: const Icon(Icons.radar_rounded), label: AppLanguage.tr('radar')),
+                        BottomNavigationBarItem(icon: const Icon(Icons.add_circle_outline_rounded, size: 26), label: AppLanguage.tr('post')),
+                        BottomNavigationBarItem(icon: const Icon(Icons.auto_stories_rounded), label: AppLanguage.tr('hub')),
+                        BottomNavigationBarItem(icon: const Icon(Icons.bubble_chart_rounded), label: AppLanguage.tr('echoes')),
+                        BottomNavigationBarItem(
+                          icon: Stack(
+                            children: [
+                              const Icon(Icons.shield_rounded),
+                              if (notifCount > 0)
+                                Positioned(
+                                  right: 0, top: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(color: kHorrorCrimson, shape: BoxShape.circle),
+                                    constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                                    child: Text(
+                                      notifCount > 10 ? '10+' : '$notifCount',
+                                      style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          label: AppLanguage.tr('identity'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             );
           },
         );
@@ -971,12 +1018,12 @@ class RealmsFeedScreen extends StatelessWidget {
 
   const RealmsFeedScreen({super.key, required this.selectedRealm, required this.accentColor, required this.onRealmChange});
 
-  final List<Map<String, dynamic>> realms = const [
-    {'name': 'All', 'icon': Icons.all_inclusive_rounded, 'color': kNeonPurple},
-    {'name': 'Horror', 'icon': Icons.dark_mode_rounded, 'color': kHorrorCrimson},
-    {'name': 'Ancient Gods', 'icon': Icons.temple_hindu_rounded, 'color': kAncientGold},
-    {'name': 'Cyber 3050', 'icon': Icons.memory_rounded, 'color': kNeonCyan},
-    {'name': 'Dreams', 'icon': Icons.cloudy_snowing, 'color': kMistyGreen},
+  List<Map<String, dynamic>> _getRealms() => [
+    {'name': 'All', 'labelKey': 'all', 'icon': Icons.all_inclusive_rounded, 'color': kNeonPurple},
+    {'name': 'Horror', 'labelKey': 'horror', 'icon': Icons.dark_mode_rounded, 'color': kHorrorCrimson},
+    {'name': 'Ancient Gods', 'labelKey': 'ancient_gods', 'icon': Icons.temple_hindu_rounded, 'color': kAncientGold},
+    {'name': 'Cyber 3050', 'labelKey': 'cyber_3050', 'icon': Icons.memory_rounded, 'color': kNeonCyan},
+    {'name': 'Dreams', 'labelKey': 'dreams', 'icon': Icons.cloudy_snowing, 'color': kMistyGreen},
   ];
 
   void _openLanguagePicker(BuildContext context) {
@@ -1047,6 +1094,8 @@ class RealmsFeedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final realms = _getRealms();
+
     return Scaffold(
       backgroundColor: kVoidBlack,
       appBar: AppBar(
@@ -1121,7 +1170,7 @@ class RealmsFeedScreen extends StatelessWidget {
                       children: [
                         Icon(r['icon'] as IconData, color: r['color'] as Color, size: 24),
                         const SizedBox(height: 6),
-                        Text(r['name'] as String, style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal, color: isSel ? Colors.white : Colors.white60)),
+                        Text(AppLanguage.tr(r['labelKey'] as String), style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal, color: isSel ? Colors.white : Colors.white60)),
                       ],
                     ),
                   ),
@@ -1154,8 +1203,8 @@ class RealmsFeedScreen extends StatelessWidget {
                   itemCount: docs.length,
                   itemBuilder: (context, i) {
                     final data = docs[i].data() as Map<String, dynamic>;
-                    // 🌟 Social Media In-Feed Ad insertion (Every 4th post)
-                    final bool shouldShowInFeedAd = (i != 0 && i % 4 == 0);
+                    // 🌟 Social Media In-Feed Native Ad (Render on 3rd & every 4th index)
+                    final bool shouldShowInFeedAd = (i != 0 && (i % 3 == 0));
 
                     return Column(
                       children: [
@@ -1572,7 +1621,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(isPlaying ? 'Transmitting Echo...' : 'Frequency: Modulated ${voiceFilter.toUpperCase()} Echo', style: TextStyle(fontSize: 12, color: isPlaying ? dimColor : Colors.white70, fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal)),
+                                Text(isPlaying ? AppLanguage.tr('transmitting_audio') : 'Frequency: Modulated ${voiceFilter.toUpperCase()} Echo', style: TextStyle(fontSize: 12, color: isPlaying ? dimColor : Colors.white70, fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal)),
                                 const SizedBox(height: 2),
                                 Text('$dim Realm • Tap to Listen', style: const TextStyle(fontSize: 10, color: Colors.white38)),
                               ],
@@ -1594,7 +1643,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
                         children: [
                           Icon(hasWitnessed ? Icons.visibility_rounded : Icons.visibility_outlined, color: hasWitnessed ? dimColor : Colors.white38, size: 18),
                           const SizedBox(width: 6),
-                          Text('${witnesses.length} Witnessed', style: TextStyle(color: hasWitnessed ? dimColor : Colors.white54, fontSize: 12)),
+                          Text('${witnesses.length} ${AppLanguage.tr('witnessed')}', style: TextStyle(color: hasWitnessed ? dimColor : Colors.white54, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -1604,7 +1653,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
                         children: [
                           const Icon(Icons.comment_outlined, color: Colors.white38, size: 18),
                           const SizedBox(width: 6),
-                          Text('${widget.data['decipherCount'] ?? 0} Deciphered', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                          Text('${widget.data['decipherCount'] ?? 0} ${AppLanguage.tr('deciphered')}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -1627,7 +1676,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
                     children: [
                       Icon(Icons.visibility_rounded, color: dimColor, size: 54),
                       const SizedBox(height: 4),
-                      Text(isCreator ? 'Self Witness' : '+1 Witness', style: TextStyle(color: dimColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(isCreator ? AppLanguage.tr('self_witness') : AppLanguage.tr('plus_witness'), style: TextStyle(color: dimColor, fontWeight: FontWeight.bold, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -1703,7 +1752,7 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
       appBar: AppBar(
         backgroundColor: kVoidBlack,
         elevation: 0,
-        title: const Text('TIME-SLIP RADAR', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16)),
+        title: Text(AppLanguage.tr('radar').toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -1727,7 +1776,7 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Column(
                 children: [
-                  Text('Scanning for Multiverse Frequencies in Orbit', style: TextStyle(color: widget.accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text(AppLanguage.tr('scan_radar'), style: TextStyle(color: widget.accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 24),
                   Center(
                     child: SizedBox(
@@ -1776,7 +1825,7 @@ class _TimeSlipRadarScreenState extends State<TimeSlipRadarScreen> {
                                 final data = doc.data() as Map<String, dynamic>;
                                 _sendInvitation(context, doc.id, data['name'] ?? 'Explorer');
                               },
-                              child: const Text('SEND INVITATION (+3 PTS)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              child: Text(AppLanguage.tr('send_invite'), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                             ),
                           ),
                         ],
@@ -2008,7 +2057,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                         children: [
                           Icon(Icons.auto_awesome, color: widget.accentColor, size: 20),
                           const SizedBox(width: 8),
-                          Text('24-HOUR AI SNAP CREATOR', style: TextStyle(color: widget.accentColor, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+                          Text(AppLanguage.tr('snap_creator'), style: TextStyle(color: widget.accentColor, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
                         ],
                       ),
                       IconButton(icon: const Icon(Icons.close, color: Colors.white54, size: 20), onPressed: () => Navigator.pop(ctx)),
@@ -2023,7 +2072,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: kVoidBlack,
-                      hintText: 'Type your deepest thought, mystery or quote...',
+                      hintText: AppLanguage.tr('snap_hint'),
                       hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                     ),
@@ -2055,7 +2104,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                         children: [
                           CircularProgressIndicator(color: widget.accentColor),
                           const SizedBox(height: 10),
-                          const Text('AI is turning your thought into visual art (Under 60s)...', style: TextStyle(color: kNeonCyan, fontSize: 12)),
+                          Text(AppLanguage.tr('generating_pic'), style: const TextStyle(color: kNeonCyan, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -2082,7 +2131,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                             isGenerating = false;
                           });
                         },
-                        child: const Text('DONE (GENERATE AI PIC)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                        child: Text(AppLanguage.tr('done_pic'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                       ),
                     ),
 
@@ -2116,7 +2165,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                         icon: isUploading ? const SizedBox.shrink() : const Icon(Icons.cloud_upload_rounded, color: Colors.black),
                         label: isUploading
                             ? const CircularProgressIndicator(color: Colors.black)
-                            : const Text('UPLOAD SNAP (LIVE FOR 24H)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                            : Text(AppLanguage.tr('upload_snap'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                       ),
                     ),
                 ],
@@ -2176,11 +2225,11 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                     children: [
                       Text('"${snapData['thought'] ?? ''}"', style: const TextStyle(fontSize: 14, color: Colors.white70, fontStyle: FontStyle.italic, height: 1.3)),
                       const SizedBox(height: 10),
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.timer_outlined, size: 14, color: kNeonCyan),
-                          SizedBox(width: 4),
-                          Text('Expires automatically in 24h', style: TextStyle(color: kNeonCyan, fontSize: 11)),
+                          const Icon(Icons.timer_outlined, size: 14, color: kNeonCyan),
+                          const SizedBox(width: 4),
+                          Text(AppLanguage.tr('expires_in'), style: const TextStyle(color: kNeonCyan, fontSize: 11)),
                         ],
                       ),
                     ],
@@ -2201,14 +2250,12 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
     return Scaffold(
       backgroundColor: kVoidBlack,
       appBar: AppBar(backgroundColor: kVoidBlack, elevation: 0, title: const Text('TRANSMISSION STUDIO', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)), centerTitle: true),
-      floatingActionButton: Container(
-        margin: const EdgeInsets.only(bottom: 6, right: 4),
-        child: FloatingActionButton(
-          backgroundColor: widget.accentColor,
-          elevation: 8,
-          onPressed: () => _open24hThoughtCreator(context),
-          child: const Icon(Icons.add, color: Colors.black, size: 30),
-        ),
+      // 🌟 DIRECT HIGH-RESPONSIVE FLOATING BUTTON
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: widget.accentColor,
+        elevation: 8,
+        onPressed: () => _open24hThoughtCreator(context),
+        child: const Icon(Icons.add, color: Colors.black, size: 30),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -2229,7 +2276,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                       children: [
                         const Icon(Icons.history_toggle_off_rounded, color: kNeonCyan, size: 16),
                         const SizedBox(width: 6),
-                        const Text('24H AI SNAP EXPLORER FEED', style: TextStyle(color: kNeonCyan, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.2)),
+                        Text(AppLanguage.tr('snap_feed'), style: const TextStyle(color: kNeonCyan, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.2)),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -2281,7 +2328,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
               },
             ),
 
-            Text('SELECT REALM DIMENSION', style: TextStyle(color: widget.accentColor, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+            Text(AppLanguage.tr('select_realm'), style: TextStyle(color: widget.accentColor, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 10, runSpacing: 10,
@@ -2291,7 +2338,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
               }).toList(),
             ),
             const SizedBox(height: 24),
-            TextField(controller: _contentController, maxLines: 4, style: const TextStyle(color: Colors.white), decoration: InputDecoration(filled: true, fillColor: kCardDark, hintText: 'Share your supernatural encounter, dream, or myth...', hintStyle: const TextStyle(color: Colors.white38), border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none))),
+            TextField(controller: _contentController, maxLines: 4, style: const TextStyle(color: Colors.white), decoration: InputDecoration(filled: true, fillColor: kCardDark, hintText: AppLanguage.tr('share_hint'), hintStyle: const TextStyle(color: Colors.white38), border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none))),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),
@@ -2305,9 +2352,9 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Voice Frequency Echo (+2 Pts)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text(AppLanguage.tr('voice_echo'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                           const SizedBox(height: 2),
-                          Text(recordedAudioBase64 != null ? 'Voice Captured! Choose Modulator filter below.' : 'Tap mic to capture paranormal audio frequency', style: TextStyle(color: widget.accentColor, fontSize: 11)),
+                          Text(recordedAudioBase64 != null ? AppLanguage.tr('voice_captured') : AppLanguage.tr('voice_tap'), style: TextStyle(color: widget.accentColor, fontSize: 11)),
                         ],
                       ),
                       IconButton(onPressed: _toggleRecording, iconSize: 34, icon: Icon(isRecording ? Icons.stop_circle_rounded : Icons.mic_rounded, color: isRecording ? kHorrorCrimson : (recordedAudioBase64 != null ? kMistyGreen : Colors.white70))),
@@ -2315,7 +2362,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                   ),
                   if (recordedAudioBase64 != null) ...[
                     const Divider(color: Colors.white12, height: 24),
-                    const Text('1-TAP REAL-TIME VOICE FILTERS (PREVIEW):', style: TextStyle(color: kNeonCyan, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                    Text(AppLanguage.tr('filters_title'), style: const TextStyle(color: kNeonCyan, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
@@ -2338,7 +2385,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: widget.accentColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                 onPressed: isTransmitting ? null : _transmit,
-                child: isTransmitting ? const CircularProgressIndicator(color: Colors.black) : const Text('BROADCAST TRANSMISSION (+2 PTS)', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5, color: Colors.black)),
+                child: isTransmitting ? const CircularProgressIndicator(color: Colors.black) : Text(AppLanguage.tr('broadcast_btn'), style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5, color: Colors.black)),
               ),
             ),
           ],
@@ -2519,9 +2566,9 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
           indicatorColor: kAncientGold,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'Creator Stories & News'),
-            Tab(text: 'Daily 20 Questions (8 PM)'),
+          tabs: [
+            Tab(text: AppLanguage.tr('creator_stories')),
+            Tab(text: AppLanguage.tr('daily_questions')),
           ],
         ),
       ),
@@ -2530,7 +2577,7 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
               backgroundColor: kAncientGold,
               onPressed: () => _showPublishStoryDialog(context),
               icon: const Icon(Icons.add, color: Colors.black),
-              label: const Text('PUBLISH LORE', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              label: Text(AppLanguage.tr('publish_lore'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
             )
           : null,
       body: TabBarView(
@@ -2729,7 +2776,7 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(color: isAnswered ? kMistyGreen.withOpacity(0.2) : kHorrorCrimson.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                                    child: Text(isAnswered ? 'SOLVED (8 PM SPOTLIGHT)' : 'PENDING ORACLE', style: TextStyle(color: isAnswered ? kMistyGreen : kHorrorCrimson, fontSize: 9, fontWeight: FontWeight.bold)),
+                                    child: Text(isAnswered ? AppLanguage.tr('solved_tag') : AppLanguage.tr('pending_tag'), style: TextStyle(color: isAnswered ? kMistyGreen : kHorrorCrimson, fontSize: 9, fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ),
@@ -2757,7 +2804,7 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                                   child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(backgroundColor: kNeonCyan, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
                                     onPressed: () => _showAnswerDialog(context, qDocs[i].id, question),
-                                    child: const Text('ANSWER SOLUTION', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
+                                    child: Text(AppLanguage.tr('solve_btn'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
                                   ),
                                 ),
                               ],
@@ -2804,7 +2851,7 @@ class _ChatsInboxScreenState extends State<ChatsInboxScreen> {
           children: [
             ListTile(
               leading: Icon(isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, color: kNeonCyan),
-              title: Text(isPinned ? 'Unpin Conversation' : AppLanguage.tr('pin_chat')),
+              title: Text(isPinned ? AppLanguage.tr('unpin_chat') : AppLanguage.tr('pin_chat')),
               onTap: () async {
                 Navigator.pop(ctx);
                 final userDoc = FirebaseFirestore.instance.collection('users').doc(myUid);
@@ -2848,7 +2895,7 @@ class _ChatsInboxScreenState extends State<ChatsInboxScreen> {
 
     return Scaffold(
       backgroundColor: kVoidBlack,
-      appBar: AppBar(backgroundColor: kVoidBlack, elevation: 0, title: const Text('ECHO FREQUENCIES', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16))),
+      appBar: AppBar(backgroundColor: kVoidBlack, elevation: 0, title: Text(AppLanguage.tr('echoes').toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16))),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(myUid).snapshots(),
         builder: (ctx, userSnap) {
@@ -2863,8 +2910,8 @@ class _ChatsInboxScreenState extends State<ChatsInboxScreen> {
                 decoration: BoxDecoration(gradient: LinearGradient(colors: [kCardDark, kNeonPurple.withOpacity(0.2)]), borderRadius: BorderRadius.circular(16), border: Border.all(color: widget.accentColor, width: 1.5)),
                 child: ListTile(
                   leading: CircleAvatar(backgroundColor: widget.accentColor, child: const Icon(Icons.auto_awesome, color: Colors.black)),
-                  title: const Text('Avatar Friend (AI Companion)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                  subtitle: const Text('Multilingual AI Oracle • Always Online', style: TextStyle(color: kMistyGreen, fontSize: 12)),
+                  title: Text(AppLanguage.tr('ai_friend_title'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+                  subtitle: Text(AppLanguage.tr('ai_friend_sub'), style: const TextStyle(color: kMistyGreen, fontSize: 12)),
                   trailing: Icon(Icons.chevron_right, color: widget.accentColor),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AvatarAIChatScreen())),
                 ),
@@ -2931,7 +2978,7 @@ class _ChatsInboxScreenState extends State<ChatsInboxScreen> {
                               if (isPinned) ...[const SizedBox(width: 6), const Icon(Icons.push_pin, size: 14, color: kNeonCyan)],
                             ],
                           ),
-                          subtitle: Text(isOnline ? AppLanguage.tr('online') : 'Signal lost', style: TextStyle(color: isOnline ? kMistyGreen : Colors.white38, fontSize: 12)),
+                          subtitle: Text(isOnline ? AppLanguage.tr('online') : AppLanguage.tr('offline'), style: TextStyle(color: isOnline ? kMistyGreen : Colors.white38, fontSize: 12)),
                           trailing: const Icon(Icons.chevron_right, color: Colors.white38),
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AvatarDirectChatScreen(peerUid: peerUid, peerName: peerName))),
                         ),
@@ -3010,11 +3057,11 @@ class _AvatarAIChatScreenState extends State<AvatarAIChatScreen> {
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: kVoidBlack,
-        title: const Row(
+        title: Row(
           children: [
-            CircleAvatar(radius: 14, backgroundColor: kNeonCyan, child: Icon(Icons.auto_awesome, size: 14, color: Colors.black)),
-            SizedBox(width: 10),
-            Text('Avatar Friend (AI)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const CircleAvatar(radius: 14, backgroundColor: kNeonCyan, child: Icon(Icons.auto_awesome, size: 14, color: Colors.black)),
+            const SizedBox(width: 10),
+            Text(AppLanguage.tr('ai_friend_title'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -3242,7 +3289,7 @@ class _AvatarDirectChatScreenState extends State<AvatarDirectChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.peerName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                Text(isTyping ? AppLanguage.tr('typing') : (isOnline ? AppLanguage.tr('online') : 'Offline'), style: TextStyle(fontSize: 11, color: isTyping ? kNeonCyan : (isOnline ? kMistyGreen : Colors.white38))),
+                Text(isTyping ? AppLanguage.tr('typing') : (isOnline ? AppLanguage.tr('online') : AppLanguage.tr('offline')), style: TextStyle(fontSize: 11, color: isTyping ? kNeonCyan : (isOnline ? kMistyGreen : Colors.white38))),
               ],
             );
           },
@@ -3432,7 +3479,7 @@ class ExplorerProfileScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: kVoidBlack,
         elevation: 0,
-        title: const Text('IDENTITY VAULT', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16)),
+        title: Text(AppLanguage.tr('identity').toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 3, fontSize: 16)),
         actions: [IconButton(icon: const Icon(Icons.power_settings_new_rounded, color: Colors.white60), onPressed: () => FirebaseAuth.instance.signOut())],
       ),
       body: StreamBuilder<DocumentSnapshot>(
@@ -3501,7 +3548,7 @@ class ExplorerProfileScreen extends StatelessWidget {
                         children: [
                           Icon(Icons.military_tech_rounded, color: accentColor, size: 20),
                           const SizedBox(width: 8),
-                          Text('ACTIVE PERKS & ARTIFACTS (${perks.length})', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
+                          Text('${AppLanguage.tr('active_perks')} (${perks.length})', style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -3517,18 +3564,18 @@ class ExplorerProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 28),
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('ARTIFACT VAULT (TAP REALM TO OPEN)', style: TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+                  child: Text(AppLanguage.tr('artifact_vault'), style: const TextStyle(color: kAncientGold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
                 ),
                 const SizedBox(height: 14),
                 GridView.count(
                   crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisSpacing: 12, mainAxisSpacing: 12,
                   children: [
-                    _buildArtifactItem('Ancient Gods', 'Temple Alignments & Lore', kAncientGold, () => onVaultSelect('Ancient Gods')),
-                    _buildArtifactItem('Dreams', 'Lucid Dreams & Paradoxes', kMistyGreen, () => onVaultSelect('Dreams')),
-                    _buildArtifactItem('Cyber 3050', 'Singularity & AI Theories', kNeonCyan, () => onVaultSelect('Cyber 3050')),
-                    _buildArtifactItem('Horror', 'Midnight Paranormal EVP', kHorrorCrimson, () => onVaultSelect('Horror')),
+                    _buildArtifactItem(AppLanguage.tr('ancient_gods'), 'Temple Alignments & Lore', kAncientGold, () => onVaultSelect('Ancient Gods')),
+                    _buildArtifactItem(AppLanguage.tr('dreams'), 'Lucid Dreams & Paradoxes', kMistyGreen, () => onVaultSelect('Dreams')),
+                    _buildArtifactItem(AppLanguage.tr('cyber_3050'), 'Singularity & AI Theories', kNeonCyan, () => onVaultSelect('Cyber 3050')),
+                    _buildArtifactItem(AppLanguage.tr('horror'), 'Midnight Paranormal EVP', kHorrorCrimson, () => onVaultSelect('Horror')),
                   ],
                 ),
               ],
