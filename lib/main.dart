@@ -34,9 +34,6 @@ const String kAdminEmail = "shrmamohit926@gmail.com";
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-// ==================================================
-// MAIN ENTRY POINT
-// ==================================================
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
@@ -72,6 +69,14 @@ class AppLanguage {
     {'name': 'Telugu', 'native': 'తెలుగు', 'code': 'te'},
     {'name': 'Marathi', 'native': 'मराठी', 'code': 'mr'},
   ];
+
+  static String getLanguageCode(String langName) {
+    final match = supportedLanguages.firstWhere(
+      (l) => l['name']!.toLowerCase() == langName.toLowerCase(),
+      orElse: () => {'code': 'en'},
+    );
+    return match['code'] ?? 'en';
+  }
 
   static Future<void> loadSavedLanguage() async {
     try {
@@ -148,22 +153,16 @@ class AppLanguage {
     },
     'Spanish': {
       'home': 'Inicio', 'radar': 'Radar', 'post': 'Publicar', 'hub': 'Centro', 'echoes': 'Ecos', 'identity': 'Identidad',
-      'select_realm': 'SELECCIONAR DIMENSIÓN', 'share_hint': 'Comparte tu encuentro sobrenatural o sueño...',
-      'voice_echo': 'Eco de Frecuencia de Voz (+2 Pts)', 'voice_tap': 'Toca el micrófono para grabar',
-      'broadcast_btn': 'TRANSMITIR (+2 PTS)', 'witnessed': 'Presenciado', 'deciphered': 'Descifrado',
+      'select_realm': 'SELECCIONAR DIMENSIÓN', 'share_hint': 'Comparte tu encuentro sobrenatural...',
+      'voice_echo': 'Eco de Voz (+2 Pts)', 'broadcast_btn': 'TRANSMITIR (+2 PTS)', 'witnessed': 'Presenciado', 'deciphered': 'Descifrado',
       'all': 'Todos', 'horror': 'Terror', 'ancient_gods': 'Dioses Antiguos', 'cyber_3050': 'Cyber 3050', 'dreams': 'Sueños',
-      'sponsored': 'Patrocinado', 'featured': 'Transmisión destacada', 'search_lang': 'Buscar idioma...', 'select_lang': 'Seleccionar idioma global',
-      'online': 'En línea', 'offline': 'Desconectado', 'typing': 'escribiendo...', 'snap_feed': 'FEED DE SNAPS DE IA 24H',
-      'snap_creator': 'CREADOR DE SNAPS DE IA 24H', 'create_snap_banner': 'Crear Snap de IA 24H (+)',
-      'no_transmissions': 'No hay transmisiones en esta dimensión aún.', 'active_perks': 'VENTAJAS Y ARTEFACTOS ACTIVOS', 'artifact_vault': 'BÓVEDA DE ARTEFACTOS',
-      'see_translation': 'Ver traducción', 'show_original': 'Ver original', 'translating': 'Traduciendo...',
-      'privacy_policy': 'Política de privacidad y términos',
+      'see_translation': 'Ver traducción', 'show_original': 'Ver original', 'translating': 'Traduciendo...', 'privacy_policy': 'Política de privacidad',
     },
     'French': {
-      'home':'Accueil','radar':'Radar','post':'Publier','hub':'Centre','echoes':'Échos','identity':'Identité','select_realm':'CHOISIR LA DIMENSION','share_hint':'Partagez votre rencontre surnaturelle...','voice_echo':'Écho vocal (+2 pts)','voice_tap':'Enregistrer','voice_captured':'Enregistré !','filters_title':'FILTRES VOCAUX :','broadcast_btn':'DIFFUSER (+2 PTS)','witnessed':'Observé','deciphered':'Déchiffré','all':'Tous','horror':'Horreur','ancient_gods':'Dieux anciens','cyber_3050':'Cyber 3050','dreams':'Rêves','see_translation':'Voir la traduction','show_original':'Voir l’original','translating':'Traduction...','privacy_policy':'Politique de confidentialité',
+      'home':'Accueil','radar':'Radar','post':'Publier','hub':'Centre','echoes':'Échos','identity':'Identité','select_realm':'CHOISIR LA DIMENSION','share_hint':'Partagez votre rencontre...','voice_echo':'Écho vocal (+2 pts)','broadcast_btn':'DIFFUSER (+2 PTS)','witnessed':'Observé','deciphered':'Déchiffré','all':'Tous','horror':'Horreur','ancient_gods':'Dieux anciens','cyber_3050':'Cyber 3050','dreams':'Rêves','see_translation':'Voir la traduction','show_original':'Voir l’original','translating':'Traduction...','privacy_policy':'Politique de confidentialité',
     },
     'German': {
-      'home':'Start','radar':'Radar','post':'Post','hub':'Zentrum','echoes':'Echos','identity':'Identität','select_realm':'DIMENSION WÄHLEN','share_hint':'Teile dein Erlebnis...','voice_echo':'Stimm-Echo (+2 Pkt)','broadcast_btn':'SENDEN (+2 PKT)','witnessed':'Bezeugt','deciphered':'Entschlüsselt','all':'Alle','horror':'Horror','ancient_gods':'Alte Götter','cyber_3050':'Cyber 3050','dreams':'Träume','see_translation':'Übersetzung anzeigen','show_original':'Original anzeigen','translating':'Übersetzen...','privacy_policy':'Datenschutzerklärung & Bedingungen',
+      'home':'Start','radar':'Radar','post':'Post','hub':'Zentrum','echoes':'Echos','identity':'Identität','select_realm':'DIMENSION WÄHLEN','share_hint':'Teile dein Erlebnis...','voice_echo':'Stimm-Echo (+2 Pkt)','broadcast_btn':'SENDEN (+2 PKT)','witnessed':'Bezeugt','deciphered':'Entschlüsselt','all':'Alle','horror':'Horror','ancient_gods':'Alte Götter','cyber_3050':'Cyber 3050','dreams':'Träume','see_translation':'Übersetzung anzeigen','show_original':'Original anzeigen','translating':'Übersetzen...','privacy_policy':'Datenschutzerklärung',
     },
     'Japanese': {
       'home':'ホーム','radar':'レーダー','post':'投稿','hub':'ハブ','echoes':'エコー','identity':'アイデンティティ','select_realm':'次元を選択','share_hint':'体験を共有...','voice_echo':'音声エコー (+2pt)','broadcast_btn':'送信 (+2pt)','witnessed':'目撃','deciphered':'解読','all':'すべて','horror':'ホラー','ancient_gods':'古代の神々','cyber_3050':'サイバー3050','dreams':'夢','see_translation':'翻訳を見る','show_original':'原文を見る','translating':'翻訳中...','privacy_policy':'プライバシーポリシー',
@@ -189,7 +188,7 @@ class AppLanguage {
       'home':'Início','radar':'Radar','post':'Publicar','hub':'Central','echoes':'Ecos','identity':'Identidade','select_realm':'DIMENSÃO','share_hint':'Compartilhe...','voice_echo':'Eco (+2 pts)','broadcast_btn':'TRANSMITIR (+2 PTS)','witnessed':'Testemunhado','deciphered':'Decifrado','all':'Todos','horror':'Terror','ancient_gods':'Deuses Antigos','cyber_3050':'Cyber 3050','dreams':'Sonhos','see_translation':'Ver tradução','show_original':'Ver original','translating':'Traduzindo...','privacy_policy':'Política de Privacidade',
     },
     'Bengali': {
-      'home':'হোম','radar':'রাডার','post':'পোস্ট','hub':'হাব','echoes':'ইকো','identity':'পরিচয়','select_realm':'ডাইমেনশন','share_hint':'অভিজ্ঞতা লিখুন...','voice_echo':'ভয়েস ইকো (+২)','broadcast_btn':'সম্প্রচার (+২)','witnessed':'দেখেছেন','deciphered':'ডিকোড','all':'সব','horror':'হরর','ancient_gods':'প্রাচীন দেবতা','cyber_3050':'সাইবার ৩০৫০','dreams':'স্বপ্ন','see_translation':'অনুবাদ দেখুন','show_original':'মূল পাঠ দেখুন','translating':'অনুবাদ হচ্ছে...','privacy_policy':'গোপনীয়তা নীতি ও শর্তাবলী',
+      'home':'হোম','radar':'রাডার','post':'পোস্ট','hub':'হাব','echoes':'ইকো','identity':'পরিচয়','select_realm':'ডাইমেনশন','share_hint':'অভিজ্ঞতা লিখুন...','voice_echo':'ভয়েস ইকো (+২)','broadcast_btn':'সম্প্রচার (+২)','witnessed':'দেখেছেন','deciphered':'ডিকোড','all':'সব','horror':'হরর','ancient_gods':'প্রাচীন দেবতা','cyber_3050':'সাইবার ৩০৫০','dreams':'স্বপ্ন','see_translation':'অনুবাদ দেখুন','show_original':'মূল পাঠ দেখুন','translating':'অনুবাদ হচ্ছে...','privacy_policy':'গোপনীয়তা নীতি',
     },
     'Punjabi': {
       'home':'ਹੋਮ','radar':'ਰਡਾਰ','post':'ਪੋਸਟ','hub':'ਹੱਬ','echoes':'ਏਕੋਜ਼','identity':'ਪਛਾਣ','select_realm':'ਡਾਈਮੇਂਸ਼ਨ','share_hint':'ਅਨੁਭਵ ਲਿਖੋ...','voice_echo':'ਵੌਇਸ ਏਕੋ (+੨)','broadcast_btn':'ਪ੍ਰਸਾਰਿਤ (+੨)','witnessed':'ਦੇਖਿਆ','deciphered':'ਡਿਕੋਡ','all':'ਸਾਰੇ','horror':'ਹੌਰਰ','ancient_gods':'ਪੁਰਾਤਨ ਦੇਵਤੇ','cyber_3050':'ਸਾਈਬਰ 3050','dreams':'ਸੁਪਨੇ','see_translation':'ਅਨੁਵਾਦ ਦੇਖੋ','show_original':'ਅਸਲ ਦੇਖੋ','translating':'ਅਨੁਵਾਦ ਹੋ ਰਿਹਾ ਹੈ...','privacy_policy':'ਪਰਦੇਦਾਰੀ ਨੀਤੀ',
@@ -201,7 +200,7 @@ class AppLanguage {
       'home':'హోమ్','radar':'రాడార్','post':'పోస్ట్','hub':'హబ్','echoes':'ఎకోస్','identity':'గుర్తింపు','select_realm':'డైమెన్షన్','share_hint':'అనుభవం రాయండి...','voice_echo':'వాయిస్ ఎకో (+2)','broadcast_btn':'ప్రసారం (+2)','witnessed':'చూసినవారు','deciphered':'డీకోడ్','all':'అన్నీ','horror':'హారర్','ancient_gods':'ప్రాచీన దేవతలు','cyber_3050':'సైబర్ 3050','dreams':'కలలు','see_translation':'అనువాదం చూడండి','show_original':'అసలు చూడండి','translating':'అనువదిస్తోంది...','privacy_policy':'గోప్యతా విధానం',
     },
     'Marathi': {
-      'home':'होम','radar':'रडार','post':'पोस्ट','hub':'हब','echoes':'प्रतिध्वनी','identity':'ओळख','select_realm':'डायमेन्शन निवडा','share_hint':'अनुभव लिहा...','voice_echo':'व्हॉइस इको (+२)','broadcast_btn':'प्रसारित करा (+२)','witnessed':'पाहिले','deciphered':'उलगडले','all':'सर्व','horror':'हॉरर','ancient_gods':'प्राचीन देव','cyber_3050':'सायबर 3050','dreams':'स्वप्ने','see_translation':'भाषांतर पहा','show_original':'मूळ मजकूर पहा','translating':'भाषांतर होत आहे...','privacy_policy':'गोपनीयता धोरण आणि अटी',
+      'home':'होम','radar':'रडार','post':'पोस्ट','hub':'हब','echoes':'प्रतिध्वनी','identity':'ओळख','select_realm':'डायमेन्शन निवडा','share_hint':'अनुभव लिहा...','voice_echo':'व्हॉइस इको (+२)','broadcast_btn':'प्रसारित करा (+२)','witnessed':'पाहिले','deciphered':'उलगडले','all':'सर्व','horror':'हॉरर','ancient_gods':'प्राचीन देव','cyber_3050':'सायबर 3050','dreams':'स्वप्ने','see_translation':'भाषांतर पहा','show_original':'मूळ मजकूर पहा','translating':'भाषांतर होत आहे...','privacy_policy':'गोपनीयता धोरण',
     },
   };
 
@@ -242,7 +241,7 @@ class AvatarApp extends StatelessWidget {
 }
 
 // ==================================================
-// INITIALIZATION GATE (PREVENTS SPLASH FREEZE)
+// INITIALIZATION GATE
 // ==================================================
 class AppInitializationGate extends StatefulWidget {
   const AppInitializationGate({super.key});
@@ -334,7 +333,7 @@ class NotificationService {
 }
 
 // ==================================================
-// CLOUDFLARE GEMINI AI ENGINE
+// MULTI-ENGINE TRANSLATION & AI SERVICE
 // ==================================================
 class AvatarAIEngine {
   static const String _workerUrl = 'https://avatar-friend-ai.projectkhurafat.workers.dev/';
@@ -355,27 +354,54 @@ class AvatarAIEngine {
         }
       }
     } catch (e) {
-      debugPrint('Cloudflare Avatar AI Error: $e');
+      debugPrint('Cloudflare AI error: $e');
     }
 
     final lower = userMessage.toLowerCase();
     if (lower.contains('hi') || lower.contains('hello') || lower.contains('hey')) {
       return "Pranaam Explorer! Avatar dimension mein aapka swagat hai. Aaj koun sa cosmic mystery decode karein?";
-    } else if (lower.contains('hindi')) {
-      return "Haan bilkul, main Hindi aur English dono mein baat kar sakta hoon. Apne mysterious vichar share kijiye!";
     }
     return "The frequency of '$userMessage' has been received across dimensions. Transmitting cosmic resonance...";
   }
 
-  static Future<String> translatePostContent(String originalText, String targetLang) async {
+  // 100% Reliable Double-Engine Realtime Translation (Google Translate API + Cloudflare fallback)
+  static Future<String> translatePostContent(String originalText, String targetLangName) async {
+    if (originalText.trim().isEmpty) return originalText;
+    final targetCode = AppLanguage.getLanguageCode(targetLangName);
+
+    try {
+      final url = Uri.parse(
+        'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$targetCode&dt=t&q=${Uri.encodeComponent(originalText)}',
+      );
+      final response = await http.get(url).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final List dynamicList = jsonDecode(response.body);
+        if (dynamicList.isNotEmpty && dynamicList[0] is List) {
+          String fullTranslated = '';
+          for (var item in dynamicList[0]) {
+            if (item is List && item.isNotEmpty) {
+              fullTranslated += item[0].toString();
+            }
+          }
+          if (fullTranslated.trim().isNotEmpty) {
+            return fullTranslated;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Google Translate API error, attempting fallback: $e');
+    }
+
+    // Secondary Worker Fallback
     try {
       final response = await http.post(
         Uri.parse(_workerUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'message': 'Translate this exact post content into $targetLang accurately and naturally. Do not include any explanations, tags, or extra words: "$originalText"',
+          'message': 'Translate this text into $targetLangName accurately. Return only the translated text: "$originalText"',
         }),
-      ).timeout(const Duration(seconds: 12));
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -384,8 +410,9 @@ class AvatarAIEngine {
         }
       }
     } catch (e) {
-      debugPrint('Translation error: $e');
+      debugPrint('Worker translation fallback error: $e');
     }
+
     return originalText;
   }
 }
@@ -1200,28 +1227,30 @@ class _AvatarNavigationHostState extends State<AvatarNavigationHost> with Widget
                       backgroundColor: Colors.transparent,
                       selectedItemColor: activeColor,
                       unselectedItemColor: Colors.white38,
-                      selectedFontSize: 11,
-                      unselectedFontSize: 11,
+                      selectedFontSize: 10,
+                      unselectedFontSize: 10,
+                      selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, height: 1.2),
+                      unselectedLabelStyle: const TextStyle(height: 1.2),
                       items: [
-                        BottomNavigationBarItem(icon: const Icon(Icons.home_rounded), label: AppLanguage.tr('home')),
-                        BottomNavigationBarItem(icon: const Icon(Icons.radar_rounded), label: AppLanguage.tr('radar')),
-                        BottomNavigationBarItem(icon: const Icon(Icons.add_circle_outline_rounded, size: 26), label: AppLanguage.tr('post')),
-                        BottomNavigationBarItem(icon: const Icon(Icons.auto_stories_rounded), label: AppLanguage.tr('hub')),
-                        BottomNavigationBarItem(icon: const Icon(Icons.bubble_chart_rounded), label: AppLanguage.tr('echoes')),
+                        BottomNavigationBarItem(icon: const Icon(Icons.home_rounded, size: 22), label: AppLanguage.tr('home')),
+                        BottomNavigationBarItem(icon: const Icon(Icons.radar_rounded, size: 22), label: AppLanguage.tr('radar')),
+                        BottomNavigationBarItem(icon: const Icon(Icons.add_circle_outline_rounded, size: 24), label: AppLanguage.tr('post')),
+                        BottomNavigationBarItem(icon: const Icon(Icons.auto_stories_rounded, size: 22), label: AppLanguage.tr('hub')),
+                        BottomNavigationBarItem(icon: const Icon(Icons.bubble_chart_rounded, size: 22), label: AppLanguage.tr('echoes')),
                         BottomNavigationBarItem(
                           icon: Stack(
                             children: [
-                              const Icon(Icons.shield_rounded),
+                              const Icon(Icons.shield_rounded, size: 22),
                               if (notifCount > 0)
                                 Positioned(
                                   right: 0, top: 0,
                                   child: Container(
                                     padding: const EdgeInsets.all(2),
                                     decoration: const BoxDecoration(color: kHorrorCrimson, shape: BoxShape.circle),
-                                    constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                                    constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
                                     child: Text(
                                       notifCount > 10 ? '10+' : '$notifCount',
-                                      style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                                      style: const TextStyle(color: Colors.white, fontSize: 7, fontWeight: FontWeight.bold),
                                       textAlign: TextAlign.center,
                                     ),
                                   ),
@@ -2851,7 +2880,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 }
 
 // ==================================================
-// TAB 4: THE ORACLE'S SANCTUM
+// TAB 4: THE ORACLE'S SANCTUM (WITH TRANSLATIONS)
 // ==================================================
 class OracleSanctumScreen extends StatefulWidget {
   final Color accentColor;
@@ -2867,10 +2896,32 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // Translation states for Hub
+  final Map<String, String> _translatedCache = {};
+  final Set<String> _loadingTranslations = {};
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+  }
+
+  void _translateHubItem(String key, String originalText) async {
+    if (_translatedCache.containsKey(key)) {
+      setState(() => _translatedCache.remove(key));
+      return;
+    }
+
+    setState(() => _loadingTranslations.add(key));
+    final targetLang = AppLanguage.currentLang.value;
+    final res = await AvatarAIEngine.translatePostContent(originalText, targetLang);
+
+    if (mounted) {
+      setState(() {
+        _translatedCache[key] = res;
+        _loadingTranslations.remove(key);
+      });
+    }
   }
 
   void _confirmDeleteDoc(BuildContext context, String collectionName, String docId, String itemType) {
@@ -3085,11 +3136,17 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                 itemCount: docs.length,
                 itemBuilder: (context, i) {
                   final item = docs[i].data() as Map<String, dynamic>;
+                  final docId = docs[i].id;
                   final isPrize = item['isPrize'] == true;
                   final likes = List<String>.from(item['likes'] ?? []);
                   final myUid = currentUser?.uid ?? '';
                   final isLiked = likes.contains(myUid);
-                  final content = item['content'] ?? '';
+                  final originalContent = item['content'] ?? '';
+                  final title = item['title'] ?? 'Sanctum Post';
+
+                  final isItemTranslated = _translatedCache.containsKey(docId);
+                  final isItemTranslating = _loadingTranslations.contains(docId);
+                  final displayContent = isItemTranslated ? _translatedCache[docId]! : originalContent;
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 16),
@@ -3117,7 +3174,7 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                                   icon: const Icon(Icons.copy_rounded, size: 18, color: Colors.white70),
                                   tooltip: 'Copy Story Text',
                                   onPressed: () {
-                                    Clipboard.setData(ClipboardData(text: content));
+                                    Clipboard.setData(ClipboardData(text: displayContent));
                                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chronicle text copied to clipboard!')));
                                   },
                                 ),
@@ -3125,16 +3182,43 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                                   IconButton(
                                     icon: const Icon(Icons.delete_outline, size: 18, color: kHorrorCrimson),
                                     tooltip: 'Purge Chronicle',
-                                    onPressed: () => _confirmDeleteDoc(context, 'developer_broadcasts', docs[i].id, 'Chronicle'),
+                                    onPressed: () => _confirmDeleteDoc(context, 'developer_broadcasts', docId, 'Chronicle'),
                                   ),
                               ],
                             ),
                           ],
                         ),
                         const SizedBox(height: 10),
-                        Text(item['title'] ?? 'Sanctum Post', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                         const SizedBox(height: 8),
-                        Text(content, style: const TextStyle(fontSize: 13, color: Colors.white70, height: 1.4)),
+                        Text(displayContent, style: const TextStyle(fontSize: 13, color: Colors.white70, height: 1.4)),
+                        const SizedBox(height: 8),
+
+                        // 🌐 INSTAGRAM TRANSLATION FOR HUB STORIES
+                        InkWell(
+                          onTap: isItemTranslating ? null : () => _translateHubItem(docId, originalContent),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isItemTranslating)
+                                const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5, color: kNeonCyan))
+                              else
+                                Icon(Icons.translate_rounded, size: 13, color: isItemTranslated ? kNeonCyan : Colors.white38),
+                              const SizedBox(width: 5),
+                              Text(
+                                isItemTranslating
+                                    ? AppLanguage.tr('translating')
+                                    : (isItemTranslated ? AppLanguage.tr('show_original') : AppLanguage.tr('see_translation')),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isItemTranslated ? kNeonCyan : Colors.white54,
+                                  fontWeight: isItemTranslated ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
                         const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3142,7 +3226,7 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                             InkWell(
                               onTap: () async {
                                 if (myUid.isEmpty) return;
-                                final docRef = FirebaseFirestore.instance.collection('developer_broadcasts').doc(docs[i].id);
+                                final docRef = FirebaseFirestore.instance.collection('developer_broadcasts').doc(docId);
                                 if (isLiked) {
                                   await docRef.update({'likes': FieldValue.arrayRemove([myUid])});
                                 } else {
@@ -3159,7 +3243,7 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                             ),
                             IconButton(
                               icon: const Icon(Icons.share_outlined, color: Colors.white38, size: 18),
-                              onPressed: () => Share.share('📜 AVATAR SANCTUM:\n\n${item['title']}\n\n$content\n\n- Published by Creator on Avatar Network.'),
+                              onPressed: () => Share.share('📜 AVATAR SANCTUM:\n\n$title\n\n$displayContent\n\n- Published by Creator on Avatar Network.'),
                             ),
                           ],
                         ),
@@ -3241,10 +3325,21 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                       itemCount: qDocs.length,
                       itemBuilder: (context, i) {
                         final qData = qDocs[i].data() as Map<String, dynamic>;
+                        final docId = qDocs[i].id;
                         final isAnswered = qData['isAnswered'] == true;
-                        final question = qData['question'] ?? '';
-                        final answer = qData['answer'] ?? '';
+                        final rawQuestion = qData['question'] ?? '';
+                        final rawAnswer = qData['answer'] ?? '';
                         final askedBy = qData['askedBy'] ?? 'Explorer';
+
+                        final qKey = 'q_$docId';
+                        final isQTranslated = _translatedCache.containsKey(qKey);
+                        final isQTranslating = _loadingTranslations.contains(qKey);
+                        final displayQuestion = isQTranslated ? _translatedCache[qKey]! : rawQuestion;
+
+                        final aKey = 'a_$docId';
+                        final isATranslated = _translatedCache.containsKey(aKey);
+                        final isATranslating = _loadingTranslations.contains(aKey);
+                        final displayAnswer = isATranslated ? _translatedCache[aKey]! : rawAnswer;
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -3273,14 +3368,35 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                                           icon: const Icon(Icons.delete_outline, size: 18, color: kHorrorCrimson),
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(),
-                                          onPressed: () => _confirmDeleteDoc(context, 'daily_questions', qDocs[i].id, 'Question'),
+                                          onPressed: () => _confirmDeleteDoc(context, 'daily_questions', docId, 'Question'),
                                         ),
                                     ],
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Text('Q: $question', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                              Text('Q: $displayQuestion', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                              const SizedBox(height: 4),
+
+                              // 🌐 TRANSLATE QUESTION
+                              InkWell(
+                                onTap: isQTranslating ? null : () => _translateHubItem(qKey, rawQuestion),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isQTranslating)
+                                      const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1.2, color: kNeonCyan))
+                                    else
+                                      Icon(Icons.translate_rounded, size: 12, color: isQTranslated ? kNeonCyan : Colors.white38),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isQTranslating ? AppLanguage.tr('translating') : (isQTranslated ? AppLanguage.tr('show_original') : AppLanguage.tr('see_translation')),
+                                      style: TextStyle(fontSize: 10, color: isQTranslated ? kNeonCyan : Colors.white54),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
                               if (isAnswered) ...[
                                 const SizedBox(height: 8),
                                 Container(
@@ -3291,7 +3407,27 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                                     children: [
                                       const Text('👑 DEVELOPER SOLUTION:', style: TextStyle(color: kNeonCyan, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                                       const SizedBox(height: 4),
-                                      Text(answer, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.3)),
+                                      Text(displayAnswer, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.3)),
+                                      const SizedBox(height: 4),
+
+                                      // 🌐 TRANSLATE ANSWER
+                                      InkWell(
+                                        onTap: isATranslating ? null : () => _translateHubItem(aKey, rawAnswer),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (isATranslating)
+                                              const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1.2, color: kNeonCyan))
+                                            else
+                                              Icon(Icons.translate_rounded, size: 12, color: isATranslated ? kNeonCyan : Colors.white38),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              isATranslating ? AppLanguage.tr('translating') : (isATranslated ? AppLanguage.tr('show_original') : AppLanguage.tr('see_translation')),
+                                              style: TextStyle(fontSize: 10, color: isATranslated ? kNeonCyan : Colors.white54),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -3302,7 +3438,7 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                                   alignment: Alignment.centerRight,
                                   child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(backgroundColor: kNeonCyan, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                                    onPressed: () => _showAnswerDialog(context, qDocs[i].id, question),
+                                    onPressed: () => _showAnswerDialog(context, docId, rawQuestion),
                                     child: Text(AppLanguage.tr('solve_btn'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11)),
                                   ),
                                 ),
@@ -3324,7 +3460,7 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
 }
 
 // ==================================================
-// TAB 5: CHATS (AVATAR FRIEND & P2P)
+// TAB 5: CHATS
 // ==================================================
 class ChatsInboxScreen extends StatefulWidget {
   final Color accentColor;
