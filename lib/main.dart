@@ -86,7 +86,6 @@ class AppLanguage {
     {'name': 'Marathi', 'native': 'मराठी', 'code': 'mr'},
   ];
 
-  // Persist the selected language locally so it survives app restarts.
   static Future<void> loadSavedLanguage() async {
     try {
       final dir = await getApplicationDocumentsDirectory();
@@ -239,7 +238,7 @@ class AvatarApp extends StatelessWidget {
       valueListenable: AppLanguage.currentLang,
       builder: (context, lang, _) {
         return MaterialApp(
-          key: ValueKey(lang), // 🔥 Forces instant top-to-bottom re-render on language toggle
+          key: ValueKey(lang),
           title: 'Avatar',
           debugShowCheckedModeBanner: false,
           theme: ThemeData.dark().copyWith(
@@ -342,7 +341,7 @@ class _InFeedAdWidgetState extends State<InFeedAdWidget> {
 
   void _loadNativeAd() {
     _nativeAd = NativeAd(
-      adUnitId: 'ca-app-pub-8605443231327124/6022222057', // Real Native Ad Unit ID
+      adUnitId: 'ca-app-pub-8605443231327124/6022222057',
       factoryId: 'listTile',
       request: const AdRequest(),
       listener: NativeAdListener(
@@ -1261,7 +1260,7 @@ class RealmsFeedScreen extends StatelessWidget {
                       border: Border.all(color: isSel ? (r['color'] as Color) : Colors.white12, width: isSel ? 2 : 1),
                     ),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: CenterAxisAlignment(),
                       children: [
                         Icon(r['icon'] as IconData, color: r['color'] as Color, size: 24),
                         const SizedBox(height: 6),
@@ -1318,7 +1317,7 @@ class RealmsFeedScreen extends StatelessWidget {
 }
 
 // ==================================================
-// TRANSMISSION CARD (DUAL SHARE & ZERO-EXPLOIT WITNESS)
+// TRANSMISSION CARD (WITH DEVELOPER + USER PURGE CONTROLS)
 // ==================================================
 class TransmissionCard extends StatefulWidget {
   final String docId;
@@ -1432,7 +1431,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
     }
   }
 
-  void _showDeleteDialog(BuildContext context, int createdAt, String authorUid) {
+  void _showDeleteDialog(BuildContext context, int createdAt, String authorUid, bool isDev) {
     final currentMillis = DateTime.now().millisecondsSinceEpoch;
     final twentyFourHours = 24 * 60 * 60 * 1000;
     final isWithin24Hours = (currentMillis - createdAt) <= twentyFourHours;
@@ -1446,7 +1445,17 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isWithin24Hours) ...[
+            if (isDev) ...[
+              ListTile(
+                leading: const Icon(Icons.shield_rounded, color: kHorrorCrimson),
+                title: const Text('Admin Purge Transmission', style: TextStyle(color: kHorrorCrimson, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Developer privilege: Purge immediately with zero penalty.', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                onTap: () async {
+                  await FirebaseFirestore.instance.collection('transmissions').doc(widget.docId).delete();
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              ),
+            ] else if (isWithin24Hours) ...[
               ListTile(
                 leading: const Icon(Icons.delete_forever, color: kHorrorCrimson),
                 title: const Text('Purge Transmission (-5 Pts Penalty)', style: TextStyle(color: kHorrorCrimson, fontWeight: FontWeight.bold)),
@@ -1463,7 +1472,7 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
               const ListTile(
                 leading: Icon(Icons.lock_clock, color: Colors.white38),
                 title: Text('Locked in Lore Archive', style: TextStyle(color: Colors.white38)),
-                subtitle: Text('Transmissions older than 24 hours cannot be purged.'),
+                subtitle: Text('Transmissions older than 24 hours cannot be purged by explorer.'),
               ),
             ],
           ],
@@ -1647,7 +1656,9 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
     final voiceFilter = widget.data['voiceFilter'] ?? 'normal';
     final dimColor = _getDimensionColor(dim);
     final witnesses = List<String>.from(widget.data['witnesses'] ?? []);
-    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final currentUid = currentUser?.uid ?? '';
+    final isDev = (currentUser?.email?.toLowerCase().trim() == kAdminEmail.toLowerCase().trim());
     final hasWitnessed = witnesses.contains(currentUid);
     final isCreator = (widget.data['uid'] == currentUid);
     final authorUid = widget.data['uid'] ?? '';
@@ -1691,8 +1702,11 @@ class _TransmissionCardState extends State<TransmissionCard> with SingleTickerPr
                           decoration: BoxDecoration(color: dimColor.withOpacity(0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: dimColor, width: 0.8)),
                           child: Text(dim, style: TextStyle(color: dimColor, fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
-                        if (isCreator)
-                          IconButton(icon: const Icon(Icons.more_vert, size: 18, color: Colors.white54), onPressed: () => _showDeleteDialog(context, createdAt, authorUid)),
+                        if (isCreator || isDev)
+                          IconButton(
+                            icon: Icon(isDev && !isCreator ? Icons.admin_panel_settings_rounded : Icons.more_vert, size: 18, color: isDev && !isCreator ? kHorrorCrimson : Colors.white54),
+                            onPressed: () => _showDeleteDialog(context, createdAt, authorUid, isDev),
+                          ),
                       ],
                     ),
                   ],
@@ -2097,21 +2111,26 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 
   void _open24hThoughtCreator(BuildContext context) async {
     final myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final isDev = (currentUser?.email?.toLowerCase().trim() == kAdminEmail.toLowerCase().trim());
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    final recentSnap = await FirebaseFirestore.instance
-        .collection('daily_snaps')
-        .where('uid', isEqualTo: myUid)
-        .where('expiresAt', isGreaterThan: now)
-        .get();
+    // Regular users can only post 1 snap per 24 hours
+    if (!isDev) {
+      final recentSnap = await FirebaseFirestore.instance
+          .collection('daily_snaps')
+          .where('uid', isEqualTo: myUid)
+          .where('expiresAt', isGreaterThan: now)
+          .get();
 
-    if (recentSnap.docs.isNotEmpty) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⏳ You can only share 1 AI Snap every 24 Hours! Please wait for your previous snap to expire.')),
-        );
+      if (recentSnap.docs.isNotEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('⏳ You can only share 1 AI Snap every 24 Hours! Please wait for your previous snap to expire.')),
+          );
+        }
+        return;
       }
-      return;
     }
 
     if (!context.mounted) return;
@@ -2184,6 +2203,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                           generatedImageUrl!,
                           fit: BoxFit.cover,
                           loadingBuilder: (c, child, p) => p == null ? child : const Center(child: CircularProgressIndicator(color: kNeonCyan)),
+                          errorBuilder: (c, err, stack) => const Center(child: Icon(Icons.broken_image, color: Colors.white38)),
                         ),
                       ),
                     ),
@@ -2222,16 +2242,17 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                               body: jsonEncode({
                                 'prompt': 'cinematic surreal multiverse mystic art of: $text, high quality, glowing neon, portrait composition',
                               }),
-                            ).timeout(const Duration(seconds: 90));
+                            ).timeout(const Duration(seconds: 45));
 
                             if (response.statusCode != 200) {
-                              throw Exception('Image Worker HTTP ${response.statusCode}: ${response.body}');
+                              throw Exception('Cloudflare Worker Error: HTTP ${response.statusCode}');
                             }
 
                             final data = jsonDecode(response.body) as Map<String, dynamic>;
                             final imageUrl = data['imageUrl']?.toString();
-                            if (data['success'] != true || imageUrl == null || imageUrl.isEmpty) {
-                              throw Exception(data['error']?.toString() ?? 'Image generation failed.');
+
+                            if (imageUrl == null || imageUrl.isEmpty) {
+                              throw Exception('No valid image URL returned from Cloudflare Worker.');
                             }
 
                             setModalState(() {
@@ -2242,7 +2263,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
                             setModalState(() => isGenerating = false);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('AI image error: $e')),
+                                SnackBar(content: Text('Cloudflare AI Worker error: $e')),
                               );
                             }
                           }
@@ -2371,7 +2392,6 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🌟 1-TAP INSTANT SNAP LAUNCH BANNER
             GestureDetector(
               onTap: () => _open24hThoughtCreator(context),
               child: Container(
@@ -2529,7 +2549,7 @@ class _TransmissionStudioScreenState extends State<TransmissionStudioScreen> {
 }
 
 // ==================================================
-// TAB 4: THE ORACLE'S SANCTUM (DEVELOPER HUB & 20 QUESTIONS)
+// TAB 4: THE ORACLE'S SANCTUM (DEVELOPER CONTROLLED)
 // ==================================================
 class OracleSanctumScreen extends StatefulWidget {
   final Color accentColor;
@@ -2549,6 +2569,29 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+  }
+
+  void _confirmDeleteDoc(BuildContext context, String collectionName, String docId, String itemType) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kCardDark,
+        title: Text('PURGE $itemType', style: const TextStyle(color: kHorrorCrimson, fontWeight: FontWeight.bold, fontSize: 14)),
+        content: Text('Permanently remove this $itemType as Developer?', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: kHorrorCrimson),
+            onPressed: () async {
+              await FirebaseFirestore.instance.collection(collectionName).doc(docId).delete();
+              if (ctx.mounted) Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$itemType purged.')));
+            },
+            child: const Text('DELETE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showPublishStoryDialog(BuildContext context) {
@@ -2766,13 +2809,23 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                               decoration: BoxDecoration(color: isPrize ? kAncientGold.withOpacity(0.2) : kNeonPurple.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
                               child: Text(isPrize ? '🏆 PRIZE ANNOUNCEMENT' : '👑 CREATOR CHRONICLE', style: TextStyle(color: isPrize ? kAncientGold : kNeonCyan, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.copy_rounded, size: 18, color: Colors.white70),
-                              tooltip: 'Copy Story Text',
-                              onPressed: () {
-                                Clipboard.setData(ClipboardData(text: content));
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chronicle text copied to clipboard!')));
-                              },
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.copy_rounded, size: 18, color: Colors.white70),
+                                  tooltip: 'Copy Story Text',
+                                  onPressed: () {
+                                    Clipboard.setData(ClipboardData(text: content));
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chronicle text copied to clipboard!')));
+                                  },
+                                ),
+                                if (isDeveloper)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, size: 18, color: kHorrorCrimson),
+                                    tooltip: 'Purge Chronicle',
+                                    onPressed: () => _confirmDeleteDoc(context, 'developer_broadcasts', docs[i].id, 'Chronicle'),
+                                  ),
+                              ],
                             ),
                           ],
                         ),
@@ -2906,10 +2959,21 @@ class _OracleSanctumScreenState extends State<OracleSanctumScreen> with SingleTi
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text('Asked by @$askedBy', style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(color: isAnswered ? kMistyGreen.withOpacity(0.2) : kHorrorCrimson.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                                    child: Text(isAnswered ? AppLanguage.tr('solved_tag') : AppLanguage.tr('pending_tag'), style: TextStyle(color: isAnswered ? kMistyGreen : kHorrorCrimson, fontSize: 9, fontWeight: FontWeight.bold)),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(color: isAnswered ? kMistyGreen.withOpacity(0.2) : kHorrorCrimson.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                                        child: Text(isAnswered ? AppLanguage.tr('solved_tag') : AppLanguage.tr('pending_tag'), style: TextStyle(color: isAnswered ? kMistyGreen : kHorrorCrimson, fontSize: 9, fontWeight: FontWeight.bold)),
+                                      ),
+                                      if (isDeveloper)
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, size: 18, color: kHorrorCrimson),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          onPressed: () => _confirmDeleteDoc(context, 'daily_questions', qDocs[i].id, 'Question'),
+                                        ),
+                                    ],
                                   ),
                                 ],
                               ),
